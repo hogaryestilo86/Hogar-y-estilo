@@ -31,20 +31,19 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Filtramos y limpiamos productos demo anteriores para dejarle la tienda vacía
-        const hasDemoItems = Array.isArray(parsed) && parsed.some(p => p && p.id && p.id.includes("prod-"));
-        if (hasDemoItems) {
-          localStorage.removeItem("store_products_list");
-          return [];
-        }
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) { /* ignore */ }
     }
-    return [];
+    return INITIAL_PRODUCTS;
   });
 
   useEffect(() => {
-    localStorage.setItem("store_products_list", JSON.stringify(products));
+    try {
+      localStorage.setItem("store_products_list", JSON.stringify(products));
+    } catch (e) {
+      console.warn("No se pudo persistir la lista de productos en el almacenamiento local por límite de cuota (datos multimedia de gran tamaño):", e);
+      // We don't want to show an annoying alert/toast constantly on every render, but we log it for diagnostic
+    }
   }, [products]);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -55,11 +54,27 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
 
+  // Elegant floating toast state for non-blocking notifications
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   // Calculamos los productos destacados dinámicamente para la vitrina deslizable manualmente
   const showcasePhotos = products
     .filter(p => p && p.featured)
     .map(p => ({
       url: p.media?.[0]?.url || "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85",
+      type: p.media?.[0]?.type || "image",
       title: p.title,
       desc: p.description
     }));
@@ -88,21 +103,22 @@ export default function App() {
     localStorage.setItem("admin_notification_email", newEmail);
   };
 
+  // Custom configured Admin WhatsApp Phone for alerts (loaded dynamically & persisted)
+  const [adminPhone, setAdminPhone] = useState<string>(() => {
+    return localStorage.getItem("admin_notification_phone") || "5493416555555";
+  });
+
+  const handleAdminPhoneChange = (newPhone: string) => {
+    setAdminPhone(newPhone);
+    localStorage.setItem("admin_notification_phone", newPhone);
+  };
+
   // Analytics Metrics (Requerimiento 6 de Estadísticas)
   const [storeMetrics, setStoreMetrics] = useState(() => {
     const saved = localStorage.getItem("store_metrics_data");
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.viewsCount === 1428) {
-          return {
-            viewsCount: 0,
-            abandonedCartCount: 0,
-            purchasesCount: 0,
-            pendingDispatchesCount: 0,
-          };
-        }
-        return parsed;
+        return JSON.parse(saved);
       } catch (e) { /* ignore */ }
     }
     return {
@@ -113,66 +129,16 @@ export default function App() {
     };
   });
 
-  // Dynamic Orders Database (Requerimiento 6 de Control de envíos)
+  // Dynamic Orders Database (Requerimiento 6 de Control de envíos) - Empieza vacío para ser completamente prolijo y profesional
   const [pendingOrders, setPendingOrders] = useState<any[]>(() => {
     const saved = localStorage.getItem("store_pending_orders_list");
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+      try { 
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) { /* ignore */ }
     }
-    return [
-      {
-        id: "ord-1011",
-        date: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-        details: {
-          fullName: "Santiago Pérez",
-          email: "santi.perez88@gmail.com",
-          phone: "3416554321",
-          address: "Av. Pellegrini 1420, Piso 4B",
-          city: "Rosario",
-          zipCode: "2000",
-          paymentMethod: "transfer",
-          installments: 3,
-        },
-        items: [
-          {
-            product: {
-              id: "prod-alba-aura",
-              title: "Velador Nórdico de Mesa Alba Aura",
-              basePrice: 38500,
-              category: "Iluminación",
-            },
-            quantity: 1,
-          }
-        ],
-        status: "pending",
-      },
-      {
-        id: "ord-1012",
-        date: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
-        details: {
-          fullName: "Ignacio Demarchi",
-          email: "nacho.demarchi@hotmail.com",
-          phone: "3413887766",
-          address: "San Martín 920, Torre 1",
-          city: "Rosario",
-          zipCode: "2000",
-          paymentMethod: "installments",
-          installments: 3,
-        },
-        items: [
-          {
-            product: {
-              id: "prod-utensilios-bambu",
-              title: "Set de Utensilios de Cocina Bambú Natural Orgánico",
-              basePrice: 19500,
-              category: "Cocina",
-            },
-            quantity: 1,
-          }
-        ],
-        status: "pending",
-      }
-    ];
+    return [];
   });
 
   // Dynamic Bank Transfer coordinates configuration (Requerimiento de datos bancarios)
@@ -192,15 +158,27 @@ export default function App() {
 
   // Safe side effects persistence sync
   useEffect(() => {
-    localStorage.setItem("store_metrics_data", JSON.stringify(storeMetrics));
+    try {
+      localStorage.setItem("store_metrics_data", JSON.stringify(storeMetrics));
+    } catch (e) {
+      console.warn("Storage error for storeMetrics:", e);
+    }
   }, [storeMetrics]);
 
   useEffect(() => {
-    localStorage.setItem("store_pending_orders_list", JSON.stringify(pendingOrders));
+    try {
+      localStorage.setItem("store_pending_orders_list", JSON.stringify(pendingOrders));
+    } catch (e) {
+      console.warn("Storage error for pendingOrders:", e);
+    }
   }, [pendingOrders]);
 
   useEffect(() => {
-    localStorage.setItem("store_bank_details", JSON.stringify(bankDetails));
+    try {
+      localStorage.setItem("store_bank_details", JSON.stringify(bankDetails));
+    } catch (e) {
+      console.warn("Storage error for bankDetails:", e);
+    }
   }, [bankDetails]);
 
   // Page Views automatic mount increment
@@ -273,6 +251,12 @@ export default function App() {
     setProducts((prev) => [newProduct, ...prev]);
   };
 
+  const handleUpdateProduct = (updatedProduct: Product) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+    );
+  };
+
   const handleDeleteProduct = (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
   };
@@ -317,7 +301,11 @@ export default function App() {
     const orderToDelete = pendingOrders.find(o => o.id === orderId);
     const updatedOrders = pendingOrders.filter((ord) => ord.id !== orderId);
     setPendingOrders(updatedOrders);
-    localStorage.setItem("store_pending_orders_list", JSON.stringify(updatedOrders));
+    try {
+      localStorage.setItem("store_pending_orders_list", JSON.stringify(updatedOrders));
+    } catch (e) {
+      console.warn("Storage error:", e);
+    }
     
     // Si borramos un pedido pendiente, decrementamos las dispatches en cola para que duren 0
     if (orderToDelete && orderToDelete.status === "pending") {
@@ -336,7 +324,11 @@ export default function App() {
       pendingDispatchesCount: 0,
     };
     setStoreMetrics(defaultStats);
-    localStorage.setItem("store_metrics_data", JSON.stringify(defaultStats));
+    try {
+      localStorage.setItem("store_metrics_data", JSON.stringify(defaultStats));
+    } catch (e) {
+      console.warn("Storage error:", e);
+    }
   };
 
   // Secret keyboard listener to trigger admin panel access (Ctrl + Alt + A)
@@ -574,9 +566,12 @@ export default function App() {
           <AdminPanel
             products={products}
             onAddProduct={handleAddCustomProduct}
+            onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
             adminEmail={adminEmail}
             onAdminEmailChange={handleAdminEmailChange}
+            adminPhone={adminPhone}
+            onAdminPhoneChange={handleAdminPhoneChange}
             storeMetrics={storeMetrics}
             pendingOrders={pendingOrders}
             onMarkOrderAsShipped={handleMarkOrderAsShipped}
@@ -584,6 +579,7 @@ export default function App() {
             onBankDetailsChange={setBankDetails}
             onDeleteOrder={handleDeleteOrder}
             onResetMetrics={handleResetMetrics}
+            showToast={showToast}
           />
         )}
       </main>
@@ -692,6 +688,7 @@ export default function App() {
           handleAddToCart(p);
           setSelectedProduct(null); // Auto close details panel
         }}
+        showToast={showToast}
       />
 
       {/* CHECKOUT FLOW AND CHANNELS GATEWAY */}
@@ -701,8 +698,10 @@ export default function App() {
         cartItems={cartItems}
         clearCart={handleClearCart}
         adminEmail={adminEmail}
+        adminPhone={adminPhone}
         onOrderComplete={handleOrderComplete}
         bankDetails={bankDetails}
+        showToast={showToast}
       />
 
       {/* STICKY INSTAGRAM FLOATING ATTENTION WIDGET Chat (Requerimiento 5) */}
@@ -793,6 +792,16 @@ export default function App() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* CUSTOM FLOATING TOAST NOTIFICATION CONTAINER WITH HIGH-CONTRAST NEUTRAL STYLE */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[100] max-w-sm bg-brand-900 text-brand-100 px-5 py-4 rounded-xl shadow-2xl border border-brand-800 flex items-center justify-between gap-4 select-none animate-bounce-short">
+          <p className="text-xs font-bold font-sans flex items-center gap-2">
+            <span>✨</span> {toast.message}
+          </p>
+          <button onClick={() => setToast(null)} className="text-brand-400 hover:text-white text-xs font-bold px-1.5 py-0.5 cursor-pointer">×</button>
         </div>
       )}
 

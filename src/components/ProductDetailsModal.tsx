@@ -5,13 +5,15 @@
 
 import React, { useState } from "react";
 import { Product, ProductReview } from "../types";
-import { X, Star, ShoppingCart, Check, ShieldCheck, Heart, Sparkles, MessageSquare, Plus, Send, Truck } from "lucide-react";
+import { X, Star, ShoppingCart, Check, ShieldCheck, Heart, Sparkles, MessageSquare, Plus, Send, Truck, Volume2, VolumeX } from "lucide-react";
+import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface ProductDetailsModalProps {
   product: Product | null;
   isOpen: boolean;
   onClose: () => void;
   onAddToCart: (product: Product) => void;
+  showToast?: (message: string, type?: "success" | "error" | "info") => void;
 }
 
 export default function ProductDetailsModal({
@@ -19,6 +21,7 @@ export default function ProductDetailsModal({
   isOpen,
   onClose,
   onAddToCart,
+  showToast,
 }: ProductDetailsModalProps) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [commentName, setCommentName] = useState("");
@@ -26,13 +29,24 @@ export default function ProductDetailsModal({
   const [commentText, setCommentText] = useState("");
   const [localReviews, setLocalReviews] = useState<Record<string, ProductReview[]>>({});
   const [liked, setLiked] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); // Default to unmuted so sound is enabled check
+
+  const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
+    if (showToast) {
+      showToast(msg, type);
+    } else {
+      console.log(`[Toast Fallback] ${type.toUpperCase()}: ${msg}`);
+    }
+  };
 
   if (!isOpen || !product) return null;
+
+  const activeMediaList = product.media || [];
 
   const handleAddReview = (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentName.trim() || !commentText.trim()) {
-      alert("Por favor completa tu nombre y tu reseña para continuar.");
+      notify("Por favor completa tu nombre y tu reseña para continuar.", "error");
       return;
     }
 
@@ -107,19 +121,33 @@ export default function ProductDetailsModal({
         {/* Left Side: Media gallery & player */}
         <div className="w-full md:w-1/2 bg-white flex flex-col justify-between border-r border-brand-200 p-4 sm:p-6 overflow-y-auto max-h-[40vh] md:max-h-full">
           <div className="relative w-full aspect-square rounded-xl bg-brand-100 overflow-hidden border border-brand-200">
-            {product.media[activeMediaIndex]?.type === "video" ? (
-              <video
-                src={product.media[activeMediaIndex].url}
-                className="w-full h-full object-cover"
-                autoPlay
-                muted
-                loop
-                playsInline
-                controls
-              />
+            {activeMediaList[activeMediaIndex]?.type === "video" ? (
+              <div className="relative w-full h-full flex items-center justify-center bg-black">
+                <ResolvedVideo
+                  src={activeMediaList[activeMediaIndex].url}
+                  className="w-full h-full object-cover"
+                  autoPlay
+                  muted={isMuted}
+                  loop
+                  playsInline
+                  controls
+                />
+                {/* Botón flotante para silenciar/activar sonido */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                     e.stopPropagation();
+                     setIsMuted(!isMuted);
+                  }}
+                  className="absolute bottom-16 right-4 z-40 bg-brand-900/90 hover:bg-black text-white p-2.5 rounded-full shadow-lg border border-brand-800 transition-all active:scale-95 flex items-center justify-center cursor-pointer hover:scale-105"
+                  title={isMuted ? "Activar sonido" : "Silenciar video"}
+                >
+                  {isMuted ? <VolumeX className="w-5 h-5 text-red-100" /> : <Volume2 className="w-5 h-5 text-white animate-pulse" />}
+                </button>
+              </div>
             ) : (
-              <img
-                src={product.media[activeMediaIndex]?.url}
+              <ResolvedImage
+                src={activeMediaList[activeMediaIndex]?.url || getCategoryPlaceholder(product?.category)}
                 alt={product.title}
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
@@ -134,9 +162,9 @@ export default function ProductDetailsModal({
           </div>
 
           {/* Media thumbnails track */}
-          {product.media.length > 1 && (
+          {activeMediaList.length > 1 && (
             <div className="flex gap-2.5 mt-4 overflow-x-auto pb-1">
-              {product.media.map((item, idx) => (
+              {activeMediaList.map((item, idx) => (
                 <button
                   key={idx}
                   onClick={() => setActiveMediaIndex(idx)}
@@ -150,7 +178,7 @@ export default function ProductDetailsModal({
                       <span className="text-white text-xs font-bold leading-none">VÍDEO</span>
                     </div>
                   ) : (
-                    <img
+                    <ResolvedImage
                       src={item.url}
                       alt={`Thumbnail ${idx + 1}`}
                       referrerPolicy="no-referrer"

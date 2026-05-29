@@ -5,7 +5,8 @@
 
 import React, { useState, useRef } from "react";
 import { Product } from "../types";
-import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft } from "lucide-react";
+import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft, Volume2, VolumeX } from "lucide-react";
+import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface ProductCardProps {
   key?: string;
@@ -21,6 +22,7 @@ export default function ProductCard({
 }: ProductCardProps) {
   const [hovered, setHovered] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
+  const [isMuted, setIsMuted] = useState(true); // Cards start muted for silent grid scrolling
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Auto price variables
@@ -29,7 +31,7 @@ export default function ProductCard({
   const transferPrice = Math.round(listPrice * 0.85);
 
   const mediaList = product?.media || [];
-  const activeMedia = mediaList[mediaIndex] || mediaList[0] || { type: "image", url: "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85" };
+  const activeMedia = mediaList[mediaIndex] || mediaList[0] || { type: "image", url: getCategoryPlaceholder(product?.category) };
   const hasMultipleMedia = mediaList.length > 1;
 
   const handleMouseEnter = () => {
@@ -78,17 +80,31 @@ export default function ProductCard({
         {/* Media display */}
         <div className="w-full h-full relative">
           {activeMedia.type === "video" ? (
-            <video
-              ref={videoRef}
-              src={activeMedia.url}
-              className="w-full h-full object-cover"
-              autoPlay
-              muted
-              loop
-              playsInline
-            />
+            <div className="w-full h-full relative">
+              <ResolvedVideo
+                ref={videoRef}
+                src={activeMedia.url}
+                className="w-full h-full object-cover"
+                autoPlay
+                muted={isMuted}
+                loop
+                playsInline
+              />
+              {/* Botón flotante para silenciar/activar sonido en tarjetas */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation(); // Evita abrir los detalles al tocar el silenciador
+                  setIsMuted(!isMuted);
+                }}
+                className="absolute bottom-3 right-3 z-30 bg-black/60 hover:bg-black/85 text-white p-1.5 rounded-full shadow-lg border border-white/20 transition-all active:scale-90 flex items-center justify-center cursor-pointer pointer-events-auto hover:scale-105"
+                title={isMuted ? "Activar sonido" : "Silenciar"}
+              >
+                {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-200" /> : <Volume2 className="w-3.5 h-3.5 text-white animate-pulse" />}
+              </button>
+            </div>
           ) : (
-            <img
+            <ResolvedImage
               src={activeMedia.url}
               alt={product.title}
               loading="lazy"
@@ -101,7 +117,7 @@ export default function ProductCard({
         {/* Floating Indicator Dots for gallery */}
         {hasMultipleMedia && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 z-20 bg-brand-900/40 px-2 py-1 rounded-full backdrop-blur-sm pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            {product.media.map((_, idx) => (
+            {mediaList.map((_, idx) => (
               <span
                 key={idx}
                 className={`w-1.5 h-1.5 rounded-full transition-all ${

@@ -13,8 +13,10 @@ interface CheckoutModalProps {
   cartItems: CartItem[];
   clearCart: () => void;
   adminEmail: string;
+  adminPhone: string;
   onOrderComplete?: (orderDetails: OrderDetails, cartItems: CartItem[]) => void;
   bankDetails: BankDetails;
+  showToast?: (message: string, type?: "success" | "error" | "info") => void;
 }
 
 export default function CheckoutModal({
@@ -23,8 +25,10 @@ export default function CheckoutModal({
   cartItems,
   clearCart,
   adminEmail,
+  adminPhone,
   onOrderComplete,
   bankDetails,
+  showToast,
 }: CheckoutModalProps) {
   const [step, setStep] = useState<"form" | "payment" | "success">("form");
   const [formData, setFormData] = useState<OrderDetails>({
@@ -40,6 +44,14 @@ export default function CheckoutModal({
 
   const [loading, setLoading] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+
+  const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
+    if (showToast) {
+      showToast(msg, type);
+    } else {
+      console.log(`[Toast Fallback] ${type.toUpperCase()}: ${msg}`);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -63,7 +75,7 @@ export default function CheckoutModal({
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName || !formData.email || !formData.address || !formData.phone) {
-      alert("Por favor, completa los campos requeridos para continuar.");
+      notify("Por favor, completa los campos requeridos para continuar.", "error");
       return;
     }
     setStep("payment");
@@ -525,40 +537,106 @@ export default function CheckoutModal({
             </div>
           )}
 
-          {step === "success" && (
-            <div className="py-8 text-center space-y-6">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-700 shadow-md">
-                <CheckCircle className="w-10 h-10" />
-              </div>
+          {step === "success" && (() => {
+            const isTransfer = formData.paymentMethod === "transfer";
+            const toPay = isTransfer ? transferTotal : finalListTotal;
+            
+            const buildOrderSummaryText = () => {
+              const methodText = isTransfer ? "Transferencia Bancaria (-15% OFF)" : "Tarjeta de Crédito (3 cuotas sin interés)";
+              
+              let text = `📦 NUEVO COMPROBANTE DE COMPRA - HOGAR & ESTILO\n\n`;
+              text += `👤 Cliente: ${formData.fullName}\n`;
+              text += `📞 Teléfono: ${formData.phone}\n`;
+              text += `📧 Email: ${formData.email}\n`;
+              text += `📍 Envío a: ${formData.address}, ${formData.city} (CP: ${formData.zipCode || "N/A"})\n`;
+              text += `💳 Método de Pago: ${methodText}\n\n`;
+              text += `🛒 Detalle del Pedido:\n`;
+              
+              cartItems.forEach((item) => {
+                text += `• ${item.quantity}x ${item.product.title} - $${new Intl.NumberFormat("es-AR").format(item.product.basePrice)}\n`;
+              });
+              
+              text += `\n💵 Importe Total: ${formatCurrency(toPay)}\n`;
+              
+              if (isTransfer) {
+                text += `\n🏦 CBU Bancario para Transferir:\n`;
+                text += `Banco: ${bankDetails.bankName}\n`;
+                text += `CBU: ${bankDetails.cbu}\n`;
+                text += `Alias: ${bankDetails.alias}\n`;
+                text += `Titular: ${bankDetails.accountHolder}\n`;
+              }
+              
+              return text;
+            };
 
-              <div className="space-y-2">
-                <h4 className="font-serif text-2xl sm:text-3xl font-bold text-brand-900">
-                  ¡Muchas gracias por tu compra!
-                </h4>
-                <p className="text-sm text-brand-600 max-w-md mx-auto font-light">
-                  Hemos recibido tu orden de compra para <strong>{formData.fullName}</strong>. Un correo electrónico de confirmación con los detalles del envío y el código de seguimiento ha sido enviado a <strong>{formData.email}</strong>.
-                </p>
-              </div>
+            const orderText = buildOrderSummaryText();
+            const cleanPhone = adminPhone ? adminPhone.replace(/[^0-9]/g, "") : "5493416555555";
+            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderText)}`;
+            const mailtoUrl = `mailto:${adminEmail}?subject=Nuevo Pedido Hogar %26 Estilo - ${encodeURIComponent(formData.fullName)}&body=${encodeURIComponent(orderText)}`;
 
-              {formData.paymentMethod === "transfer" && (
-                <div className="bg-green-50 border border-green-200 p-4 rounded-xl max-w-md mx-auto text-left text-xs space-y-2">
-                  <p className="font-semibold text-green-800">📌 Recuerda enviar tu comprobante bancario:</p>
-                  <p className="text-brand-700">
-                    Asegura tu reserva transfiriendo el importe de <strong className="text-green-700">{formatCurrency(transferTotal)}</strong> y envía el comprobante al Instagram <a href="https://instagram.com/deco.home.rosario" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-brand-900">@deco.home.rosario</a> indicando tu nombre.
+            return (
+              <div className="py-6 text-center space-y-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-700 shadow-md">
+                  <CheckCircle className="w-10 h-10" />
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-serif text-2xl sm:text-3xl font-bold text-brand-900">
+                    ¡Muchas gracias por tu compra!
+                  </h4>
+                  <p className="text-xs sm:text-sm text-brand-600 max-w-md mx-auto font-light">
+                    Hemos registrado tu pedido para <strong>{formData.fullName}</strong> en nuestro panel de control de envíos locales.
                   </p>
                 </div>
-              )}
 
-              <div className="pt-6">
-                <button
-                  onClick={handleFinish}
-                  className="bg-brand-900 hover:bg-black text-brand-50 px-8 py-3 rounded-full text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all shadow-md cursor-pointer"
-                >
-                  Volver a la Tienda
-                </button>
+                {/* Direct Action Channels Dispatch Box */}
+                <div className="bg-white border border-brand-200 p-5 rounded-2xl max-w-md mx-auto text-left space-y-3 shadow-xs">
+                  <p className="font-bold text-xs uppercase tracking-wider text-brand-800 text-center">
+                    📲 ¡Envía tu pedido al vendedor para agilizar el despacho!
+                  </p>
+                  <p className="text-[11px] text-brand-500 text-center font-light leading-relaxed">
+                    Puedes notificar al propietario al instante presionando los botones de abajo. Tu comprobante se cargará listo para enviar por Email o WhatsApp.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <a
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-bold text-[11px] py-3 px-3 rounded-lg shadow-sm transition-all uppercase tracking-wider text-center"
+                    >
+                      <span>Por WhatsApp</span>
+                      <span className="text-xs">💬</span>
+                    </a>
+                    <a
+                      href={mailtoUrl}
+                      className="flex items-center justify-center gap-1.5 bg-brand-900 hover:bg-black text-brand-50 font-bold text-[11px] py-3 px-3 rounded-lg shadow-sm transition-all uppercase tracking-wider text-center"
+                    >
+                      <span>Por E-mail</span>
+                      <span className="text-xs">✉️</span>
+                    </a>
+                  </div>
+                </div>
+
+                {isTransfer && (
+                  <div className="bg-green-50 border border-green-200 p-4 rounded-xl max-w-md mx-auto text-left text-xs space-y-2">
+                    <p className="font-semibold text-green-800">📌 Recuerda transferir para guardar la seña:</p>
+                    <p className="text-brand-700 leading-relaxed font-light">
+                      Transfiere el importe de <strong className="text-green-750 font-serif font-black">{formatCurrency(transferTotal)}</strong> y envía el comprobante bancario por cualquiera de los canales de arriba o por nuestro Instagram principal.
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-4">
+                  <button
+                    onClick={handleFinish}
+                    className="bg-brand-900 hover:bg-black text-brand-50 px-8 py-3 rounded-full text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all shadow-md cursor-pointer"
+                  >
+                    Volver a la Tienda
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@
 import React from "react";
 import { CartItem } from "../types";
 import { X, ArrowRight, Trash2, ShieldCheck, HelpCircle, Truck, RefreshCw } from "lucide-react";
+import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface SlideOutCartProps {
   isOpen: boolean;
@@ -135,20 +136,35 @@ export default function SlideOutCart({
             ) : (
               cartItems.map((item) => {
                 const product = item.product;
-                const mediaUrl = product.media[0]?.url || "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15";
+                const activeMedia = product.media && product.media.length > 0 ? product.media[0] : null;
+                const isVideoMedia = activeMedia?.type === "video";
+                const mediaUrl = activeMedia?.url || getCategoryPlaceholder(product.category);
                 
                 return (
                   <div 
                     key={product.id}
                     className="flex bg-white rounded-lg p-3 border border-brand-200 hover:border-brand-300 shadow-xs transition-shadow relative"
                   >
-                    {/* Image Preview */}
-                    <img
-                      src={mediaUrl}
-                      alt={product.title}
-                      referrerPolicy="no-referrer"
-                      className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border border-brand-200"
-                    />
+                    {/* Image or Video Preview */}
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-md border border-brand-200 overflow-hidden bg-brand-100 shrink-0 relative flex items-center justify-center">
+                      {isVideoMedia ? (
+                        <ResolvedVideo
+                          src={mediaUrl}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                          autoPlay
+                          loop
+                        />
+                      ) : (
+                        <ResolvedImage
+                          src={mediaUrl}
+                          alt={product.title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
 
                     {/* Meta info */}
                     <div className="ml-3 sm:ml-4 flex-1 flex flex-col justify-between">

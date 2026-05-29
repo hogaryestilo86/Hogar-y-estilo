@@ -6,9 +6,11 @@
 import React, { useRef } from "react";
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight } from "lucide-react";
 import { resolveImageUrl } from "../App";
+import { ResolvedImage, ResolvedVideo } from "../indexedDbMedia";
 
 interface ShowcasePhoto {
   url: string;
+  type?: string;
   title: string;
   desc: string;
 }
@@ -86,7 +88,8 @@ export default function HeroSlider({ showcasePhotos }: HeroSliderProps) {
       >
         {showcasePhotos.map((item, idx) => {
           const resolvedUrl = resolveImageUrl(item.url);
-          const isVideo = resolvedUrl.toLowerCase().endsWith(".mp4") || 
+          const isVideo = item.type === "video" || 
+                          resolvedUrl.toLowerCase().endsWith(".mp4") || 
                           resolvedUrl.toLowerCase().endsWith(".webm") || 
                           resolvedUrl.includes("video") || 
                           resolvedUrl.startsWith("data:video");
@@ -99,7 +102,7 @@ export default function HeroSlider({ showcasePhotos }: HeroSliderProps) {
               {/* Card Image/Video Container */}
               <div className="relative h-[220px] overflow-hidden bg-brand-50 flex items-center justify-center">
                 {isVideo ? (
-                  <video
+                  <ResolvedVideo
                     src={resolvedUrl}
                     className="w-full h-full object-cover pointer-events-none"
                     autoPlay
@@ -108,11 +111,11 @@ export default function HeroSlider({ showcasePhotos }: HeroSliderProps) {
                     playsInline
                   />
                 ) : (
-                  <img
+                  <ResolvedImage
                     src={resolvedUrl}
                     alt={item.title}
                     onError={(e) => {
-                      e.currentTarget.src = "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85";
+                      e.currentTarget.src = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
                     }}
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     loading="lazy"

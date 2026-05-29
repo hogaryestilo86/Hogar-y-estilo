@@ -6,14 +6,18 @@
 import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
-import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check } from "lucide-react";
+import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil } from "lucide-react";
+import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache } from "../indexedDbMedia";
 
 interface AdminPanelProps {
   products: Product[];
   onAddProduct: (product: Product) => void;
+  onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
   adminEmail: string;
   onAdminEmailChange: (email: string) => void;
+  adminPhone?: string;
+  onAdminPhoneChange?: (phone: string) => void;
   storeMetrics: {
     viewsCount: number;
     abandonedCartCount: number;
@@ -26,14 +30,18 @@ interface AdminPanelProps {
   onBankDetailsChange: (details: BankDetails) => void;
   onDeleteOrder: (orderId: string) => void;
   onResetMetrics: () => void;
+  showToast?: (message: string, type?: "success" | "error" | "info") => void;
 }
 
 export default function AdminPanel({
   products,
   onAddProduct,
+  onUpdateProduct,
   onDeleteProduct,
   adminEmail,
   onAdminEmailChange,
+  adminPhone = "5493416555555",
+  onAdminPhoneChange = () => {},
   storeMetrics,
   pendingOrders,
   onMarkOrderAsShipped,
@@ -41,11 +49,25 @@ export default function AdminPanel({
   onBankDetailsChange,
   onDeleteOrder,
   onResetMetrics,
+  showToast,
 }: AdminPanelProps) {
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [basePrice, setBasePrice] = useState("");
   const [category, setCategory] = useState("Cocina");
+  
+  // Custom non-blocking interactive states
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+
+  const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
+    if (showToast) {
+      showToast(msg, type);
+    } else {
+      console.log(`[Toast Fallback] ${type.toUpperCase()}: ${msg}`);
+    }
+  };
   const [featuresText, setFeaturesText] = useState(""); // Comma separated key features
   const [featured, setFeatured] = useState(false);
 
@@ -80,16 +102,82 @@ export default function AdminPanel({
 
   const handleClientApiKeyChange = (key: string) => {
     setClientApiKey(key);
-    if (key) {
-      localStorage.setItem("store_client_gemini_api_key", key);
-    } else {
-      localStorage.removeItem("store_client_gemini_api_key");
+    try {
+      if (key) {
+        localStorage.setItem("store_client_gemini_api_key", key);
+      } else {
+        localStorage.removeItem("store_client_gemini_api_key");
+      }
+    } catch (e) {
+      console.warn("No se pudo guardar la clave API en storage:", e);
     }
   };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          resolve(e.target.result as string);
+        } else {
+          reject(new Error("Error leyendo archivo"));
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 900;
+          const MAX_HEIGHT = 900;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+            resolve(dataUrl);
+          } else {
+            resolve(e.target?.result as string);
+          }
+        };
+        img.onerror = () => {
+          resolve(e.target?.result as string);
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => {
+        resolve("");
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -100,33 +188,55 @@ export default function AdminPanel({
       const file = files[i];
       const fileSizeInMB = file.size / (1024 * 1024);
 
-      // Validate format
       const isPhoto = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
       const isVideo = ["video/mp4", "video/webm"].includes(file.type);
 
       if (!isPhoto && !isVideo) {
-        alert(`El archivo "${file.name}" no posee un formato permitido.\nSolo se admiten imágenes (JPG, PNG, WebP) o videos (MP4, WebM).`);
+        notify(`El archivo "${file.name}" no posee un formato de imagen o video permitido. Solo se admiten imágenes (JPG, PNG, WebP) o videos (MP4, WebM).`, "error");
         continue;
       }
 
-      // Check size restrictions
-      if (isPhoto && fileSizeInMB > 5) {
-        alert(`La imagen "${file.name}" supera el límite máximo de 5MB (Tamaño actual: ${fileSizeInMB.toFixed(2)}MB).\nPor favor, optimiza o reduce el tamaño de la imagen.`);
+      if (isPhoto && fileSizeInMB > 7) {
+        notify(`La imagen "${file.name}" supera el límite de 7MB. Intenta con una imagen más liviana.`, "error");
         continue;
       }
 
       if (isVideo && fileSizeInMB > 50) {
-        alert(`El video "${file.name}" supera el límite máximo de 50MB (Tamaño actual: ${fileSizeInMB.toFixed(2)}MB).\nUtiliza contenedores comprimidos o duraciones más cortas.`);
+        notify(`El video "${file.name}" supera el límite máximo de 50MB (Tamaño actual: ${fileSizeInMB.toFixed(2)}MB).`, "error");
         continue;
       }
 
-      // Safe asynchronous read-out with URL.createObjectURL or FileReader as requested
-      // We will use URL.createObjectURL because it is instantaneous and works nicely in local previews:
-      const objectUrl = URL.createObjectURL(file);
-      updatedMedia.push({
-        type: isVideo ? "video" : "image",
-        url: objectUrl,
-      });
+      try {
+        if (isPhoto) {
+          // Guardar imagen en IndexedDB para máxima resolución y evitar cuota de LocalStorage
+          const idbUrl = await storeMedia(file);
+          updatedMedia.push({
+            type: "image",
+            url: idbUrl,
+          });
+        } else {
+          // Guardar video en IndexedDB para que persista entre sesiones de forma óptima
+          const idbUrl = await storeMedia(file);
+          updatedMedia.push({
+            type: "video",
+            url: idbUrl,
+          });
+        }
+      } catch (error) {
+        console.warn("IndexedDB storage failed, using dynamic local fallback URL for this session:", error);
+        try {
+          const fallbackUrl = URL.createObjectURL(file);
+          const fallbackKey = `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          inMemoryFallbackCache[fallbackKey] = fallbackUrl;
+          updatedMedia.push({
+            type: isPhoto ? "image" : "video",
+            url: `idb://${fallbackKey}`,
+          });
+        } catch (fallbackError) {
+          console.error("Local object URL creation also failed:", fallbackError);
+          notify(`No se pudo procesar el archivo "${file.name}".`, "error");
+        }
+      }
     }
 
     setMediaList(updatedMedia);
@@ -138,7 +248,7 @@ export default function AdminPanel({
     const backup = [...mediaList];
     const item = backup[index];
     if (item && item.url.startsWith("blob:")) {
-      URL.revokeObjectURL(item.url); // Clean out garbage collection memory leak
+      URL.revokeObjectURL(item.url);
     }
     backup.splice(index, 1);
     setMediaList(backup);
@@ -146,7 +256,7 @@ export default function AdminPanel({
 
   const optimizeDescriptionWithGemini = async () => {
     if (!description.trim() && !title.trim()) {
-      alert("Por favor, ingresa al menos un título tentativo o algunas notas descriptivas simples primero.");
+      notify("Por favor, ingresa al menos un título tentativo o algunas notas descriptivas simples primero.", "error");
       return;
     }
 
@@ -260,17 +370,28 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     }
   };
 
+  const handleCancelEdit = () => {
+    setTitle("");
+    setBasePrice("");
+    setCategory("Cocina");
+    setDescription("");
+    setFeaturesText("");
+    setMediaList([]);
+    setFeatured(false);
+    setEditingProductId(null);
+  };
+
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!title.trim() || !basePrice.trim() || !description.trim()) {
-      alert("Por favor completa los campos principales (Título, Precio Base y Descripción).");
+      notify("Por favor completa los campos principales (Título, Precio Base y Descripción).", "error");
       return;
     }
 
     const priceNum = parseFloat(basePrice);
     if (isNaN(priceNum) || priceNum <= 0) {
-      alert("Por favor ingresa un precio válido mayor a cero.");
+      notify("Por favor ingresa un precio válido mayor a cero.", "error");
       return;
     }
 
@@ -280,13 +401,42 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       : [
           {
             type: "image",
-            url: "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85",
+            url: getCategoryPlaceholder(category),
           }
         ];
 
     const featuresArray = featuresText
       ? featuresText.split(",").map((f) => f.trim()).filter((f) => f.length > 0)
       : ["Producto de fabricación artesanal cuidada", "Diseño de vanguardia", "Garantía oficial Hogar y Estilo"];
+
+    if (editingProductId) {
+      const original = products.find((p) => p.id === editingProductId);
+      const updatedProduct: Product = {
+        ...original,
+        id: editingProductId,
+        title: title.trim(),
+        basePrice: priceNum,
+        category: category,
+        description: description.trim(),
+        features: featuresArray,
+        media: productMedia,
+        featured: featured,
+        reviews: original?.reviews || [
+          {
+            id: `rev-auto-${Date.now()}`,
+            author: "Curador de Hogar y Estilo",
+            rating: 5,
+            comment: "Producto seleccionado minuciosamente por nuestro departamento de diseño.",
+            date: "Hoy"
+          }
+        ]
+      };
+
+      onUpdateProduct(updatedProduct);
+      handleCancelEdit();
+      notify(`¡El producto "${updatedProduct.title}" ha sido modificado con éxito!`, "success");
+      return;
+    }
 
     const newProduct: Product = {
       id: `prod-custom-${Date.now()}`,
@@ -319,7 +469,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     setFeaturesText("");
     setMediaList([]);
     setFeatured(false);
-    alert(`¡El producto "${newProduct.title}" ha sido creado con éxito y ya está mapeado en la tienda online!`);
+    notify(`¡El producto "${newProduct.title}" ha sido creado con éxito y ya está mapeado en la tienda online!`, "success");
   };
 
   const formatCurrency = (val: number) => {
@@ -364,18 +514,38 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           </h3>
           <p className="text-xs text-brand-600 font-light">Evolución en tiempo real de interacciones, carritos y despachos.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (confirm("¿Estás seguro de que deseas restablecer todas las estadísticas de visitas y carritos a 0 para comenzar tu negocio desde cero?")) {
-              onResetMetrics();
-            }
-          }}
-          className="inline-flex items-center gap-1.5 bg-white hover:bg-red-50 hover:text-red-700 border border-brand-300 hover:border-red-200 text-brand-800 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer active:scale-95"
-        >
-          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-          <span>Restablecer estadísticas a 0</span>
-        </button>
+        {!confirmReset ? (
+          <button
+            type="button"
+            onClick={() => setConfirmReset(true)}
+            className="inline-flex items-center gap-1.5 bg-white hover:bg-red-50 hover:text-red-700 border border-brand-300 hover:border-red-200 text-brand-800 text-[11px] font-bold uppercase tracking-wider px-3.5 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer active:scale-95 animate-none"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+            <span>Restablecer estadísticas a 0</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-1.5 px-3 animate-in fade-in duration-200">
+            <span className="text-red-800 font-bold text-[10.5px]">¿Borrar estadísticas?</span>
+            <button
+              type="button"
+              onClick={() => {
+                onResetMetrics();
+                setConfirmReset(false);
+                notify("Estadísticas restablecidas a 0 con éxito.", "success");
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] uppercase px-2.5 py-1 rounded-md cursor-pointer transition-all"
+            >
+              Sí, borrar
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmReset(false)}
+              className="bg-white border border-brand-200 hover:bg-brand-50 text-brand-800 font-bold text-[10px] uppercase px-2.5 py-1 rounded-md cursor-pointer transition-all"
+            >
+              No
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
@@ -528,18 +698,40 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                         )}
                       </td>
                       <td className="px-5 py-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`¿Estás seguro de que deseas eliminar permanentemente el pedido de ${order.details.fullName}?`)) {
-                              onDeleteOrder(order.id);
-                            }
-                          }}
-                          className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer inline-flex items-center justify-center"
-                          title="Eliminar este pedido"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </button>
+                        {confirmDeleteOrderId !== order.id ? (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteOrderId(order.id)}
+                            className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer inline-flex items-center justify-center"
+                            title="Eliminar este pedido"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 animate-in fade-in duration-200">
+                            <span className="text-[9px] font-bold text-red-700 leading-none">¿Borrar?</span>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onDeleteOrder(order.id);
+                                  setConfirmDeleteOrderId(null);
+                                  notify(`Se borró el pedido de ${order.details.fullName}.`, "success");
+                                }}
+                                className="bg-red-600 text-white font-extrabold text-[9.5px] px-1.5 py-0.5 rounded cursor-pointer hover:bg-red-700"
+                              >
+                                Sí
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteOrderId(null)}
+                                className="bg-white border border-brand-200 text-brand-800 font-extrabold text-[9.5px] px-1.5 py-0.5 rounded cursor-pointer hover:bg-brand-100"
+                              >
+                                No
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -564,33 +756,68 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 max-w-lg items-end pt-1">
-          <div className="flex-1 w-full">
-            <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1.5">
-              Tu Email de Notificaciones (Propietario de la Tienda)
-            </label>
-            <input
-              type="email"
-              required
-              placeholder="ejemplo@correo.com"
-              value={adminEmail}
-              onChange={(e) => onAdminEmailChange(e.target.value)}
-              className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-800 text-brand-900"
-            />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl pt-2">
+          {/* Email Channel Config */}
+          <div className="bg-brand-50/50 p-4 rounded-xl border border-brand-200/80 space-y-3 flex flex-col justify-between">
+            <div>
+              <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1">
+                📧 Tu Email de Recepción de Órdenes
+              </label>
+              <p className="text-[10px] text-brand-500 font-light mb-2">Las confirmaciones pre-armadas por mail se dirigirán a esta dirección.</p>
+              <input
+                type="email"
+                required
+                placeholder="ejemplo@correo.com"
+                value={adminEmail}
+                onChange={(e) => onAdminEmailChange(e.target.value)}
+                className="w-full bg-white border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-800 text-brand-900"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!adminEmail || !adminEmail.includes("@")) {
+                  notify("Por favor ingresa una dirección de correo válida.", "error");
+                  return;
+                }
+                notify(`¡Email de Notificación guardado!: ${adminEmail}`, "success");
+              }}
+              className="bg-brand-900 hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider py-2.5 px-4 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 flex items-center justify-center w-full shadow-xs"
+            >
+              Guardar Email de Enlace
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (!adminEmail || !adminEmail.includes("@")) {
-                alert("Por favor ingresa una dirección de correo válida.");
-                return;
-              }
-              alert(`¡Canal de Notificaciones Configurado!\n\nDe ahora en adelante, cada vez que un cliente concrete una compra en la tienda, todos los datos llegaran directamente a: ${adminEmail}`);
-            }}
-            className="bg-brand-900 hover:bg-black text-white text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 h-[38px] flex items-center justify-center whitespace-nowrap shadow-sm select-none"
-          >
-            Guardar Email de Enlace
-          </button>
+
+          {/* WhatsApp Channel Config */}
+          <div className="bg-brand-50/50 p-4 rounded-xl border border-brand-200/80 space-y-3 flex flex-col justify-between">
+            <div>
+              <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1">
+                💬 Tu Teléfono de WhatsApp Comercial
+              </label>
+              <p className="text-[10px] text-brand-500 font-light mb-2">Carga tu número de WhatsApp con código de país (Ej: 5493416555555).</p>
+              <input
+                type="text"
+                required
+                placeholder="Ejemplo: 5493416555555"
+                value={adminPhone}
+                onChange={(e) => onAdminPhoneChange(e.target.value)}
+                className="w-full bg-white border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-800 text-brand-900"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!adminPhone || adminPhone.length < 10) {
+                  notify("Por favor ingresa un número de teléfono válido con código de país.", "error");
+                  return;
+                }
+                notify(`¡WhatsApp de Notificación guardado!: +${adminPhone}`, "success");
+              }}
+              className="bg-brand-900 hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider py-2.5 px-4 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 flex items-center justify-center w-full shadow-xs"
+            >
+              Guardar WhatsApp de Enlace
+            </button>
+          </div>
         </div>
       </div>
 
@@ -672,7 +899,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             <button
               type="button"
               onClick={() => {
-                alert("¡Datos Bancarios Guardados!\n\nLos compradores verán exactamente estas coordenadas cuando seleccionen pagar con Transferencia.");
+                notify("¡Datos Bancarios Guardados! Los compradores verán esta cuenta al pagar con Transferencia.", "success");
               }}
               className="w-full bg-brand-900 hover:bg-black text-white text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 h-[38px] flex items-center justify-center shadow-sm select-none"
             >
@@ -685,14 +912,46 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Creation Form block (Left 2 columns) */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-brand-200 p-5 sm:p-6 shadow-sm">
-            <h3 className="font-serif text-xl sm:text-2xl font-bold text-brand-900 mb-6 flex items-center gap-1.5 border-b border-brand-100 pb-3">
-              <Plus className="w-6 h-6 text-brand-800" />
-              Cargar Nuevo Producto Premium
+        <div className="lg:col-span-2 space-y-6" id="admin-creation-form-panel">
+          <div className="bg-white rounded-2xl border border-brand-200 p-5 sm:p-6 shadow-sm transition-all focus-within:ring-1 focus-within:ring-brand-100">
+            <h3 className="font-serif text-xl sm:text-2xl font-bold text-brand-900 mb-6 flex items-center justify-between gap-1.5 border-b border-brand-100 pb-3">
+              <div className="flex items-center gap-1.5">
+                {editingProductId ? <Pencil className="w-5 h-5 text-brand-800 animate-pulse" /> : <Plus className="w-6 h-6 text-brand-800" />}
+                <span>{editingProductId ? "Modificar Producto Premium" : "Cargar Nuevo Producto Premium"}</span>
+              </div>
+              {editingProductId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="text-[10px] sm:text-xs font-sans font-bold uppercase tracking-wider bg-brand-100 hover:bg-brand-200 text-brand-800 border border-brand-200 rounded-full px-3 py-1 cursor-pointer transition-all active:scale-95"
+                >
+                  Cancelar Edición
+                </button>
+              )}
             </h3>
 
             <form onSubmit={handleCreateProduct} className="space-y-5">
+              {editingProductId && (
+                <div className="bg-brand-50/70 border-l-4 border-brand-800 p-4 rounded-r-xl text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2 animate-fadeIn" id="edit-mode-active-sticker">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-brand-900 flex items-center gap-1.5 uppercase tracking-wide">
+                      <span className="inline-block w-2 h-2 rounded-full bg-brand-800 animate-ping"></span>
+                      <span>✏️ Modo Edición Activo</span>
+                    </p>
+                    <p className="text-[11px] text-brand-700 font-light leading-relaxed">
+                      Estás modificando el producto <strong>"{title}"</strong>. Puedes cambiar su sección (abajo), reescribir su descripción con la IA, o eliminar y añadir nuevas imágenes del producto.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="bg-brand-100 hover:bg-brand-200 text-brand-800 text-[10px] uppercase tracking-wider font-bold py-1.5 px-3.5 rounded-full border border-brand-200 transition-all active:scale-95 cursor-pointer shrink-0"
+                  >
+                    Descartar Edición
+                  </button>
+                </div>
+              )}
+
               {/* Row 1: Title and Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -710,12 +969,12 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-brand-800 uppercase tracking-widest mb-1.5">
-                    Categoría *
+                    Sección o Colección de Tienda *
                   </label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden text-brand-900 font-medium"
+                    className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden text-brand-900 font-semibold cursor-pointer"
                   >
                     <option value="Cocina">Cocina</option>
                     <option value="Hogar">Hogar</option>
@@ -805,6 +1064,46 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   </div>
                 </div>
 
+                {/* Alternativa: Cargar multimedia mediante URL de internet */}
+                <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center bg-brand-50 border border-brand-200 rounded-xl p-3.5 shadow-2xs">
+                  <div className="flex-1 space-y-1 text-left">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-brand-700 block">O ingresa multimedia mediante una URL pública de Internet (Opcional):</span>
+                    <input
+                      type="url"
+                      id="media-url-manual-input"
+                      placeholder="Ej. https://tuservicio.com/foto.jpg o video.mp4"
+                      className="w-full bg-white border border-brand-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-brand-500 text-brand-900 outline-hidden"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inputEl = document.getElementById("media-url-manual-input") as HTMLInputElement;
+                      const urlVal = inputEl?.value?.trim();
+                      if (!urlVal) {
+                        notify("Por favor, ingresa una dirección URL válida.", "error");
+                        return;
+                      }
+                      
+                      const lowercaseUrl = urlVal.toLowerCase();
+                      const isVid = lowercaseUrl.endsWith(".mp4") || lowercaseUrl.endsWith(".webm") || lowercaseUrl.includes("video") || lowercaseUrl.startsWith("data:video");
+                      
+                      setMediaList([
+                        ...mediaList,
+                        {
+                          type: isVid ? "video" : "image",
+                          url: urlVal
+                        }
+                      ]);
+                      if (inputEl) inputEl.value = "";
+                      notify("Multimedia por URL agregada con éxito.", "success");
+                    }}
+                    className="bg-brand-900 hover:bg-black text-white font-serif font-bold text-xs uppercase tracking-wider px-4 py-2.5 rounded-lg cursor-pointer transition-all self-end sm:self-center whitespace-nowrap"
+                  >
+                    Agregar URL
+                  </button>
+                </div>
+
                 {/* File preview gallery */}
                 {mediaList.length > 0 && (
                   <div className="bg-brand-100 p-4 rounded-xl border border-brand-200 space-y-3">
@@ -813,9 +1112,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       {mediaList.map((item, index) => (
                         <div key={index} className="relative w-20 h-20 bg-white border border-brand-300 rounded-lg overflow-hidden group">
                           {item.type === "video" ? (
-                            <video src={item.url} className="w-full h-full object-cover" muted />
+                            <ResolvedVideo src={item.url} className="w-full h-full object-cover" muted />
                           ) : (
-                            <img src={item.url} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <ResolvedImage src={item.url} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           )}
                           <button
                             type="button"
@@ -922,13 +1221,22 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               </div>
 
               {/* Submit triggers */}
-              <div className="flex justify-end pt-3">
+              <div className="flex justify-end gap-3 pt-3">
+                {editingProductId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="bg-brand-50 hover:bg-brand-100 text-brand-800 border border-brand-200 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                  >
+                    Cancelar Edición
+                  </button>
+                )}
                 <button
                   type="submit"
                   className="bg-brand-900 hover:bg-black text-brand-100 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center gap-1.5 shadow-md hover:shadow-lg transition-transform active:scale-95 cursor-pointer"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  <span>Publicar e Incorporar Producto</span>
+                  <span>{editingProductId ? "Guardar Cambios de Producto" : "Publicar e Incorporar Producto"}</span>
                 </button>
               </div>
             </form>
@@ -943,7 +1251,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               Gestor de Productos Activos
             </h4>
             <p className="text-xs text-brand-600 font-light mb-4">
-              Visualiza tus productos de inventario. Puedes remover tus cargas personalizadas presionando el icono correspondiente.
+              Visualiza tus productos de inventario. Puedes modificar detalles/fotos, o remover cargas de la tienda.
             </p>
 
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
@@ -954,15 +1262,28 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 return (
                   <div 
                     key={item.id}
-                    className="flex bg-brand-50 rounded-lg p-2.5 border border-brand-200 items-center justify-between"
+                    className={`flex rounded-lg p-2.5 border items-center justify-between transition-all ${
+                      editingProductId === item.id 
+                        ? "bg-brand-50 border-brand-800 ring-1 ring-brand-800" 
+                        : "bg-brand-50/50 border-brand-200 hover:border-brand-300"
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <img
-                        src={item.media[0]?.url || "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15"}
-                        alt={item.title}
-                        className="w-12 h-12 rounded object-cover border border-brand-200 shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
+                      {item.media && item.media[0]?.type === "video" ? (
+                        <ResolvedVideo
+                          src={item.media[0]?.url}
+                          className="w-12 h-12 rounded object-cover border border-brand-200 shrink-0 bg-brand-100"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <ResolvedImage
+                          src={(item.media && item.media[0]?.url) || getCategoryPlaceholder(item.category)}
+                          alt={item.title}
+                          className="w-12 h-12 rounded object-cover border border-brand-200 shrink-0 bg-brand-100"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
                       <div>
                         <h5 className="text-xs font-serif font-bold text-brand-900 line-clamp-1">{item.title}</h5>
                         <p className="text-[10px] text-brand-500 mt-0.5 uppercase tracking-wide">{item.category}</p>
@@ -973,14 +1294,49 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       </div>
                     </div>
 
-                    {/* Delete actions for all products */}
-                    <button
-                      onClick={() => onDeleteProduct(item.id)}
-                      className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer shrink-0"
-                      title="Borrar de la tienda"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Modify Product button */}
+                      <button
+                        onClick={() => {
+                          setEditingProductId(item.id);
+                          setTitle(item.title);
+                          setBasePrice(item.basePrice.toString());
+                          setCategory(item.category || "Cocina");
+                          setDescription(item.description);
+                          setFeaturesText(item.features ? item.features.join(", ") : "");
+                          setMediaList(item.media || []);
+                          setFeatured(!!item.featured);
+                          
+                          // Smooth scroll to form in touch screens or desktops
+                          const formEl = document.getElementById("admin-creation-form-panel");
+                          if (formEl) {
+                            formEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }
+                        }}
+                        className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                          editingProductId === item.id 
+                            ? "text-brand-900 bg-brand-200" 
+                            : "text-brand-400 hover:text-brand-900 hover:bg-brand-200/50"
+                        }`}
+                        title="Modificar producto"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+
+                      {/* Delete actions for all products */}
+                      <button
+                        onClick={() => {
+                          if (editingProductId === item.id) {
+                            handleCancelEdit();
+                          }
+                          onDeleteProduct(item.id);
+                        }}
+                        className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                        title="Borrar de la tienda"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
