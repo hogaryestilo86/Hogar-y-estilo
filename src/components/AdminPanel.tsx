@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef } from "react";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
 import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check } from "lucide-react";
 
@@ -73,6 +74,19 @@ export default function AdminPanel({
   const [optimizing, setOptimizing] = useState(false);
   const [aiError, setAiError] = useState("");
 
+  const [clientApiKey, setClientApiKey] = useState(() => {
+    return localStorage.getItem("store_client_gemini_api_key") || (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
+  });
+
+  const handleClientApiKeyChange = (key: string) => {
+    setClientApiKey(key);
+    if (key) {
+      localStorage.setItem("store_client_gemini_api_key", key);
+    } else {
+      localStorage.removeItem("store_client_gemini_api_key");
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,6 +153,79 @@ export default function AdminPanel({
     setOptimizing(true);
     setAiError("");
 
+    const activeApiKey = clientApiKey?.trim() || "";
+
+    if (activeApiKey) {
+      try {
+        const ai = new GoogleGenAI({
+          apiKey: activeApiKey,
+          httpOptions: {
+            headers: {
+              "User-Agent": "aistudio-build",
+            },
+          },
+        });
+
+        const systemPrompt = `Eres un experto en redactar títulos de alta conversión, descripciones persuasivas y palabras clave de SEO para e-commerce de alta gama para la marca "Hogar y Estilo".
+A partir del título rudimentario y de la descripción o palabras sueltas provistas por el usuario, debes generar 3 campos optimizados:
+1. Un título de producto comercialmente atractivo, sofisticado y optimizado para SEO (ej: "Lámpara de Mesa de Madera Rústica Japandi" en lugar de "lampara de madera").
+2. Una descripción persuasiva adaptada para Argentina/Latinoamérica (Español Neutro), utilizando formato Markdown con:
+   - Un párrafo introductorio ultra elegante que evoque comodidad, orden o distinción.
+   - Una sección titulada "**Detalles de Diseño**" con una lista de ventajas clave, materiales sofisticados y usabilidad.
+   - Un sutil y persuasivo llamado a la acción sobre la renovación de sus ambientes cotidianos.
+3. El SEO "todo" o tags clave: Una lista de 5 a 6 palabras clave o características destacadas de SEO, separadas exactamente por una coma (ej: "mármol travertino real, mesa auxiliar japandi, estilo rústico moderno, decoración de salas minimalistas, calidad artesanal premium").
+
+Reglas críticas:
+- No hables de dropshipping abiertamente, enfócate en productos exclusivos de Hogar & Estilo.
+- Devuelve la respuesta STRICTLY en formato JSON válido de acuerdo al esquema solicitado sin markdown tags afuera. El campo de SEO debe ser "seoFeatures" con los tags de palabras clave separados por coma.`;
+
+        const userMessage = `Título provisto: "${title || ""}"
+Descripción básica / Notas del producto: "${description || ""}"`;
+
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: `${systemPrompt}\n\n${userMessage}`,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                title: { 
+                  type: Type.STRING, 
+                  description: "Título sofisticado de alta gama para el producto" 
+                },
+                description: { 
+                  type: Type.STRING, 
+                  description: "Descripción persuasiva en formato Markdown" 
+                },
+                seoFeatures: { 
+                  type: Type.STRING, 
+                  description: "Palabras clave de SEO separadas exclusivamente por coma" 
+                }
+              },
+              required: ["title", "description", "seoFeatures"]
+            }
+          }
+        });
+
+        const jsonText = response.text || "{}";
+        const parsedData = JSON.parse(jsonText);
+
+        if (parsedData.title) setTitle(parsedData.title);
+        if (parsedData.description) setDescription(parsedData.description);
+        if (parsedData.seoFeatures) setFeaturesText(parsedData.seoFeatures);
+        setOptimizing(false);
+        return; // Success on client-side call
+      } catch (sdkErr: any) {
+        console.warn("Fallo el SDK local de Gemini, reintentando con endpoint de servidor...", sdkErr);
+        if (sdkErr.message && (sdkErr.message.includes("API key") || sdkErr.message.includes("key"))) {
+          setAiError("La API Key provista para Vercel no es válida o está rechazada. Por favor verifícala.");
+          setOptimizing(false);
+          return;
+        }
+      }
+    }
+
     try {
       const response = await fetch("/api/optimize-description", {
         method: "POST",
@@ -155,7 +242,7 @@ export default function AdminPanel({
       try {
         data = await response.json();
       } catch (jsonErr) {
-        throw new Error("El motor inteligente de Gemini requiere que el servidor full-stack esté encendido. Si estás en modo estático (Vercel/GitHub Pages), esta funcionalidad no está disponible.");
+        throw new Error("Si estás usando Vercel o un servidor estático, la ruta /api de Node no está disponible. Para solucionarlo, por favor ingresa tu propia API Key de Gemini en la sección de configuración de abajo para ejecutar la IA directamente en tu navegador.");
       }
 
       if (!response.ok) {
@@ -794,6 +881,44 @@ export default function AdminPanel({
                 <p className="text-[10px] text-brand-500">
                   Tip: escribe un título simple o características básicas y presiona <strong>"Optimizar con IA"</strong>. El sistema de inteligencia artificial rellenará automáticamente el nombre profesional del producto, redactará una descripción persuasiva y cargará etiquetas clave de SEO por ti.
                 </p>
+
+                {/* Vercel Client-Side API Key Input Option */}
+                <div className="bg-brand-50/70 border border-brand-200 rounded-xl p-3.5 text-left space-y-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-brand-800 flex items-center gap-1.5 uppercase tracking-wider">
+                      <span>🔑 Configuración de IA para Vercel (Opcional)</span>
+                    </label>
+                    <span className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                      clientApiKey ? "text-green-700 bg-green-50 border-green-200" : "text-brand-500 bg-brand-100 border-brand-200"
+                    }`}>
+                      {clientApiKey ? "🔑 Conectado" : "Usar Local"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-brand-600 font-light leading-relaxed">
+                    Si publicaste tu ecommerce en <strong>Vercel (servidor estático)</strong>, la base de datos de IA del servidor remoto no estará activa de forma directa. Ingresa tu API Key de Gemini aquí abajo para que las consultas se realicen de forma segura e inmediata directamente desde tu navegador:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Pega tu API Key de Gemini en el navegador (ej: AIzaSy...)"
+                      value={clientApiKey}
+                      onChange={(e) => handleClientApiKeyChange(e.target.value)}
+                      className="flex-1 bg-white border border-brand-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-800 text-brand-900 font-mono"
+                    />
+                    {clientApiKey && (
+                      <button
+                        type="button"
+                        onClick={() => handleClientApiKeyChange("")}
+                        className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer transition-all active:scale-95"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-brand-500 leading-snug">
+                    ¿No tienes una llave? Consíguela gratis en segundos con tu cuenta de Google en <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="text-brand-800 font-medium underline hover:text-black">Google AI Studio</a>. También puedes configurarla como variable de entorno <code className="bg-brand-100 px-1 py-0.5 rounded font-mono text-[9px]">VITE_GEMINI_API_KEY</code> en Vercel.
+                  </p>
+                </div>
               </div>
 
               {/* Submit triggers */}
