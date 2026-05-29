@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Premium neutral palette */
+  --color-brand-50: #fbfbfa;
+  --color-brand-100: #f6f5f2;
+  --color-brand-200: #eae8e1;
+  --color-brand-300: #d6d2c4;
+  --color-brand-400: #b8b19f;
+  --color-brand-500: #99907c;
+  --color-brand-600: #7c725f;
+  --color-brand-700: #5f5749;
+  --color-brand-800: #423d33;
+  --color-brand-900: #292620;
+}
+
+/* Custom global overrides for smooth premium feel */
+body {
+  background-color: #FAF8F5;
+  background-image: radial-gradient(circle, #bfb9a6 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  color: #292620;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+.premium-grid-bg {
+  background-color: #FAF8F5 !important;
+  background-image: radial-gradient(circle, #bfb9a6 1.5px, transparent 1.5px) !important;
+  background-size: 24px 24px !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f6f5f2;
+}
+::-webkit-scrollbar-thumb {
+  background: #d6d2c4;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b8b19f;
+}
+
+/* Selection */
+::selection {
+  background-color: #eae8e1;
+  color: #292620;
+}
+
+/* Hide typical controls for video overlays */
+.video-no-controls::-webkit-media-controls {
+  display: flex !important;
+}
+
+/* Markdown styling classes for Gemini reviews and optimized texts */
+.markdown-body h1, .markdown-body h2 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  color: #292620;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.markdown-body h1 {
+  font-size: 1.5rem;
+}
+.markdown-body h2 {
+  font-size: 1.25rem;
+}
+.markdown-body p {
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+.markdown-body ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.markdown-body li {
+  margin-bottom: 0.5rem;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Hogar y Estilo",
+  "description": "Tienda online premium de dropshipping con asistente de redacción inteligente de descripciones con IA y checkout optimizado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
