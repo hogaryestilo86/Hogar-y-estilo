@@ -555,10 +555,10 @@ export default function App() {
                     Restablecer Filtros
                   </button>
                 </div>
-              ) : selectedCategory === "Todos" && searchQuery === "" ? (
+              ) : searchQuery === "" ? (
                 <div className="space-y-12 text-left">
-                  {/* SECCION 1: Productos Destacados */}
-                  {filteredProducts.filter(p => p.featured).length > 0 && (
+                  {/* SECCION 1: Productos Destacados (SÓLO cuando se muestra Todo) */}
+                  {selectedCategory === "Todos" && filteredProducts.filter(p => p.featured).length > 0 && (
                     <div className="space-y-6" id="seccion-destacados-grilla">
                       <div className="border-l-4 border-amber-500 pl-4 py-1">
                         <span className="text-[10px] font-mono text-amber-600 uppercase tracking-widest font-bold">Selección Destacada</span>
@@ -612,9 +612,9 @@ export default function App() {
                             setTimeout(() => {
                               const el = document.getElementById("seccion-categorias-expandidas");
                               if (el) {
-                                el.scrollIntoView({ behavior: "smooth" });
+                                el.scrollIntoView({ behavior: "smooth", block: "start" });
                               }
-                            }, 100);
+                            }, 150);
                           }}
                           className="bg-brand-900 hover:bg-black text-brand-100 hover:text-white font-serif font-bold text-sm tracking-wide px-8 py-4 sm:py-5 rounded-full transition-all flex items-center gap-2.5 cursor-pointer shadow-md transform hover:scale-[1.03] active:scale-[0.98]"
                         >
@@ -639,7 +639,15 @@ export default function App() {
                             {categories.map((cat) => (
                               <button
                                 key={cat}
-                                onClick={() => setSelectedCategory(cat)}
+                                onClick={() => {
+                                  setSelectedCategory(cat);
+                                  setTimeout(() => {
+                                    const el = document.getElementById("seccion-categorias-expandidas");
+                                    if (el) {
+                                      el.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    }
+                                  }, 60);
+                                }}
                                 className={`px-4 sm:px-4.5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all border cursor-pointer ${
                                   selectedCategory === cat
                                     ? "bg-brand-900 text-white border-brand-900"
@@ -746,12 +754,14 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => {
-                            setIsExpanded(false);
-                            setSelectedCategory("Todos");
                             const el = document.getElementById("productos");
                             if (el) {
-                              el.scrollIntoView({ behavior: "smooth" });
+                              el.scrollIntoView({ behavior: "smooth", block: "start" });
                             }
+                            setTimeout(() => {
+                              setIsExpanded(false);
+                              setSelectedCategory("Todos");
+                            }, 150);
                           }}
                           className="bg-brand-100 hover:bg-brand-200 border border-brand-300 text-brand-950 font-bold text-xs uppercase px-7 py-3 rounded-full cursor-pointer transition-all hover:scale-[1.03] active:scale-[0.97]"
                         >
