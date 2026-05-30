@@ -894,6 +894,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     <option value="Belleza">Belleza</option>
                     <option value="Herramientas">Herramientas</option>
                     <option value="Iluminación">Iluminación</option>
+                    <option value="Niños">Niños</option>
                   </select>
                 </div>
               </div>

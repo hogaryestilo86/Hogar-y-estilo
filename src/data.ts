@@ -153,5 +153,53 @@ export const INITIAL_PRODUCTS: Product[] = [
     ],
     reviews: [],
     featured: false
+  },
+  {
+    id: "prod-bloques-madera",
+    title: "Set de Cubos Apilables de Madera Cuentacuentos",
+    description: "Un hermoso set de 12 bloques apilables didácticos construidos íntegramente en madera natural pulida. Decorados con pinturas no tóxicas al agua en tonos pastel. Estimula la motricidad fina, la coordinación ojo-mano y el pensamiento lógico-espacial en los más chicos.",
+    basePrice: 15400,
+    beforePrice: 21000,
+    category: "Niños",
+    media: [
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1515488042361-404e9250afef?auto=format&fit=crop&w=800&q=85"
+      },
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=800&q=85"
+      }
+    ],
+    features: [
+      "Maderas sustentables y bordes redondeados anti-astillas.",
+      "Pinturas ecológicas premium seguras para morder y chupar.",
+      "Bolsita de lienzo orgánico para guardar las piezas con facilidad.",
+      "Estimula el desarrollo cognitivo sensorial y la pinza fina."
+    ],
+    reviews: [],
+    featured: true
+  },
+  {
+    id: "prod-doudou-conejito",
+    title: "Confección Apego Bebé Gasa Algodón Orgánico",
+    description: "Tierno sonajero y doudou con diseño de conejito dormilón, ideal para brindar seguridad y calma a tu bebé desde sus primeros días. Confeccionado con gasa doble de algodón orgánico certificado de máxima suavidad y sumamente transpirable.",
+    basePrice: 9800,
+    beforePrice: 14000,
+    category: "Niños",
+    media: [
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?auto=format&fit=crop&w=800&q=85"
+      }
+    ],
+    features: [
+      "100% Algodón orgánico certificado hipoalergénico y ultrasuave.",
+      "Nudos en extremos testeados para que el bebé muerda calmadamente.",
+      "Evita irritaciones y alergias en pieles de recién nacidos.",
+      "Fácil de lavar, mantiene su suavidad incluso tras múltiples lavados."
+    ],
+    reviews: [],
+    featured: false
   }
 ];
