@@ -5,7 +5,7 @@
 
 import React, { useState, useRef } from "react";
 import { Product } from "../types";
-import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft, Volume2, VolumeX } from "lucide-react";
+import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface ProductCardProps {
@@ -38,15 +38,22 @@ export default function ProductCard({
 
   const handleMouseEnter = () => {
     setHovered(true);
-    if (hasMultipleMedia) {
-      // Switch to the second media on hover
-      setMediaIndex(1);
-    }
   };
 
   const handleMouseLeave = () => {
     setHovered(false);
-    setMediaIndex(0);
+  };
+
+  const handlePrevMedia = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (mediaList.length <= 1) return;
+    setMediaIndex((prev) => (prev > 0 ? prev - 1 : mediaList.length - 1));
+  };
+
+  const handleNextMedia = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (mediaList.length <= 1) return;
+    setMediaIndex((prev) => (prev < mediaList.length - 1 ? prev + 1 : 0));
   };
 
   const formatCurrency = (val: number) => {
@@ -116,15 +123,43 @@ export default function ProductCard({
           )}
         </div>
 
-        {/* Floating Indicator Dots for gallery */}
+        {/* Carousel Arrow buttons */}
         {hasMultipleMedia && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 z-20 bg-brand-900/40 px-2 py-1 rounded-full backdrop-blur-sm pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <>
+            <button
+              type="button"
+              onClick={handlePrevMedia}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 z-30 bg-white/90 hover:bg-white text-brand-950 p-2 rounded-full shadow-md backdrop-blur-xs transition-all active:scale-90 hover:scale-105 flex items-center justify-center cursor-pointer border border-brand-200/60"
+              title="Imagen Anterior"
+            >
+              <ChevronLeft className="w-4 h-4 text-brand-900 stroke-[2.5]" />
+            </button>
+            <button
+              type="button"
+              onClick={handleNextMedia}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 z-30 bg-white/90 hover:bg-white text-brand-950 p-2 rounded-full shadow-md backdrop-blur-xs transition-all active:scale-90 hover:scale-105 flex items-center justify-center cursor-pointer border border-brand-200/60"
+              title="Siguiente Imagen"
+            >
+              <ChevronRight className="w-4 h-4 text-brand-900 stroke-[2.5]" />
+            </button>
+          </>
+        )}
+
+        {/* Floating Indicator Dots for gallery (Interactive with tap/click) */}
+        {hasMultipleMedia && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-30 bg-black/40 px-2.5 py-1.5 rounded-full backdrop-blur-xs transition-opacity duration-300 pointer-events-auto">
             {mediaList.map((_, idx) => (
-              <span
+              <button
                 key={idx}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${
-                  idx === mediaIndex ? "bg-white w-3" : "bg-white/50"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMediaIndex(idx);
+                }}
+                className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
+                  idx === mediaIndex ? "bg-white w-4" : "bg-white/50 hover:bg-white/80"
                 }`}
+                title={`Ir a imagen ${idx + 1}`}
               />
             ))}
           </div>

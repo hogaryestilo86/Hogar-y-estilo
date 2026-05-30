@@ -7,7 +7,7 @@ import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
 import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil } from "lucide-react";
-import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache } from "../indexedDbMedia";
+import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache, getMedia } from "../indexedDbMedia";
 
 interface AdminPanelProps {
   products: Product[];
@@ -460,6 +460,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       setOptimizing(false);
     }
   };
+
 
   const handleCancelEdit = () => {
     setTitle("");
@@ -1034,26 +1035,56 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
                 {/* File preview gallery */}
                 {mediaList.length > 0 && (
-                  <div className="bg-brand-100 p-4 rounded-xl border border-brand-200 space-y-3">
-                    <p className="text-[11px] font-bold text-brand-700 uppercase tracking-wide">Archivos a incorporar ({mediaList.length}):</p>
+                  <div className="bg-brand-100 p-4 rounded-xl border border-brand-200 space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                      <p className="text-[11px] font-bold text-brand-700 uppercase tracking-wide">
+                        Archivos a incorporar ({mediaList.length}):
+                      </p>
+                    </div>
+
                     <div className="flex flex-wrap gap-3">
-                      {mediaList.map((item, index) => (
-                        <div key={index} className="relative w-20 h-20 bg-white border border-brand-300 rounded-lg overflow-hidden group">
-                          {item.type === "video" ? (
-                            <ResolvedVideo src={item.url} className="w-full h-full object-cover" muted />
-                          ) : (
-                            <ResolvedImage src={item.url} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => removeMediaItem(index)}
-                            className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                            aria-label="Remove media"
+                      {mediaList.map((item, index) => {
+                        const isImage = item.type === "image";
+                        return (
+                          <div 
+                            key={index}
+                            className="relative w-24 h-24 bg-white border border-brand-200 rounded-lg overflow-hidden shadow-xs flex flex-col justify-between"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                            {/* Media render */}
+                            <div className="w-full h-full relative">
+                              {item.type === "video" ? (
+                                <ResolvedVideo src={item.url} className="w-full h-full object-cover" muted />
+                              ) : (
+                                <ResolvedImage src={item.url} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              )}
+                            </div>
+
+                            {/* Delete button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeMediaItem(index);
+                              }}
+                              className="absolute top-1 right-1 bg-red-650 hover:bg-red-700 text-white p-1 rounded-full shadow-md transition-all active:scale-90 cursor-pointer z-20"
+                              title="Quitar"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+
+                            {/* Indicator badge: "Imagen" or "Video" */}
+                            {isImage ? (
+                              <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-brand-900/80 text-brand-100 font-medium shadow-xs z-10">
+                                Imagen
+                              </div>
+                            ) : (
+                              <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-600/85 text-white shadow-xs z-10">
+                                Video
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1286,6 +1317,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         </div>
 
       </div>
+
+      {/* Gemini Image Studio modal removed as it is now integrated inline above in the product form files section for better responsiveness and touch-friendly direct use */}
+
     </div>
   );
 }
