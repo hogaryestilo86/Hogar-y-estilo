@@ -88,3 +88,25 @@ body {
 .markdown-body li {
   margin-bottom: 0.5rem;
 }
+
+/* Slide progress animated bar for premium experience */
+@keyframes slide-progress {
+  0% { background-position: 0 0; }
+  100% { background-position: 20px 0; }
+}
+
+.animate-slide-progress {
+  background-size: 20px 20px;
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.2) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.2) 75%,
+    transparent 75%,
+    transparent
+  );
+  animation: slide-progress 1s linear infinite;
+}
+

@@ -25,12 +25,100 @@ interface AdminPanelProps {
     pendingDispatchesCount: number;
   };
   pendingOrders: any[];
-  onMarkOrderAsShipped: (orderId: string) => void;
   bankDetails: BankDetails;
   onBankDetailsChange: (details: BankDetails) => void;
   onDeleteOrder: (orderId: string) => void;
   onResetMetrics: () => void;
   showToast?: (message: string, type?: "success" | "error" | "info") => void;
+}
+
+interface OrderRowProps {
+  key?: any;
+  order: any;
+  onDeleteOrder: (orderId: string) => void;
+  formatCurrency: (val: number) => string;
+  confirmDeleteOrderId: string | null;
+  setConfirmDeleteOrderId: (id: string | null) => void;
+  notify: (msg: string, type?: "success" | "error" | "info") => void;
+}
+
+function OrderRowComponent({
+  order,
+  onDeleteOrder,
+  formatCurrency,
+  confirmDeleteOrderId,
+  setConfirmDeleteOrderId,
+  notify
+}: OrderRowProps) {
+  const subtotal = order.items.reduce((acc: number, item: any) => acc + (item.product.basePrice * item.quantity), 0);
+  const isTransfer = order.details.paymentMethod === "transfer";
+  const priceToPay = isTransfer ? Math.round(subtotal * 0.85) : subtotal;
+
+  return (
+    <tr className="hover:bg-brand-50/30 transition-colors border-b border-brand-100 last:border-b-0">
+      <td className="px-5 py-4 space-y-1 text-left align-top">
+        <p className="font-bold text-brand-900 text-sm font-sans">{order.details.fullName}</p>
+        <div className="flex flex-col gap-0.5 text-[11px] text-brand-500 font-light">
+          <span className="flex items-center gap-1 shrink-0"><Mail className="w-3 h-3 text-brand-400" /> {order.details.email}</span>
+          <span className="flex items-center gap-1 shrink-0"><Phone className="w-3 h-3 text-brand-400" /> {order.details.phone}</span>
+        </div>
+      </td>
+      <td className="px-5 py-4 leading-relaxed font-light text-[11px] text-left align-top">
+        <p className="font-semibold text-brand-900 text-xs font-sans">{order.details.address}</p>
+        <p className="text-brand-500 font-sans">{order.details.city} ({order.details.zipCode})</p>
+      </td>
+      <td className="px-5 py-4 space-y-1 text-left align-top">
+        {order.items.map((item: any, i: number) => (
+          <div key={i} className="flex items-center gap-1.5 text-[11px]">
+            <span className="bg-brand-800 text-brand-100 font-mono text-[9.5px] px-1 py-0.5 rounded-sm font-semibold">{item.quantity}x</span>
+            <span className="font-medium text-brand-950 font-sans line-clamp-1">{item.product.title}</span>
+          </div>
+        ))}
+      </td>
+      <td className="px-5 py-4 space-y-1 text-left align-top">
+        <p className="text-sm font-black text-brand-950 font-serif">{formatCurrency(priceToPay)}</p>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm inline-block ${isTransfer ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-brand-100 border border-brand-200 text-brand-800'}`}>
+          {isTransfer ? '15% Off Trsf' : '3 Cuotas Sin Int.'}
+        </span>
+      </td>
+      <td className="px-5 py-4 text-center align-top">
+        {confirmDeleteOrderId !== order.id ? (
+          <button
+            type="button"
+            onClick={() => setConfirmDeleteOrderId(order.id)}
+            className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer inline-flex items-center justify-center"
+            title="Eliminar este pedido"
+          >
+            <Trash2 className="w-4 h-4 text-red-500" />
+          </button>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5 animate-in fade-in duration-200 justify-center">
+            <span className="text-[9px] font-bold text-red-700 leading-none">¿Borrar?</span>
+            <div className="flex gap-1 justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteOrder(order.id);
+                  setConfirmDeleteOrderId(null);
+                  notify(`Se borró el pedido de ${order.details.fullName}.`, "success");
+                }}
+                className="bg-red-600 text-white font-extrabold text-[9.5px] px-2 py-0.5 rounded cursor-pointer hover:bg-red-700"
+              >
+                Sí
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteOrderId(null)}
+                className="bg-white border border-brand-200 text-brand-800 font-extrabold text-[9.5px] px-2 py-0.5 rounded cursor-pointer hover:bg-brand-100"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        )}
+      </td>
+    </tr>
+  );
 }
 
 export default function AdminPanel({
@@ -44,7 +132,6 @@ export default function AdminPanel({
   onAdminPhoneChange = () => {},
   storeMetrics,
   pendingOrders,
-  onMarkOrderAsShipped,
   bankDetails,
   onBankDetailsChange,
   onDeleteOrder,
@@ -54,6 +141,7 @@ export default function AdminPanel({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [basePrice, setBasePrice] = useState("");
+  const [beforePrice, setBeforePrice] = useState("");
   const [category, setCategory] = useState("Cocina");
   
   // Custom non-blocking interactive states
@@ -276,17 +364,20 @@ export default function AdminPanel({
           },
         });
 
-        const systemPrompt = `Eres un experto en redactar títulos de alta conversión, descripciones persuasivas y palabras clave de SEO para e-commerce de alta gama para la marca "Hogar y Estilo".
-A partir del título rudimentario y de la descripción o palabras sueltas provistas por el usuario, debes generar 3 campos optimizados:
-1. Un título de producto comercialmente atractivo, sofisticado y optimizado para SEO (ej: "Lámpara de Mesa de Madera Rústica Japandi" en lugar de "lampara de madera").
-2. Una descripción persuasiva adaptada para Argentina/Latinoamérica (Español Neutro), utilizando formato Markdown con:
-   - Un párrafo introductorio ultra elegante que evoque comodidad, orden o distinción.
+        const systemPrompt = `Eres un experto amigable, cálido y profesional en redactar publicaciones para e-commerce. Trabajas para la marca de decoración "Hogar y Estilo" de Rosario, Argentina.
+Tus respuestas y textos sugeridos deben estar escritos siempre con el tratamiento de "Vos" (voseo argentino: ej. tuteo amigable, cercano, cálido, utilizando palabras locales naturales, sin sonar exagerado pero con total confianza y cercanía).
+Eliminá por completo cualquier trato de "Usted" o español ibérico. Háblame de "Vos" a mí también en la descripción del producto.
+
+A partir del título rudimentario y de la descripción o notas provistas por el usuario, debés generar 3 campos optimizados:
+1. Un título de producto comercialmente atractivo, sofisticado, elegante y optimizado para SEO (ej: "Lámpara de Mesa de Madera Rústica Japandi" en lugar de "lampara de madera").
+2. Una descripción persuasiva y súper vendedora adaptada al voseo argentino de forma informal, cercana, amigable pero muy profesional y refinada, redactada en formato Markdown con:
+   - Un párrafo introductorio ultra elegante que evoque comodidad, orden, calidez en el hogar o distinción. Te debés dirigir al comprador hablándole de "Vos" (ej: "Transformá tus espacios", "Llevá calidez a tu mesa").
    - Una sección titulada "**Detalles de Diseño**" con una lista de ventajas clave, materiales sofisticados y usabilidad.
-   - Un sutil y persuasivo llamado a la acción sobre la renovación de sus ambientes cotidianos.
+   - Un sutil y persuasivo llamado a la acción que invite a renovar los rincones cotidianos de su hogar.
 3. El SEO "todo" o tags clave: Una lista de 5 a 6 palabras clave o características destacadas de SEO, separadas exactamente por una coma (ej: "mármol travertino real, mesa auxiliar japandi, estilo rústico moderno, decoración de salas minimalistas, calidad artesanal premium").
 
 Reglas críticas:
-- No hables de dropshipping abiertamente, enfócate en productos exclusivos de Hogar & Estilo.
+- No hables de dropshipping abiertamente. Los productos son seleccionados exclusivamente por Hogar & Estilo.
 - Devuelve la respuesta STRICTLY en formato JSON válido de acuerdo al esquema solicitado sin markdown tags afuera. El campo de SEO debe ser "seoFeatures" con los tags de palabras clave separados por coma.`;
 
         const userMessage = `Título provisto: "${title || ""}"
@@ -373,6 +464,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
   const handleCancelEdit = () => {
     setTitle("");
     setBasePrice("");
+    setBeforePrice("");
     setCategory("Cocina");
     setDescription("");
     setFeaturesText("");
@@ -385,15 +477,17 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     e.preventDefault();
 
     if (!title.trim() || !basePrice.trim() || !description.trim()) {
-      notify("Por favor completa los campos principales (Título, Precio Base y Descripción).", "error");
+      notify("Por favor completa los campos principales (Título, Precio de Ahora y Descripción).", "error");
       return;
     }
 
     const priceNum = parseFloat(basePrice);
     if (isNaN(priceNum) || priceNum <= 0) {
-      notify("Por favor ingresa un precio válido mayor a cero.", "error");
+      notify("Por favor ingresa un precio de venta de ahora válido mayor a cero.", "error");
       return;
     }
+
+    const beforePriceNum = beforePrice.trim() ? parseFloat(beforePrice) : undefined;
 
     // Default placeholder if no media was loaded
     const productMedia: ProductMedia[] = mediaList.length > 0
@@ -416,6 +510,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         id: editingProductId,
         title: title.trim(),
         basePrice: priceNum,
+        beforePrice: beforePriceNum,
         category: category,
         description: description.trim(),
         features: featuresArray,
@@ -442,6 +537,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       id: `prod-custom-${Date.now()}`,
       title: title.trim(),
       basePrice: priceNum,
+      beforePrice: beforePriceNum,
       category: category,
       description: description.trim(),
       features: featuresArray,
@@ -464,6 +560,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     // Clean up local fields
     setTitle("");
     setBasePrice("");
+    setBeforePrice("");
     setCategory("Cocina");
     setDescription("");
     setFeaturesText("");
@@ -548,7 +645,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
         {/* Metric 1 */}
         <div className="bg-white p-5 rounded-2xl border border-brand-200 shadow-xs flex items-center gap-4">
           <div className="p-3.5 bg-brand-50 rounded-xl text-brand-800 shrink-0">
@@ -584,23 +681,6 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             <p className="text-[10px] text-green-700 font-semibold mt-1">Facturaciones registradas</p>
           </div>
         </div>
-
-        {/* Metric 4 */}
-        <div className="bg-white p-5 rounded-2xl border border-brand-200 shadow-xs flex items-center gap-4">
-          <div className="p-3.5 bg-brand-900 text-brand-100 rounded-xl shrink-0">
-            <Clock className="w-6 h-6 text-brand-300" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-brand-400 uppercase tracking-widest leading-none">Por Despachar</p>
-            <h4 className="font-serif text-2xl font-black text-brand-900 mt-1 flex items-center gap-1.5">
-              <span>{storeMetrics.pendingDispatchesCount}</span>
-              {storeMetrics.pendingDispatchesCount > 0 && (
-                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-              )}
-            </h4>
-            <p className="text-[10px] text-brand-500 font-semibold mt-1">Pendientes de logística</p>
-          </div>
-        </div>
       </div>
 
       {/* SECCIÓN REGISTRO Y CONTROL DE PEDIDOS */}
@@ -613,7 +693,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             </span>
           </h3>
           <p className="text-xs text-brand-600 mt-1 font-light">
-            Aquí puedes ver los datos de contacto, facturación, dirección y lista de compra de tus clientes. Puedes dar de alta cada despacho presionando el botón de acción de logística.
+            Aquí puedes ver los datos de contacto, facturación, dirección y lista de compra de tus clientes.
           </p>
         </div>
         
@@ -632,193 +712,25 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   <th className="px-5 py-3.5">Dirección de Destino</th>
                   <th className="px-5 py-3.5">Detalle Artículos</th>
                   <th className="px-5 py-3.5">Metodo de Pago / Total</th>
-                  <th className="px-5 py-3.5 text-center">Estatus / Logística</th>
                   <th className="px-5 py-3.5 text-center">Eliminar</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-100 bg-white">
-                {pendingOrders.map((order: any) => {
-                  const subtotal = order.items.reduce((acc: number, item: any) => acc + (item.product.basePrice * item.quantity), 0);
-                  const isTransfer = order.details.paymentMethod === "transfer";
-                  const priceToPay = isTransfer ? Math.round(subtotal * 0.85) : subtotal;
-                  
-                  return (
-                    <tr key={order.id} className="hover:bg-brand-50/30 transition-colors">
-                      <td className="px-5 py-4 space-y-1">
-                        <p className="font-bold text-brand-900 text-sm">{order.details.fullName}</p>
-                        <div className="flex flex-col gap-0.5 text-[11px] text-brand-500 font-light">
-                          <span className="flex items-center gap-1 shrink-0"><Mail className="w-3 h-3 text-brand-400" /> {order.details.email}</span>
-                          <span className="flex items-center gap-1 shrink-0"><Phone className="w-3 h-3 text-brand-400" /> {order.details.phone}</span>
-                        </div>
-                        <a 
-                          href={`https://wa.me/54${order.details.phone.replace(/[^0-9]/g, "")}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 bg-green-50 hover:bg-green-150 border border-green-200 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded mt-1 shadow-2xs"
-                        >
-                          💬 Chatear WhatsApp
-                        </a>
-                      </td>
-                      <td className="px-5 py-4 leading-relaxed font-light text-[11px]">
-                        <p className="font-semibold text-brand-900 text-xs">{order.details.address}</p>
-                        <p className="text-brand-500">{order.details.city} ({order.details.zipCode})</p>
-                        <p className="text-[10px] bg-brand-100 text-brand-800 px-2 py-0.5 rounded mt-1.5 inline-block font-semibold">Correo Argentino</p>
-                      </td>
-                      <td className="px-5 py-4 space-y-1">
-                        {order.items.map((item: any, i: number) => (
-                          <div key={i} className="flex items-center gap-1.5 text-[11px]">
-                            <span className="bg-brand-800 text-brand-100 font-mono text-[9.5px] px-1 py-0.5 rounded-sm font-semibold">{item.quantity}x</span>
-                            <span className="font-medium text-brand-950 font-sans line-clamp-1">{item.product.title}</span>
-                          </div>
-                        ))}
-                      </td>
-                      <td className="px-5 py-4 space-y-1">
-                        <p className="text-sm font-black text-brand-950 font-serif">{formatCurrency(priceToPay)}</p>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm inline-block ${isTransfer ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-brand-100 border border-brand-200 text-brand-800'}`}>
-                          {isTransfer ? '15% Off Trsf' : '3 Cuotas Sin Int.'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        {order.status === "pending" ? (
-                          <div className="flex flex-col items-center gap-2">
-                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                               <Clock className="w-3 h-3 animate-spin text-amber-600" /> Pendiente
-                             </span>
-                             <button
-                               onClick={() => onMarkOrderAsShipped(order.id)}
-                               className="bg-brand-800 hover:bg-black text-white font-bold text-[10px] uppercase tracking-wider py-1.5 px-3 rounded-md shadow-xs cursor-pointer hover:scale-105 active:scale-95 transition-all animate-none"
-                             >
-                               🚚 Despachar Pedido
-                             </button>
-                          </div>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10.5px] font-bold bg-green-100 text-green-800 border border-green-200 shadow-2xs">
-                            <Check className="w-3.5 h-3.5 text-green-600" /> Despachado
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        {confirmDeleteOrderId !== order.id ? (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteOrderId(order.id)}
-                            className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer inline-flex items-center justify-center"
-                            title="Eliminar este pedido"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        ) : (
-                          <div className="flex flex-col items-center gap-1.5 animate-in fade-in duration-200">
-                            <span className="text-[9px] font-bold text-red-700 leading-none">¿Borrar?</span>
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onDeleteOrder(order.id);
-                                  setConfirmDeleteOrderId(null);
-                                  notify(`Se borró el pedido de ${order.details.fullName}.`, "success");
-                                }}
-                                className="bg-red-600 text-white font-extrabold text-[9.5px] px-1.5 py-0.5 rounded cursor-pointer hover:bg-red-700"
-                              >
-                                Sí
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteOrderId(null)}
-                                className="bg-white border border-brand-200 text-brand-800 font-extrabold text-[9.5px] px-1.5 py-0.5 rounded cursor-pointer hover:bg-brand-100"
-                              >
-                                No
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {pendingOrders.map((order: any) => (
+                  <OrderRowComponent
+                    key={order.id}
+                    order={order}
+                    onDeleteOrder={onDeleteOrder}
+                    formatCurrency={formatCurrency}
+                    confirmDeleteOrderId={confirmDeleteOrderId}
+                    setConfirmDeleteOrderId={setConfirmDeleteOrderId}
+                    notify={notify}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
         )}
-      </div>
-
-      {/* SECCIÓN CONFIGURACIÓN EMAIL NOTIFICACIONES (Requerimiento de email del comprador) */}
-      <div className="bg-white p-6 rounded-2xl border border-brand-200 shadow-xs space-y-4 text-left">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="font-serif text-lg font-bold text-brand-900 flex items-center gap-2">
-              <span>📬 Configuración de Notificaciones por Email</span>
-              <span className="text-[9px] uppercase tracking-wider bg-green-100 text-green-800 font-sans py-0.5 px-2 rounded-full font-bold">Activo</span>
-            </h3>
-            <p className="text-xs text-brand-600 font-light mt-1">
-              <strong>Simple y Directo:</strong> No requiere ninguna configuración técnica compleja ni datos de servidores (sin SMTP ni contraseñas). Solo ingresa tu correo personal o comercial para recibir un resumen automático de cada pedido detallado.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl pt-2">
-          {/* Email Channel Config */}
-          <div className="bg-brand-50/50 p-4 rounded-xl border border-brand-200/80 space-y-3 flex flex-col justify-between">
-            <div>
-              <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1">
-                📧 Tu Email de Recepción de Órdenes
-              </label>
-              <p className="text-[10px] text-brand-500 font-light mb-2">Las confirmaciones pre-armadas por mail se dirigirán a esta dirección.</p>
-              <input
-                type="email"
-                required
-                placeholder="ejemplo@correo.com"
-                value={adminEmail}
-                onChange={(e) => onAdminEmailChange(e.target.value)}
-                className="w-full bg-white border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-800 text-brand-900"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!adminEmail || !adminEmail.includes("@")) {
-                  notify("Por favor ingresa una dirección de correo válida.", "error");
-                  return;
-                }
-                notify(`¡Email de Notificación guardado!: ${adminEmail}`, "success");
-              }}
-              className="bg-brand-900 hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider py-2.5 px-4 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 flex items-center justify-center w-full shadow-xs"
-            >
-              Guardar Email de Enlace
-            </button>
-          </div>
-
-          {/* WhatsApp Channel Config */}
-          <div className="bg-brand-50/50 p-4 rounded-xl border border-brand-200/80 space-y-3 flex flex-col justify-between">
-            <div>
-              <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1">
-                💬 Tu Teléfono de WhatsApp Comercial
-              </label>
-              <p className="text-[10px] text-brand-500 font-light mb-2">Carga tu número de WhatsApp con código de país (Ej: 5493416555555).</p>
-              <input
-                type="text"
-                required
-                placeholder="Ejemplo: 5493416555555"
-                value={adminPhone}
-                onChange={(e) => onAdminPhoneChange(e.target.value)}
-                className="w-full bg-white border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-800 text-brand-900"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (!adminPhone || adminPhone.length < 10) {
-                  notify("Por favor ingresa un número de teléfono válido con código de país.", "error");
-                  return;
-                }
-                notify(`¡WhatsApp de Notificación guardado!: +${adminPhone}`, "success");
-              }}
-              className="bg-brand-900 hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider py-2.5 px-4 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 flex items-center justify-center w-full shadow-xs"
-            >
-              Guardar WhatsApp de Enlace
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* SECCIÓN CONFIGURACIÓN COBRO TRANSFERENCIAS (Requerimiento de datos bancarios) */}
@@ -989,18 +901,34 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-brand-800 uppercase tracking-widest mb-1.5">
-                    Precio Base de Costo * (ARS)
+                    Precio de Ahora * (ARS)
                   </label>
                   <input
                     type="number"
                     required
-                    placeholder="Ej. 42000"
+                    placeholder="Ej. 38500"
                     value={basePrice}
                     onChange={(e) => setBasePrice(e.target.value)}
                     className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 font-medium"
                   />
                   <p className="text-[10px] text-brand-500 mt-1 italic">
-                    El sistema de precios calcula las 3 cuotas y el 15% de descuento automáticamente.
+                    Es el precio real de venta. De acá calculamos las 3 cuotas y el 15% de descuento por transferencia.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-brand-800 uppercase tracking-widest mb-1.5">
+                    Precio de Antes (ARS) - Opcional
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Ej. 45000"
+                    value={beforePrice}
+                    onChange={(e) => setBeforePrice(e.target.value)}
+                    className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 font-medium"
+                  />
+                  <p className="text-[10px] text-brand-500 mt-1 italic">
+                    Cargá un valor más alto para que la tienda le muestre al cliente cuánto se está ahorrando.
                   </p>
                 </div>
                 
@@ -1301,6 +1229,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                           setEditingProductId(item.id);
                           setTitle(item.title);
                           setBasePrice(item.basePrice.toString());
+                          setBeforePrice(item.beforePrice ? item.beforePrice.toString() : "");
                           setCategory(item.category || "Cocina");
                           setDescription(item.description);
                           setFeaturesText(item.features ? item.features.join(", ") : "");

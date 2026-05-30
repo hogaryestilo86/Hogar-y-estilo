@@ -120,12 +120,13 @@ export default function ProductDetailsModal({
 
         {/* Left Side: Media gallery & player */}
         <div className="w-full md:w-1/2 bg-white flex flex-col justify-between border-r border-brand-200 p-4 sm:p-6 overflow-y-auto max-h-[40vh] md:max-h-full">
-          <div className="relative w-full aspect-square rounded-xl bg-brand-100 overflow-hidden border border-brand-200">
+          <div className="relative w-full aspect-square rounded-xl bg-brand-100 overflow-hidden border border-brand-200 flex items-center justify-center">
             {activeMediaList[activeMediaIndex]?.type === "video" ? (
               <div className="relative w-full h-full flex items-center justify-center bg-black">
                 <ResolvedVideo
                   src={activeMediaList[activeMediaIndex].url}
-                  className="w-full h-full object-cover"
+                  className="max-w-full max-h-full object-contain"
+                  style={{ maxWidth: "100%", objectFit: "contain" }}
                   autoPlay
                   muted={isMuted}
                   loop
@@ -150,7 +151,8 @@ export default function ProductDetailsModal({
                 src={activeMediaList[activeMediaIndex]?.url || getCategoryPlaceholder(product?.category)}
                 alt={product.title}
                 referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
+                className="max-w-full max-h-full object-contain"
+                style={{ maxWidth: "100%", objectFit: "contain" }}
               />
             )}
 

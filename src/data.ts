@@ -37,6 +37,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     title: "Velador Nórdico de Mesa Alba Aura",
     description: "Un velador diseñado con sutiles curvas de madera natural de fresno seleccionada y una pantalla de hilo tejida a mano que difunde una luz cálida y orgánica. Ideal para transformar cualquier mesa de luz o escritorio en un oasis de serenidad.",
     basePrice: 38500,
+    beforePrice: 48000,
     category: "Iluminación",
     media: [
       {
@@ -62,6 +63,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     title: "Set de Utensilios de Cocina Bambú Natural Orgánico",
     description: "Conjunto de 5 herramientas esenciales de cocina fabricadas íntegramente de bambú de crecimiento certificado. Su dureza natural es altamente superior a las maderas tradicionales, protegiendo tus sartenes antiadherentes y aportando un aire fresco y rústico a tu mesada.",
     basePrice: 19500,
+    beforePrice: 26000,
     category: "Cocina",
     media: [
       {
@@ -87,6 +89,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     title: "Sillón de Lectura Bouclé Confort",
     description: "Sillón individual tapizado con la exclusiva tela bouclé (ovejita), conocida por su textura sumamente suave y su estética de vanguardia europea. Su estructura acolchada y ergonómica te abraza en cada momento de lectura.",
     basePrice: 145000,
+    beforePrice: 180000,
     category: "Hogar",
     media: [
       {
@@ -112,6 +115,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     title: "Serum Rejuvenecedor de Belleza Rosa Mosqueta",
     description: "Elixir facial hidratante formulado con extracto puro prensado en frío de semillas de Rosa Mosqueta patagónica y enriquecido con ácido hialurónico concentrado. Regenera el tejido, unifica el tono de la piel y aporta una luminosidad natural inolvidable.",
     basePrice: 16200,
+    beforePrice: 22000,
     category: "Belleza",
     media: [
       {
@@ -133,6 +137,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     title: "Organizador Multifuncional Metálico Negro",
     description: "Repisa y organizador modular multiuso, ideal tanto para condimentos en la cocina como para toallas en el baño o herramientas en el taller. Fabricado de acero reforzado con pintura termoestable de alta duración, totalmente a prueba de óxido.",
     basePrice: 24500,
+    beforePrice: 32000,
     category: "Herramientas",
     media: [
       {

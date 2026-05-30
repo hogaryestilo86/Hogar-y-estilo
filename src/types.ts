@@ -21,6 +21,7 @@ export interface Product {
   title: string;
   description: string;
   basePrice: number;
+  beforePrice?: number;
   category: string;
   media: ProductMedia[];
   reviews: ProductReview[];

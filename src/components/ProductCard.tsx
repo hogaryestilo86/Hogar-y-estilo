@@ -13,12 +13,14 @@ interface ProductCardProps {
   product: Product;
   onAddToCart: (product: Product) => void;
   onViewDetails: (product: Product) => void;
+  onBuyNow: (product: Product) => void;
 }
 
 export default function ProductCard({
   product,
   onAddToCart,
   onViewDetails,
+  onBuyNow,
 }: ProductCardProps) {
   const [hovered, setHovered] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
@@ -84,7 +86,7 @@ export default function ProductCard({
               <ResolvedVideo
                 ref={videoRef}
                 src={activeMedia.url}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain bg-neutral-50/80 p-2"
                 autoPlay
                 muted={isMuted}
                 loop
@@ -109,7 +111,7 @@ export default function ProductCard({
               alt={product.title}
               loading="lazy"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              className="w-full h-full object-contain bg-neutral-50/80 p-2 transition-transform duration-700 ease-out group-hover:scale-105"
             />
           )}
         </div>
@@ -171,40 +173,75 @@ export default function ProductCard({
           {/* Base regular lists price */}
           <div className="flex items-baseline justify-between">
             <span className="text-brand-500 text-xs font-light">Precio de lista:</span>
-            <span className="text-xl sm:text-2xl font-bold tracking-tight text-brand-900 font-serif">
-              {formatCurrency(listPrice)}
-            </span>
+            <div className="flex flex-col items-end">
+              {product.beforePrice && product.beforePrice > listPrice && (
+                <span className="text-xs line-through text-red-500 font-semibold leading-none mb-0.5">
+                  {formatCurrency(product.beforePrice)}
+                </span>
+              )}
+              <span className="text-xl sm:text-2xl font-black tracking-tight text-brand-900 font-serif leading-none">
+                {formatCurrency(listPrice)}
+              </span>
+            </div>
           </div>
 
+          {product.beforePrice && product.beforePrice > listPrice && (
+            <div className="flex justify-end mt-1.5">
+              <span className="bg-amber-100 text-brand-900 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-amber-250 inline-flex items-center gap-1 shadow-3xs animate-pulse">
+                🔥 ¡Ahorrás {formatCurrency(product.beforePrice - listPrice)}!
+              </span>
+            </div>
+          )}
+
           {/* installment calculation (3 installments without interest) */}
-          <div className="flex items-center gap-1.5 text-xs text-brand-700 mt-1">
+          <div className="flex items-center gap-1.5 text-xs text-brand-700 mt-2">
             <CreditCard className="w-3.5 h-3.5 text-brand-500 shrink-0" />
             <span>
-              Ver en <strong>3 cuotas de {formatCurrency(installmentPrice)} sin interés</strong>
+              Llevatelo en <strong>3 cuotas de {formatCurrency(installmentPrice)} sin interés</strong>
             </span>
           </div>
 
           {/* transfer discount (15% cash discount, bold green) */}
-          <div className="flex items-center gap-1.5 text-xs text-green-700 mt-1 bg-green-50 p-1.5 rounded-md border border-green-200">
-            <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
-            <span>
-              Transferencia: <strong className="text-sm font-extrabold">{formatCurrency(transferPrice)}</strong> (¡<strong>15% OFF</strong>!)
-            </span>
+          <div className="flex flex-col gap-1 text-xs text-green-700 mt-2 bg-green-50/80 p-2 rounded-xl border border-green-200">
+            <div className="flex items-center gap-1.5 font-semibold">
+              <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                Transferencia: <strong className="text-sm font-black">{formatCurrency(transferPrice)}</strong> (¡<strong>15% OFF</strong>!)
+              </span>
+            </div>
+            <div className="text-[10px] text-green-800 font-medium pl-5 leading-none">
+              💡 Pagando por Transferencia ahorrás <strong className="font-bold">{formatCurrency(listPrice - transferPrice)}</strong> más
+            </div>
           </div>
         </div>
 
-        {/* Add to Cart Button */}
-        <button
-          id={`btn-add-${product.id}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddToCart(product);
-          }}
-          className="w-full mt-4 bg-brand-800 hover:bg-brand-900 text-white font-medium text-xs sm:text-sm tracking-wider uppercase py-2.5 sm:py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-sm hover:shadow-md"
-        >
-          <ShoppingCart className="w-4 h-4" />
-          <span>Agregar al Carrito</span>
-        </button>
+        {/* Buy Now & Add to Cart Action Buttons set */}
+        <div className="space-y-2 mt-4">
+          <button
+            id={`btn-buynow-${product.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onBuyNow(product);
+            }}
+            className="w-full bg-brand-900 hover:bg-black text-white font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-sm hover:shadow-md"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+            <span>Comprar ahora</span>
+          </button>
+          
+          <button
+            id={`btn-add-${product.id}`}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(product);
+            }}
+            className="w-full bg-brand-100 hover:bg-brand-200 text-brand-950 border border-brand-250 font-semibold text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          >
+            <ShoppingCart className="w-3.5 h-3.5" />
+            <span>Agregar al carrito</span>
+          </button>
+        </div>
       </div>
     </div>
   );

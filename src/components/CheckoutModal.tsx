@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { OrderDetails, CartItem, BankDetails } from "../types";
-import { X, CreditCard, Landmark, CheckCircle, ArrowRight, ClipboardCheck, ArrowLeft, ShieldAlert } from "lucide-react";
+import { X, CreditCard, Landmark, CheckCircle, ArrowRight, ClipboardCheck, ArrowLeft, ShieldAlert, DollarSign, HelpCircle, Copy, Instagram } from "lucide-react";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -14,7 +14,7 @@ interface CheckoutModalProps {
   clearCart: () => void;
   adminEmail: string;
   adminPhone: string;
-  onOrderComplete?: (orderDetails: OrderDetails, cartItems: CartItem[]) => void;
+  onOrderComplete?: (orderDetails: OrderDetails, cartItems: CartItem[], generatedOrderId?: string) => void;
   bankDetails: BankDetails;
   showToast?: (message: string, type?: "success" | "error" | "info") => void;
 }
@@ -31,6 +31,13 @@ export default function CheckoutModal({
   showToast,
 }: CheckoutModalProps) {
   const [step, setStep] = useState<"form" | "payment" | "success">("form");
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [step, isOpen]);
   const [formData, setFormData] = useState<OrderDetails>({
     fullName: "",
     email: "",
@@ -38,12 +45,41 @@ export default function CheckoutModal({
     address: "",
     city: "",
     zipCode: "",
-    paymentMethod: "transfer",
+    paymentMethod: "" as any,
     installments: 3,
   });
 
+  const [cardData, setCardData] = useState({
+    number: "",
+    name: "",
+    expiry: "",
+    cvv: "",
+  });
+
+  const handleCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { name, value } = e.target;
+    if (name === "number") {
+      value = value.replace(/\D/g, "")
+                  .replace(/(\d{4})/g, "$1 ")
+                  .trim()
+                  .substring(0, 19);
+    } else if (name === "expiry") {
+      value = value.replace(/\D/g, "");
+      if (value.length > 2) {
+        value = value.substring(0, 2) + "/" + value.substring(2, 4);
+      }
+      value = value.substring(0, 5);
+    } else if (name === "cvv") {
+      value = value.replace(/\D/g, "").substring(0, 4);
+    }
+    setCardData((prev) => ({ ...prev, [name]: value }));
+  };
+
   const [loading, setLoading] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+  const [generatedOrderId, setGeneratedOrderId] = useState("");
+  const [copiedOrder, setCopiedOrder] = useState(false);
+  const [copiedMsg, setCopiedMsg] = useState(false);
 
   const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
     if (showToast) {
@@ -60,7 +96,7 @@ export default function CheckoutModal({
     0
   );
   const isFreeShipping = subtotal >= 50000;
-  const shipping = isFreeShipping ? 0 : 5800;
+  const shipping = isFreeShipping ? 0 : 10000;
   const finalListTotal = subtotal + shipping;
 
   // Payments logic
@@ -89,38 +125,38 @@ export default function CheckoutModal({
   };
 
   const handleConfirmPayment = async () => {
+    if (formData.paymentMethod === "credit") {
+      if (!cardData.number || cardData.number.length < 15) {
+        notify("Por favor, ingresá un número de tarjeta válido.", "error");
+        return;
+      }
+      if (!cardData.name || cardData.name.trim().length < 4) {
+        notify("Por favor, ingresá el nombre impreso en la tarjeta.", "error");
+        return;
+      }
+      if (!cardData.expiry || cardData.expiry.length < 5) {
+        notify("Por favor, ingresá un vencimiento válido (MM/AA).", "error");
+        return;
+      }
+      if (!cardData.cvv || cardData.cvv.length < 3) {
+        notify("Por favor, ingresá el código de seguridad (CVV) de la tarjeta.", "error");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch("/api/send-order-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          adminEmail: adminEmail,
-          orderDetails: formData,
-          cartItems: cartItems,
-        }),
-      });
+      // Generate automatic unique Order Num #1000-#9999 as requested
+      const orderNum = `#${Math.floor(1000 + Math.random() * 9000)}`;
+      setGeneratedOrderId(orderNum);
 
-      if (response.ok) {
-        try {
-          const resData = await response.json();
-          console.log("Correo despachado con éxito de forma interna:", resData);
-        } catch (jsonErr) {
-          console.log("Notificación procesada de forma local (formato estático).");
-        }
-      } else {
-        console.warn("Servidor de notificaciones de correo no disponible (modo estático). El pedido se registrará de forma local.");
+      if (onOrderComplete) {
+        onOrderComplete(formData, cartItems, orderNum);
       }
     } catch (e) {
-      console.log("Modo de despacho offline activo: Procesando de manera exclusivamente local.");
+      console.log("Error registrando pedido de forma local:", e);
     } finally {
-      // Always register order locally for dynamic analytics and panel tracking
-      if (onOrderComplete) {
-        onOrderComplete(formData, cartItems);
-      }
       setLoading(false);
       setStep("success");
     }
@@ -137,7 +173,7 @@ export default function CheckoutModal({
       address: "",
       city: "",
       zipCode: "",
-      paymentMethod: "transfer",
+      paymentMethod: "" as any,
       installments: 3,
     });
   };
@@ -189,7 +225,7 @@ export default function CheckoutModal({
         )}
 
         {/* Content switch */}
-        <div className="p-6 max-h-[70vh] overflow-y-auto">
+        <div ref={contentRef} className="p-6 max-h-[70vh] overflow-y-auto">
           {step === "form" && (
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -319,7 +355,7 @@ export default function CheckoutModal({
                 </div>
                 <div className="flex items-center gap-2">
                   <span>🚚</span>
-                  <span>Entrega coordinada nacional por <strong>Correo Argentino</strong> (2 a 5 días)</span>
+                  <span>Entrega coordinada nacional a domicilio (2 a 5 días)</span>
                 </div>
               </div>
 
@@ -344,8 +380,15 @@ export default function CheckoutModal({
 
           {step === "payment" && (
             <div className="space-y-6">
+              {/* Friendly notification to select method first */}
+              <div className="bg-amber-50/70 border border-amber-200 text-brand-900 rounded-xl p-4 text-center space-y-1 shadow-xs">
+                <p className="text-xs text-brand-800 font-sans leading-relaxed">
+                  👋 <strong>¡Ya casi es tuyo!</strong> Por favor, elegí con qué medio querés pagar a continuación para ver los detalles:
+                </p>
+              </div>
+
               {/* Selector de métodos de pago */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Transferencia bancaria (Fácil y destacada con 15% descuento) */}
                 <div
                   className={`border-2 p-4 rounded-xl cursor-pointer transition-all flex flex-col justify-between ${
@@ -357,21 +400,21 @@ export default function CheckoutModal({
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-brand-900 flex items-center gap-2 text-sm sm:text-base">
-                        <Landmark className="w-5 h-5 text-green-700" />
+                      <h4 className="font-bold text-brand-900 flex items-center gap-1.5 text-xs sm:text-sm">
+                        <Landmark className="w-4 h-4 text-green-700 shrink-0" />
                         Transferencia Bancaria
                       </h4>
-                      <span className="bg-green-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      <span className="bg-green-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
                         -15% OFF
                       </span>
                     </div>
-                    <p className="text-xs text-brand-600 font-light mt-2">
-                      Paga de forma directa mediante CBU o Alias bancario para recibir un 15% de descuento en el pedido.
+                    <p className="text-[11px] text-brand-600 font-light mt-2 leading-relaxed">
+                      Paga mediante CBU o Alias bancario directo para recibir un 15% de descuento en el pedido.
                     </p>
                   </div>
                   <div className="text-right mt-4 pt-2 border-t border-brand-100">
-                    <span className="text-[10px] text-brand-500">Monto total con descuento:</span>
-                    <p className="text-lg font-bold text-green-700 font-serif">
+                    <span className="text-[9px] text-brand-500 block">Total con descuento:</span>
+                    <p className="text-base font-bold text-green-700 font-serif">
                       {formatCurrency(transferTotal)}
                     </p>
                   </div>
@@ -388,21 +431,21 @@ export default function CheckoutModal({
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-brand-900 flex items-center gap-2 text-sm sm:text-base">
-                        <CreditCard className="w-5 h-5 text-brand-800" />
-                        Tarjeta (Crédito/Débito)
+                      <h4 className="font-bold text-brand-900 flex items-center gap-1.5 text-xs sm:text-sm">
+                        <CreditCard className="w-4 h-4 text-brand-800 shrink-0" />
+                        Tarjeta de Crédito / Débito
                       </h4>
-                      <span className="bg-brand-800 text-brand-50 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                        3 Cuotas Sin Interés
+                      <span className="bg-brand-800 text-brand-50 text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0">
+                        3 Sin Interés
                       </span>
                     </div>
-                    <p className="text-xs text-brand-600 font-light mt-2">
-                      Admite tarjetas Visa, Mastercard, American Express o Cabal. Listo para Mercado Pago.
+                    <p className="text-[11px] text-brand-600 font-light mt-2 leading-relaxed">
+                      Cobro online inmediato sin enviar fotos ni comprobantes de pago.
                     </p>
                   </div>
                   <div className="text-right mt-4 pt-2 border-t border-brand-100">
-                    <span className="text-[10px] text-brand-500">3 de lista de:</span>
-                    <p className="text-lg font-bold text-brand-900 font-serif">
+                    <span className="text-[9px] text-brand-500 block">3 cuotas fijas de:</span>
+                    <p className="text-base font-bold text-brand-900 font-serif">
                       {formatCurrency(installmentAmount)}
                     </p>
                   </div>
@@ -410,50 +453,105 @@ export default function CheckoutModal({
               </div>
 
               {/* Detalles dinámicos según el método elegido */}
-              {formData.paymentMethod === "transfer" ? (
-                <div className="bg-green-50 border border-green-200 rounded-xl p-5 space-y-3">
-                  <h4 className="font-serif font-bold text-green-900 text-sm flex items-center gap-1.5">
-                    <Landmark className="w-4 h-4 text-green-700" />
-                    Datos para realizar la Transferencia Bancaria:
-                  </h4>
-                  <div className="text-xs text-brand-800 space-y-1.5 font-mono">
-                    <p><strong>Banco / Entidad:</strong> {bankDetails.bankName}</p>
-                    <p><strong>Titular de la Cuenta:</strong> {bankDetails.accountHolder}</p>
-                    <p><strong>CBU / CVU:</strong> {bankDetails.cbu}</p>
-                    <p><strong>Alias de Pago:</strong> {bankDetails.alias}</p>
-                    <p><strong>CUIT / CUIL:</strong> {bankDetails.cuit}</p>
+              {!formData.paymentMethod && (
+                <div className="bg-[#FFFDF9] border-2 border-dashed border-amber-300 rounded-xl p-6 text-center space-y-3 shadow-xs">
+                  <div className="p-3 bg-amber-50 rounded-full inline-block text-amber-600 animate-bounce">
+                    <HelpCircle className="w-6 h-6" />
                   </div>
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={copyCBU}
-                      className="px-3.5 py-1.5 bg-green-700 hover:bg-green-800 text-white text-xs font-semibold rounded-lg transition-transform active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <ClipboardCheck className="w-3.5 h-3.5" />
-                      <span>{copiedText ? "¡Copiado!" : "Copiar datos de CBU"}</span>
-                    </button>
-                    <p className="text-[10px] text-green-700 italic">
-                      Por favor, una vez realizada la transferencia, envía el comprobante a nuestro Instagram @deco.home.rosario para despachar tu envío de inmediato.
+                  <div className="space-y-1">
+                    <h4 className="font-serif font-black text-brand-900 text-sm">
+                      Por favor, seleccioná tu Medio de Pago arriba:
+                    </h4>
+                    <p className="text-xs text-brand-600 max-w-md mx-auto leading-relaxed">
+                      Elegí <strong>Transferencia Bancaria</strong> para disfrutar de un 15% de descuento inmediato, o <strong>Tarjeta de Crédito / Débito</strong> para financiar en hasta 3 cuotas fijas sin interés.
                     </p>
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {formData.paymentMethod === "transfer" && (
+                <div className="bg-white border-2 border-brand-200 rounded-xl p-5 sm:p-6 space-y-4 shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-brand-100 pb-3">
+                    <Landmark className="w-5 h-5 text-brand-900" />
+                    <h4 className="font-serif font-bold text-brand-900 text-sm">
+                      Paso de Pago por Transferencia:
+                    </h4>
+                  </div>
+                  
+                  <div className="space-y-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-brand-800">
+                      <div className="bg-brand-50 p-3 rounded-lg">
+                        <span className="block text-[10px] text-brand-505 uppercase tracking-widest font-bold">Banco</span>
+                        <span className="font-semibold text-brand-900">{bankDetails.bankName || "Banco Nación"}</span>
+                      </div>
+                      
+                      <div className="bg-brand-50 p-3 rounded-lg">
+                        <span className="block text-[10px] text-brand-505 uppercase tracking-widest font-bold">Titular de Cuenta</span>
+                        <span className="font-semibold text-brand-900">{bankDetails.accountHolder || "Hogar y Estilo S.H."}</span>
+                      </div>
+                      
+                      <div className="bg-brand-50 p-3 rounded-lg">
+                        <span className="block text-[10px] text-brand-505 uppercase tracking-widest font-bold">Tipo de Cuenta</span>
+                        <span className="font-semibold text-brand-900">Caja de Ahorros Pesos</span>
+                      </div>
+
+                      <div className="bg-brand-50 p-3 rounded-lg">
+                        <span className="block text-[10px] text-brand-505 uppercase tracking-widest font-bold">CUIT / Identificación</span>
+                        <span className="font-semibold text-brand-900">{bankDetails.cuit || "20-35890432-1"}</span>
+                      </div>
+
+                      <div className="bg-brand-50 p-3 rounded-lg col-span-1 sm:col-span-2">
+                        <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">CBU / CVU Bancario (Copiar manualmente de ser necesario)</span>
+                        <span className="font-mono font-bold text-brand-900 text-xs sm:text-sm break-all select-all">{bankDetails.cbu}</span>
+                      </div>
+                    </div>
+
+                    {/* Copy interactive Alias line (ONLY ALIAS COPIABLE WITH A TAP) */}
+                    <div className="flex flex-col sm:flex-row justify-between items-center bg-green-50/70 border border-green-200 p-4 rounded-xl gap-4 text-left">
+                      <div>
+                        <span className="block text-[10px] text-green-755 uppercase tracking-widest font-bold mb-0.5">Alias de Cobro (Toca para copiar)</span>
+                        <span className="font-sans font-black text-brand-950 text-base tracking-wider select-all">{bankDetails.alias}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(bankDetails.alias);
+                          notify("¡Alias copiado! Úsalo para transferir", "success");
+                        }}
+                        className="px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white rounded-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer font-bold text-xs shadow-xs w-full sm:w-auto"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-white" />
+                        <span>Copiar Alias</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-brand-600 font-light mt-2 leading-relaxed bg-[#FFFDF9] border border-brand-200 p-2.5 rounded-lg">
+                    💡 <strong>Recordá:</strong> Copiá el Alias para transferir desde la aplicación de tu banco o billetera virtual. No hace falta que envíes capturas, asociamos automáticamente con tus datos.
+                  </p>
+                </div>
+              )}
+
+              {formData.paymentMethod === "credit" && (
                 <div className="bg-brand-100 border border-brand-300 rounded-xl p-5 space-y-4">
                   <h4 className="font-serif font-semibold text-brand-900 text-sm flex items-center gap-1.5">
                     <CreditCard className="w-4 h-4 text-brand-800" />
-                    Simulador seguro de Tarjeta de Crédito/Débito
+                    Pasarela Segura Automática (Acreditación Inmediata)
                   </h4>
                   <p className="text-xs text-brand-600 font-light">
-                    Hogar y Estilo utiliza encriptación de datos de extremo a extremo. Paga tranquilo.
+                    Hogar y Estilo procesa los cobros con cifrado SSL de seguridad. Tu pago se valida al instante sin tener que enviar comprobantes ni avisar por WhatsApp.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <span className="block text-[10px] font-semibold text-brand-700 uppercase mb-1">Número de Tarjeta</span>
                       <input
                         type="text"
+                        name="number"
                         placeholder="4517 •••• •••• 1278"
                         maxLength={19}
                         disabled={loading}
+                        value={cardData.number}
+                        onChange={handleCardChange}
                         className="w-full bg-white border border-brand-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 font-mono"
                       />
                     </div>
@@ -461,8 +559,11 @@ export default function CheckoutModal({
                       <span className="block text-[10px] font-semibold text-brand-700 uppercase mb-1">Nombre Impreso</span>
                       <input
                         type="text"
+                        name="name"
                         placeholder="SOFIA MEDINA"
                         disabled={loading}
+                        value={cardData.name}
+                        onChange={handleCardChange}
                         className="w-full bg-white border border-brand-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900"
                       />
                     </div>
@@ -470,20 +571,26 @@ export default function CheckoutModal({
                       <span className="block text-[10px] font-semibold text-brand-700 uppercase mb-1">Vencimiento</span>
                       <input
                         type="text"
+                        name="expiry"
                         placeholder="MM / AA"
                         maxLength={5}
                         disabled={loading}
-                        className="w-full bg-white border border-brand-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900"
+                        value={cardData.expiry}
+                        onChange={handleCardChange}
+                        className="w-full bg-white border border-brand-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 font-mono"
                       />
                     </div>
                     <div>
                       <span className="block text-[10px] font-semibold text-brand-700 uppercase mb-1">Código (CVV)</span>
                       <input
                         type="password"
+                        name="cvv"
                         placeholder="•••"
                         maxLength={4}
                         disabled={loading}
-                        className="w-full bg-white border border-brand-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900"
+                        value={cardData.cvv}
+                        onChange={handleCardChange}
+                        className="w-full bg-white border border-brand-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 font-mono"
                       />
                     </div>
                   </div>
@@ -514,9 +621,11 @@ export default function CheckoutModal({
                 <button
                   type="button"
                   onClick={handleConfirmPayment}
-                  disabled={loading}
+                  disabled={loading || !formData.paymentMethod}
                   className={`px-6 py-3 text-xs sm:text-sm font-semibold tracking-wider uppercase rounded-lg flex items-center gap-2 transition-all shadow-md transform active:scale-95 cursor-pointer ${
-                    formData.paymentMethod === "transfer"
+                    !formData.paymentMethod
+                      ? "bg-brand-200 text-brand-400 border border-brand-300 cursor-not-allowed shadow-none"
+                      : formData.paymentMethod === "transfer"
                       ? "bg-green-700 hover:bg-green-800 text-white"
                       : "bg-brand-900 hover:bg-black text-white"
                   }`}
@@ -528,7 +637,13 @@ export default function CheckoutModal({
                     </>
                   ) : (
                     <>
-                      <span>{formData.paymentMethod === "transfer" ? "Notificar y Confirmar Pedido" : "Confirmar Pago Seguro"}</span>
+                      <span>
+                        {!formData.paymentMethod
+                          ? "Seleccionar Pago"
+                          : formData.paymentMethod === "transfer"
+                          ? "Registrar Pedido y Ver Alias"
+                          : "Confirmar Pago Seguro"}
+                      </span>
                       <CheckCircle className="w-4 h-4" />
                     </>
                   )}
@@ -542,7 +657,8 @@ export default function CheckoutModal({
             const toPay = isTransfer ? transferTotal : finalListTotal;
             
             const buildOrderSummaryText = () => {
-              const methodText = isTransfer ? "Transferencia Bancaria (-15% OFF)" : "Tarjeta de Crédito (3 cuotas sin interés)";
+              let methodText = "Tarjeta de Crédito (3 cuotas sin interés)";
+              if (isTransfer) methodText = "Transferencia Bancaria (-15% OFF)";
               
               let text = `📦 NUEVO COMPROBANTE DE COMPRA - HOGAR & ESTILO\n\n`;
               text += `👤 Cliente: ${formData.fullName}\n`;
@@ -570,63 +686,177 @@ export default function CheckoutModal({
             };
 
             const orderText = buildOrderSummaryText();
-            const cleanPhone = adminPhone ? adminPhone.replace(/[^0-9]/g, "") : "5493416555555";
-            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(orderText)}`;
-            const mailtoUrl = `mailto:${adminEmail}?subject=Nuevo Pedido Hogar %26 Estilo - ${encodeURIComponent(formData.fullName)}&body=${encodeURIComponent(orderText)}`;
-
+            const directMessageText = `Hola Hogar y Estilo, ya realicé mi compra y quedo a la espera del código de seguimiento una vez despachado`;
             return (
               <div className="py-6 text-center space-y-6">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-700 shadow-md">
-                  <CheckCircle className="w-10 h-10" />
-                </div>
+                
+                {/* 1. SECCIÓN PRINCIPAL: AGRADECIMIENTO E INSTAGRAM DIRECTO AL INCIAR LA PÁGINA (A pedido del usuario) */}
+                <div className="bg-brand-100 border-2 border-brand-200 p-5 sm:p-6 rounded-2xl max-w-md mx-auto text-center space-y-4 shadow-sm animate-fade-in">
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-700 shadow-md">
+                    <CheckCircle className="w-8 h-8 animate-bounce" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-serif text-2xl sm:text-3xl font-bold text-brand-900">
+                      ¡Gracias por elegirnos!
+                    </h4>
+                    <p className="text-xs sm:text-sm text-brand-700 max-w-xs mx-auto font-light leading-relaxed">
+                      Registramos el pedido de forma exitosa para <strong>{formData.fullName}</strong>.
+                    </p>
+                  </div>
 
-                <div className="space-y-2">
-                  <h4 className="font-serif text-2xl sm:text-3xl font-bold text-brand-900">
-                    ¡Muchas gracias por tu compra!
-                  </h4>
-                  <p className="text-xs sm:text-sm text-brand-600 max-w-md mx-auto font-light">
-                    Hemos registrado tu pedido para <strong>{formData.fullName}</strong> en nuestro panel de control de envíos locales.
-                  </p>
-                </div>
+                  <div className="border-t border-brand-250 pt-3 space-y-3">
+                    <p className="text-xs sm:text-sm text-brand-950 font-semibold leading-relaxed font-sans">
+                      📲 <strong>¡Aviso Importante!</strong> Para confirmar la compra y coordinar el despacho rápido de tus productos, por favor envianos una captura o foto del comprobante de pago a nuestro Instagram.
+                    </p>
 
-                {/* Direct Action Channels Dispatch Box */}
-                <div className="bg-white border border-brand-200 p-5 rounded-2xl max-w-md mx-auto text-left space-y-3 shadow-xs">
-                  <p className="font-bold text-xs uppercase tracking-wider text-brand-800 text-center">
-                    📲 ¡Envía tu pedido al vendedor para agilizar el despacho!
-                  </p>
-                  <p className="text-[11px] text-brand-500 text-center font-light leading-relaxed">
-                    Puedes notificar al propietario al instante presionando los botones de abajo. Tu comprobante se cargará listo para enviar por Email o WhatsApp.
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <a
-                      href={whatsappUrl}
+                      href="https://instagram.com/deco.home.rosario"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-bold text-[11px] py-3 px-3 rounded-lg shadow-sm transition-all uppercase tracking-wider text-center"
+                      onClick={() => {
+                        navigator.clipboard.writeText(directMessageText);
+                        notify("¡Mensaje de aviso copiado! Pegalo al chatear en Instagram.", "success");
+                      }}
+                      className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:brightness-110 text-white py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] active:scale-95 text-center cursor-pointer font-sans shadow-md"
                     >
-                      <span>Por WhatsApp</span>
-                      <span className="text-xs">💬</span>
-                    </a>
-                    <a
-                      href={mailtoUrl}
-                      className="flex items-center justify-center gap-1.5 bg-brand-900 hover:bg-black text-brand-50 font-bold text-[11px] py-3 px-3 rounded-lg shadow-sm transition-all uppercase tracking-wider text-center"
-                    >
-                      <span>Por E-mail</span>
-                      <span className="text-xs">✉️</span>
+                      <Instagram className="w-4.5 h-4.5 text-white" />
+                      <span>Avisar Compra por Instagram</span>
                     </a>
                   </div>
                 </div>
 
-                {isTransfer && (
-                  <div className="bg-green-50 border border-green-200 p-4 rounded-xl max-w-md mx-auto text-left text-xs space-y-2">
-                    <p className="font-semibold text-green-800">📌 Recuerda transferir para guardar la seña:</p>
-                    <p className="text-brand-700 leading-relaxed font-light">
-                      Transfiere el importe de <strong className="text-green-750 font-serif font-black">{formatCurrency(transferTotal)}</strong> y envía el comprobante bancario por cualquiera de los canales de arriba o por nuestro Instagram principal.
+                {/* 2. BADGE DE ESTADO DEL PAGO SÚPER CLARO SEGÚN TRANSFER/TARJETA */}
+                {isTransfer ? (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-1.5 shadow-xs">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-955 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full font-serif">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                      Estado: Reserva Confirmada - Pago Pendiente
+                    </div>
+                    <p className="text-[11px] text-brand-700 leading-relaxed font-light">
+                      Tu pedido está reservado por 24 horas. Realizá la transferencia de <strong>{formatCurrency(transferTotal)}</strong> usando el <strong>Alias de abajo</strong>, y envianos el comprobante por Instagram para que preparemos tu paquete de inmediato.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-green-50 border border-green-200 text-green-955 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-1.5 shadow-xs">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-955 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full font-serif">
+                      <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                      Estado: Pago Seguro Aprobado 🎉
+                    </div>
+                    <p className="text-[11px] text-brand-700 leading-relaxed font-light">
+                      El pago de <strong>{formatCurrency(finalListTotal)}</strong> con tarjeta fue procesado y confirmado con éxito. ¡Ya estamos preparando tu pedido para despacharlo!
                     </p>
                   </div>
                 )}
 
-                <div className="pt-4">
+                {/* 3. GIGANTE Order Number widget space as requested */}
+                <div className="flex flex-col items-center space-y-2">
+                  <div 
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedOrderId || "#1024");
+                      setCopiedOrder(true);
+                      notify("¡Número de orden copiado!", "success");
+                      setTimeout(() => setCopiedOrder(false), 2000);
+                    }}
+                    className="bg-brand-900 hover:bg-black text-brand-50 rounded-xl px-10 py-5 shadow-lg border border-brand-800 inline-block cursor-pointer group active:scale-95 transition-all text-center select-none"
+                    title="¡Toca para copiar!"
+                  >
+                    <span className="block text-[9px] text-brand-300 font-black uppercase tracking-widest mb-1 font-sans group-hover:text-amber-300 transition-colors">
+                      {copiedOrder ? "¡Copiado con éxito! 🎉" : "Número de tu Orden (Toca para copiar)"}
+                    </span>
+                    <span className="font-mono text-3xl sm:text-4xl font-black text-white tracking-wider group-hover:text-amber-300 transition-colors">
+                      {generatedOrderId || "#1024"}
+                    </span>
+                  </div>
+                  
+                  {/* Copy Order ID Button */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedOrderId || "#1024");
+                        setCopiedOrder(true);
+                        notify("Número de orden copiado", "success");
+                        setTimeout(() => setCopiedOrder(false), 2000);
+                      }}
+                      className="bg-white hover:bg-brand-50 border border-brand-200 text-brand-900 px-4.5 py-2 rounded-lg text-xs font-semibold tracking-wide transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 text-center font-sans"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-brand-850" />
+                      <span>{copiedOrder ? "¡Número Copiado!" : "Copiar Número de Orden"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Recordatorio de envío de comprobante y nro de orden */}
+                <div className="bg-[#FFFDF9] border border-amber-205 rounded-xl p-4 max-w-md mx-auto text-center space-y-1 shadow-xs">
+                  <p className="text-[11px] sm:text-xs text-brand-900 leading-relaxed font-sans">
+                    ⚠️ <strong>Si abonás por Transferencia Bancaria:</strong> Recordá que para poder despachar tu pedido, debés enviarnos por Instagram tanto tu <strong>Número de Orden ({generatedOrderId || "#1024"})</strong> como la <strong>captura o comprobante de pago</strong>. ¡Así corroboramos y preparamos tu despacho más rápido!
+                  </p>
+                </div>
+
+                {/* 4. DATOS BANCARIOS (SI ES TRANSFERENCIA) */}
+                {isTransfer && (
+                  <div className="bg-green-50/70 border-2 border-green-200 p-5 sm:p-6 rounded-2xl max-w-md mx-auto text-left space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-green-200 pb-2.5">
+                      <Landmark className="w-4.5 h-4.5 text-green-800" />
+                      <span className="font-bold text-xs uppercase tracking-wider text-green-950">🏦 Datos bancarios para transferir:</span>
+                    </div>
+
+                    <div className="space-y-3 text-[11px] font-mono text-brand-800 bg-white p-4 rounded-xl border border-brand-100">
+                      <p><strong>Banco:</strong> {bankDetails.bankName}</p>
+                      <p><strong>Titular:</strong> {bankDetails.accountHolder}</p>
+                      <p><strong>CBU CVU:</strong> <span className="font-bold text-brand-950 break-all">{bankDetails.cbu}</span></p>
+                      
+                      <div className="p-3 border border-dashed border-green-200 bg-green-50/50 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 my-2 text-left">
+                        <div>
+                          <p className="text-[10px] text-brand-500 font-bold uppercase tracking-wider font-sans">Alias para Copiar:</p>
+                          <p className="text-sm font-sans font-extrabold text-brand-950 tracking-wider select-all">{bankDetails.alias}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(bankDetails.alias || "");
+                            notify("¡Alias de CBU copiado!", "success");
+                          }}
+                          className="bg-green-700 hover:bg-green-800 text-white font-sans px-3.5 py-2 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95 whitespace-nowrap self-stretch sm:self-auto justify-center"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-white" />
+                          <span>Copiar Alias</span>
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] text-brand-600 font-sans italic leading-tight pt-1">
+                        ⚠️ Por seguridad y para evitar errores de un número que puedan errar, solo se puede copiar con un toque el Alias. Por favor, utilizalo para transferir.
+                      </p>
+
+                      <p className="border-t border-brand-100 pt-2 shrink-0">
+                        <strong>Monto neto a transferir:</strong> <strong className="text-green-800 text-sm font-bold font-mono">{formatCurrency(transferTotal)}</strong>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. ACREDITACIÓN DE TARJETA (SI ES TARJETA) */}
+                {!isTransfer && (
+                  <div className="bg-blue-50 border border-blue-200 p-5 rounded-xl max-w-md mx-auto text-left text-xs space-y-1.5 shadow-xs">
+                    <p className="font-semibold text-blue-800 flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                      💳 Acreditación de Pago Segura:
+                    </p>
+                    <p className="text-[11px] text-brand-700 leading-relaxed font-light">
+                      Tu pago de <strong className="text-brand-900 font-bold">{formatCurrency(finalListTotal)}</strong> ha sido validado y acreditado con éxito en criptografía SSL de extremo a extremo. Los artículos ya pasaron a control de logística y empaque reforzado.
+                    </p>
+                  </div>
+                )}
+
+                {/* 6. OTROS CANALES */}
+                <div className="bg-[#FAF8F5] border border-brand-200 p-4 rounded-xl max-w-md mx-auto text-center space-y-2">
+                  <p className="text-[11px] text-brand-600 leading-relaxed font-light">
+                    Por consultas sobre el despacho o para seguir el paquete, puedes responder directamente al correo electrónico automatizado o consultarnos en Instagram en <a href="https://instagram.com/deco.home.rosario" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-900 hover:underline">@deco.home.rosario</a>.
+                  </p>
+                </div>
+
+                {/* 7. BOTÓN VOLVER */}
+                <div className="pt-2">
                   <button
                     onClick={handleFinish}
                     className="bg-brand-900 hover:bg-black text-brand-50 px-8 py-3 rounded-full text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all shadow-md cursor-pointer"

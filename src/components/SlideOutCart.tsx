@@ -26,7 +26,7 @@ export default function SlideOutCart({
   onCheckout,
 }: SlideOutCartProps) {
   const FREE_SHIPPING_LIMIT = 50000;
-  const SHIPPING_COST = 5800;
+  const SHIPPING_COST = 10000;
 
   // Calculations
   const subtotal = cartItems.reduce(
@@ -82,35 +82,65 @@ export default function SlideOutCart({
           </div>
 
           {/* Shipping Threshold Progress Metagame */}
-          <div className="p-4 sm:p-5 bg-white border-b border-brand-100">
+          <div className="p-4 sm:p-5 bg-brand-100/50 border-b border-brand-200">
             {cartItems.length === 0 ? (
-              <p className="text-xs sm:text-sm text-brand-500 font-light text-center">
-                Carga productos para calcular el envío gratis.
-              </p>
-            ) : isFreeShipping ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs sm:text-sm text-green-700 flex items-center gap-1.5 font-medium">
-                  <Truck className="w-4 h-4" />
-                  ¡Felicitaciones! Tenés <strong>Envío Gratis</strong> para todo este pedido.
+              <div className="text-center py-2">
+                <p className="text-xs text-brand-500 font-light font-sans flex items-center justify-center gap-1.5">
+                  <Truck className="w-4 h-4 text-brand-400" />
+                  Cargá productos para calcular el envío gratis.
                 </p>
-                <div className="w-full bg-green-100 h-2 rounded-full overflow-hidden">
-                  <div className="bg-green-700 h-full rounded-full transition-all duration-500 w-full" />
+              </div>
+            ) : isFreeShipping ? (
+              <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 sm:p-4.5 space-y-3 shadow-xs animate-pulse">
+                <div className="flex items-center gap-2.5 text-green-900">
+                  <div className="p-2 bg-green-100 rounded-full text-green-700 shadow-sm animate-bounce">
+                    <Truck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-serif font-black text-xs sm:text-sm uppercase tracking-wide">¡ENVÍO 100% GRATIS!</h4>
+                    <p className="text-[11px] text-green-700 font-semibold leading-tight mt-0.5">
+                      ¡Excelente! Cumpliste con el presupuesto para que te enviemos tu pedido totalmente gratis.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="w-full bg-green-100 h-3 rounded-full overflow-hidden shadow-inner">
+                    <div className="bg-gradient-to-r from-green-600 to-emerald-500 h-full rounded-full transition-all duration-700 w-full animate-slide-progress" />
+                  </div>
+                  <div className="flex justify-between text-[9px] font-bold text-green-700 tracking-wider">
+                    <span>ENVÍO BONIFICADO</span>
+                    <span>100% COMPLETADO</span>
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs sm:text-sm text-brand-800 font-light">
-                  Estás a solo <strong className="font-bold text-brand-900">{formatCurrency(remainingForFreeShipping)}</strong> de obtener <strong className="font-semibold text-green-700">Envío Gratis</strong>.
-                </p>
-                <div className="w-full bg-brand-200 h-2 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-brand-800 h-full rounded-full transition-all duration-500" 
-                    style={{ width: `${progressPercent}%` }}
-                  />
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50/30 border border-amber-200 rounded-xl p-3.5 space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0 animate-bounce">
+                    <Truck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-serif font-black text-xs text-brand-900 tracking-wide">
+                      Envío Gratis Disponible
+                    </h4>
+                    <p className="text-[11px] text-brand-800 leading-tight">
+                      Te faltan solo <strong className="font-extrabold text-rose-600 font-mono text-[11.5px] bg-white px-1.5 py-0.5 rounded border border-rose-100 shadow-2xs inline-block animate-pulse">{formatCurrency(remainingForFreeShipping)}</strong> para envío gratis.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-[10px] text-brand-500 italic">
-                  Umbral de envío gratis: {formatCurrency(FREE_SHIPPING_LIMIT)} ARS.
-                </p>
+
+                <div className="space-y-1">
+                  <div className="w-full bg-brand-200 h-2 rounded-full overflow-hidden shadow-inner">
+                    <div 
+                      className="bg-gradient-to-r from-amber-500 to-rose-500 h-full rounded-full transition-all duration-700 relative overflow-hidden animate-slide-progress" 
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-[9px] text-brand-500 font-bold tracking-tight">
+                    <span>Llevás {progressPercent.toFixed(0)}% del mínimo</span>
+                    <span>Envío Gratis a partir de {formatCurrency(FREE_SHIPPING_LIMIT)}</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -123,7 +153,7 @@ export default function SlideOutCart({
                 <div>
                   <p className="text-lg font-serif font-bold text-brand-900">Tu bolsa está vacía</p>
                   <p className="text-xs sm:text-sm text-brand-500 font-light mt-1">
-                    Animate a decorar tu hogar con nuestra exclusiva curaduría.
+                    Animate a transformar tus espacios con la mejor selección de decoración y diseño.
                   </p>
                 </div>
                 <button
@@ -240,7 +270,7 @@ export default function SlideOutCart({
                 </div>
                 {!isFreeShipping && (
                   <p className="text-[10px] text-brand-500 text-right font-light">
-                    Agrega {formatCurrency(remainingForFreeShipping)} más para envío bonificado.
+                    Agregá {formatCurrency(remainingForFreeShipping)} más para envío bonificado.
                   </p>
                 )}
                 <div className="border-t border-brand-200 pt-3 flex justify-between text-base sm:text-lg font-bold text-brand-900">
@@ -249,11 +279,24 @@ export default function SlideOutCart({
                 </div>
               </div>
 
+              {/* Shipping helper directly above CTAs as requested */}
+              {isFreeShipping ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-2.5 text-center text-xs text-green-800 font-semibold flex items-center justify-center gap-2 shadow-2xs">
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-ping shrink-0" />
+                  <span>¡Excelente! Tenés <strong>Envío Gratis</strong> para todo este pedido. 🎉</span>
+                </div>
+              ) : (
+                <div className="bg-amber-50/80 border border-amber-200/80 rounded-lg p-2.5 text-center text-xs text-brand-800 flex items-center justify-center gap-2 shadow-2xs">
+                  <span className="inline-block w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                  <span>Faltan solo <strong className="text-rose-600 font-mono font-bold">{formatCurrency(remainingForFreeShipping)}</strong> para tener <strong>Envío Gratis</strong>.</span>
+                </div>
+              )}
+
               {/* Secure order elements */}
               <div className="bg-brand-100 p-2.5 rounded-lg border border-brand-200 flex items-center gap-2 text-[10.5px] text-brand-600 font-light leading-snug">
                 <ShieldCheck className="w-5 h-5 text-green-700 shrink-0" />
                 <span>
-                  Compra segura y protegida. Reembolso total de 14 días si no estás 100% satisfecho con los materiales.
+                  Compra segura y protegida. Tenés cambio garantizado si algo no queda perfecto en tu hogar.
                 </span>
               </div>
 

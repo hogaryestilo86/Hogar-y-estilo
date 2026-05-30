@@ -88,7 +88,7 @@ export default function Header({
             <button
               id="btn-nav-shop"
               onClick={() => onTabChange("shop")}
-              className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide transition-all ${
+              className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide transition-all cursor-pointer ${
                 activeTab === "shop"
                   ? "bg-brand-900 text-brand-100 shadow-sm"
                   : "text-brand-700 hover:text-brand-900"
@@ -100,7 +100,7 @@ export default function Header({
               <button
                 id="btn-nav-admin"
                 onClick={() => onTabChange("admin")}
-                className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide transition-all ${
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide transition-all cursor-pointer ${
                   activeTab === "admin"
                     ? "bg-brand-500 text-brand-100 shadow-sm"
                     : "text-brand-700 hover:text-brand-900"

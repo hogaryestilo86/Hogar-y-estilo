@@ -17,9 +17,10 @@ interface ShowcasePhoto {
 
 interface HeroSliderProps {
   showcasePhotos: ShowcasePhoto[];
+  onSelectCategory?: (category: string) => void;
 }
 
-export default function HeroSlider({ showcasePhotos }: HeroSliderProps) {
+export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSliderProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const scrollLeft = () => {
@@ -145,13 +146,22 @@ export default function HeroSlider({ showcasePhotos }: HeroSliderProps) {
                   <span className="text-[10px] font-mono text-brand-400">
                     Hogar & Cocina
                   </span>
-                  <a
-                    href="#productos"
-                    className="text-[11px] font-bold uppercase tracking-wider text-brand-900 hover:text-brand-700 transition-colors flex items-center gap-1.5 group"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onSelectCategory) {
+                        onSelectCategory("Destacados");
+                      }
+                      const el = document.getElementById("productos");
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth" });
+                      }
+                    }}
+                    className="text-[11px] font-bold uppercase tracking-wider text-brand-900 hover:text-brand-700 transition-colors flex items-center gap-1.5 group cursor-pointer border-none bg-transparent"
                   >
                     <span>Ver catálogo</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>

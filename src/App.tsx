@@ -13,7 +13,7 @@ import CheckoutModal from "./components/CheckoutModal";
 import AdminPanel from "./components/AdminPanel";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
-import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck } from "lucide-react";
+import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
 // Helper to resolve image urls, stripping the local server proxy prefix if run in static hosts (Vercel, GitHub Pages)
 export function resolveImageUrl(url: string | undefined): string {
@@ -82,6 +82,12 @@ export default function App() {
   // Sticky instagram chat sim widget state
   const [showStickyChat, setShowStickyChat] = useState(true);
 
+  // Tracking details states
+  const [searchOrderId, setSearchOrderId] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
+  const [trackerResult, setTrackerResult] = useState<any | null>(null);
+  const [trackerSearchDone, setTrackerSearchDone] = useState(false);
+
   // Active slide index for manual presentation photos slider (Requerimiento de fotos autodesplazables cada 5 segundos)
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
@@ -128,6 +134,59 @@ export default function App() {
       pendingDispatchesCount: 0,
     };
   });
+
+  // Argentine common real buyer combinations for live simulation alerts (Requerimiento 4 / 7)
+  const ARGENTINE_BUYERS = [
+    { name: "Sofía", city: "Rosario" },
+    { name: "Matías", city: "Funes" },
+    { name: "Lucas", city: "Córdoba" },
+    { name: "Florencia", city: "San Lorenzo" },
+    { name: "Valentina", city: "Godoy Cruz" },
+    { name: "Juan", city: "Salta" },
+    { name: "Bautista", city: "Mendoza" },
+    { name: "Mateo", city: "Santa Fe" },
+    { name: "Catalina", city: "San Isidro" },
+    { name: "Camila", city: "Mar del Plata" },
+    { name: "Felipe", city: "San Miguel" },
+    { name: "Agustina", city: "Rafaela" },
+    { name: "Joaquín", city: "Neuquén" },
+    { name: "Martina", city: "Paraná" },
+    { name: "Thiago", city: "Ramos Mejía" },
+    { name: "Delfina", city: "La Plata" },
+    { name: "Benjamín", city: "Tigre" },
+    { name: "Victoria", city: "San Luis" },
+    { name: "Facundo", city: "Bahía Blanca" },
+    { name: "Lautaro", city: "San Carlos" },
+    { name: "Emilia", city: "Yerba Buena" },
+    { name: "Brisa", city: "Santo Tomé" },
+    { name: "Julián", city: "Roldán" },
+    { name: "Milagros", city: "Corrientes" }
+  ];
+
+  const [recentSaleAlert, setRecentSaleAlert] = useState<string | null>(null);
+
+  useEffect(() => {
+    const showRandomAlert = () => {
+      const buyer = ARGENTINE_BUYERS[Math.floor(Math.random() * ARGENTINE_BUYERS.length)];
+      setRecentSaleAlert(`¡${buyer.name} de ${buyer.city} realizó una compra hace un momento!`);
+
+      // Dismiss after 6 seconds
+      setTimeout(() => {
+        setRecentSaleAlert(null);
+      }, 6000);
+    };
+
+    // Show initial alert after 35 seconds to avoid initial mounting layout shifts
+    const initialTimer = setTimeout(showRandomAlert, 35000);
+
+    // Repeat every 85 seconds
+    const intervalTimer = setInterval(showRandomAlert, 85000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalTimer);
+    };
+  }, []);
 
   // Dynamic Orders Database (Requerimiento 6 de Control de envíos) - Empieza vacío para ser completamente prolijo y profesional
   const [pendingOrders, setPendingOrders] = useState<any[]>(() => {
@@ -194,8 +253,8 @@ export default function App() {
   const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
   const [adminLoginError, setAdminLoginError] = useState("");
 
-  // Categories query set (Herramientas, Iluminación veladores, luces de emergencia etc.)
-  const categories = ["Todos", "Cocina", "Hogar", "Belleza", "Herramientas", "Iluminación"];
+  // Categories query set (Herramientas, Iluminación, Destacados, etc.)
+  const categories = ["Todos", "Destacados", "Cocina", "Hogar", "Belleza", "Herramientas", "Iluminación"];
 
   // Handlers
   const handleAddToCart = (product: Product) => {
@@ -243,6 +302,11 @@ export default function App() {
     setCartItems((prev) => prev.filter((item) => item.product.id !== id));
   };
 
+  const handleBuyNow = (product: Product) => {
+    setCartItems([{ product, quantity: 1 }]);
+    setIsCheckoutOpen(true);
+  };
+
   const handleClearCart = () => {
     setCartItems([]);
   };
@@ -261,9 +325,9 @@ export default function App() {
     setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const handleOrderComplete = (orderDetails: any, itemsInCart: any[]) => {
+  const handleOrderComplete = (orderDetails: any, itemsInCart: any[], generatedOrderId?: string) => {
     const newOrder = {
-      id: `ord-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: generatedOrderId || `ord-${Math.floor(1000 + Math.random() * 9000)}`,
       date: new Date().toISOString(),
       details: orderDetails,
       items: [...itemsInCart],
@@ -281,19 +345,6 @@ export default function App() {
       purchasesCount: prev.purchasesCount + 1,
       pendingDispatchesCount: prev.pendingDispatchesCount + 1,
       abandonedCartCount: Math.max(0, prev.abandonedCartCount - 1),
-    }));
-  };
-
-  const handleMarkOrderAsShipped = (orderId: string) => {
-    setPendingOrders((prevOrders) =>
-      prevOrders.map((ord) =>
-        ord.id === orderId ? { ...ord, status: "shipped" } : ord
-      )
-    );
-    
-    setStoreMetrics((prev: any) => ({
-      ...prev,
-      pendingDispatchesCount: Math.max(0, prev.pendingDispatchesCount - 1),
     }));
   };
 
@@ -357,7 +408,9 @@ export default function App() {
       descStr.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesCategory =
-      selectedCategory === "Todos" || p.category === selectedCategory;
+      selectedCategory === "Todos" ||
+      (selectedCategory === "Destacados" && p.featured) ||
+      p.category === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -407,7 +460,10 @@ export default function App() {
           <div className="space-y-12">
             
             {/* Elegant Hero Carousel Slider */}
-            <HeroSlider showcasePhotos={showcasePhotos} />
+            <HeroSlider 
+              showcasePhotos={showcasePhotos} 
+              onSelectCategory={(cat) => setSelectedCategory(cat)} 
+            />
 
             {/* Quality USP Grid */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -428,9 +484,9 @@ export default function App() {
                     <Star className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="font-serif font-bold text-brand-900 text-sm">Calidad de Curaduría</h4>
+                    <h4 className="font-serif font-bold text-brand-900 text-sm">Calidad y Estilo Únicos</h4>
                     <p className="text-xs text-brand-600 mt-1 font-light leading-relaxed">
-                      Trabajamos de forma alineada con talleres de vidrieros y marmoleros locales para garantizar terminaciones perfectas.
+                      Seleccionamos los mejores productos de decoración, bazar y organización para lograr un hogar cálido, ordenado y con personalidad.
                     </p>
                   </div>
                 </div>
@@ -520,16 +576,77 @@ export default function App() {
                     Restablecer Filtros
                   </button>
                 </div>
+              ) : selectedCategory === "Todos" && searchQuery === "" ? (
+                <div className="space-y-12 text-left">
+                  {/* SECCION 1: Productos Destacados */}
+                  {filteredProducts.filter(p => p.featured).length > 0 && (
+                    <div className="space-y-6" id="seccion-destacados-grilla">
+                      <div className="border-l-4 border-amber-500 pl-4 py-1">
+                        <span className="text-[10px] font-mono text-amber-600 uppercase tracking-widest font-bold">Selección Destacada</span>
+                        <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">✨ Productos Estrella</h3>
+                        <p className="text-xs text-brand-500 font-light mt-0.5">Los favoritos de nuestros clientes, seleccionados por su estilo y funcionalidad.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 font-sans">
+                        {filteredProducts.filter(p => p.featured).map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            onAddToCart={handleAddToCart}
+                            onViewDetails={(p) => setSelectedProduct(p)}
+                            onBuyNow={handleBuyNow}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SECCION 2: Resto de los Productos */}
+                  {filteredProducts.filter(p => !p.featured).length > 0 && (
+                    <div className="space-y-6 pt-6 border-t border-brand-100" id="seccion-resto-grilla">
+                      <div className="border-l-4 border-brand-800 pl-4 py-1">
+                        <span className="text-[10px] font-mono text-brand-600 uppercase tracking-widest font-bold">Colección de Estilo</span>
+                        <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">🏡 Más de Nuestro Catálogo</h3>
+                        <p className="text-xs text-brand-500 font-light mt-0.5">Explorá todos nuestros maravillosos elementos pensados para tu vida diaria.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 font-sans">
+                        {filteredProducts.filter(p => !p.featured).map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            onAddToCart={handleAddToCart}
+                            onViewDetails={(p) => setSelectedProduct(p)}
+                            onBuyNow={handleBuyNow}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                  {filteredProducts.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      onViewDetails={(p) => setSelectedProduct(p)}
-                    />
-                  ))}
+                <div className="space-y-6 text-left">
+                  {/* Single Clean Filtered View */}
+                  <div className="border-l-4 border-brand-900 pl-4 py-1">
+                    <span className="text-[10px] font-mono text-brand-600 uppercase tracking-widest font-bold">
+                      {selectedCategory === "Destacados" ? "Favoritos" : "Colección"}
+                    </span>
+                    <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">
+                      {selectedCategory === "Destacados" ? "✨ Productos Estrella" : `Colección ${selectedCategory}`}
+                    </h3>
+                    <p className="text-xs text-brand-500 font-light mt-0.5">
+                      Mostrando {filteredProducts.length} {filteredProducts.length === 1 ? "producto" : "productos"}.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 font-sans">
+                    {filteredProducts.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                        onViewDetails={(p) => setSelectedProduct(p)}
+                        onBuyNow={handleBuyNow}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </section>
@@ -560,6 +677,61 @@ export default function App() {
               </div>
             </section>
 
+            {/* GUÍA DE COMPRA PASO A PASO: CÓMO COMPRAR (Requerimiento 5) */}
+            <section className="bg-white py-16">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-10">
+                <div className="space-y-2">
+                  <span className="text-[10px] uppercase tracking-widest bg-brand-100 text-brand-800 py-1 px-3.5 rounded-full font-bold font-sans">Súper Simple</span>
+                  <h3 className="font-serif text-3xl font-bold text-brand-900 tracking-tight">¿Cómo Comprar en la Tienda?</h3>
+                  <div className="h-1 w-12 bg-brand-800 rounded-full mx-auto mt-2" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left max-w-5xl mx-auto">
+                  {/* Step 1 */}
+                  <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
+                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">01</div>
+                    <div className="p-3 bg-brand-900 text-brand-100 rounded-xl inline-block">
+                      <ShoppingCart className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="font-serif text-base font-bold text-brand-950">Elegí tus favoritos</h4>
+                      <p className="text-xs text-brand-600 font-light leading-relaxed">
+                        Navegá por nuestro catálogo de cocina, organizadores o cuidado personal, seleccioná tus artículos favoritos y agregalos al carrito.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
+                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">02</div>
+                    <div className="p-3 bg-brand-900 text-brand-100 rounded-xl inline-block">
+                      <Truck className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="font-serif text-base font-bold text-brand-950">Completá tus datos</h4>
+                      <p className="text-xs text-brand-600 font-light leading-relaxed">
+                        Ingresá tus datos reales para el despacho y seleccioná el medio de pago preferido (tenés 15% de descuento por transferencia bancaria).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
+                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">03</div>
+                    <div className="p-3 bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white rounded-xl inline-block">
+                      <Instagram className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="font-serif text-base font-bold text-brand-950">Avisanos en Instagram</h4>
+                      <p className="text-xs text-brand-600 font-light leading-relaxed">
+                        Escribinos a nuestra cuenta oficial <a href="https://instagram.com/deco.home.rosario" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-900 underline hover:text-black">@deco.home.rosario</a> adjuntando tu número de pedido y el comprobante o captura de pago (si elegiste realizar una transferencia bancaria) para que coordinemos tu despacho al instante.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
           </div>
         ) : (
           /* Administration Dashboard Tab Integrated (Requerimiento 3) */
@@ -574,7 +746,6 @@ export default function App() {
             onAdminPhoneChange={handleAdminPhoneChange}
             storeMetrics={storeMetrics}
             pendingOrders={pendingOrders}
-            onMarkOrderAsShipped={handleMarkOrderAsShipped}
             bankDetails={bankDetails}
             onBankDetailsChange={setBankDetails}
             onDeleteOrder={handleDeleteOrder}
@@ -585,86 +756,84 @@ export default function App() {
       </main>
 
       {/* FOOTER: LEGALES, SEO Y ENLACE EXCLUSIVO DE INSTAGRAM (Requerimientos 5 y 8) */}
-      <footer className="bg-brand-900 text-brand-100 border-t border-brand-800 pt-12 pb-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* Column 1: Brand & Instagram Contacts */}
-            <div className="space-y-4">
-              <h4 className="font-serif text-xl font-bold tracking-wide text-white">Hogar & Estilo</h4>
-              <p className="text-xs text-brand-300 font-light leading-relaxed">
-                Selección exclusiva de productos prácticos de cocina, organizadores funcionales y artículos de cuidado personal elegidos para aportar calidez, orden y diseño a todos tus ambientes.
-              </p>
-              
-              {/* Instagram Exclusive Link (Foco exclusivo en Instagram Requerimiento 5) */}
-              <div className="space-y-1.5 pt-2">
-                <span className="block text-[10px] font-bold text-brand-400 uppercase tracking-widest">Contacto Exclusivo</span>
-                <a 
-                  href="https://instagram.com/deco.home.rosario"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-brand-100 hover:text-white bg-brand-800 p-2.5 px-4 rounded-xl border border-brand-700 hover:border-brand-500 transition-colors cursor-pointer group"
-                >
-                  <Instagram className="w-5 h-5 text-pink-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-semibold">@deco.home.rosario</span>
-                </a>
+      {activeTab === "shop" && (
+        <footer className="bg-brand-900 text-brand-100 border-t border-brand-800 pt-12 pb-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {/* Column 1: Brand & Instagram Contacts */}
+              <div className="space-y-4">
+                <h4 className="font-serif text-xl font-bold tracking-wide text-white">Hogar & Estilo</h4>
+                <p className="text-xs text-brand-300 font-light leading-relaxed">
+                  Selección exclusiva de productos prácticos de cocina, organizadores funcionales y artículos de cuidado personal elegidos para aportar calidez, orden y diseño a todos tus ambientes.
+                </p>
+                
+                {/* Instagram Exclusive Link (Foco exclusivo en Instagram Requerimiento 5) */}
+                <div className="space-y-1.5 pt-2">
+                  <span className="block text-[10px] font-bold text-brand-400 uppercase tracking-widest">Contacto Exclusivo</span>
+                  <a 
+                    href="https://instagram.com/deco.home.rosario"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-brand-100 hover:text-white bg-brand-800 p-2.5 px-4 rounded-xl border border-brand-700 hover:border-brand-500 transition-colors cursor-pointer group"
+                  >
+                    <Instagram className="w-5 h-5 text-pink-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-semibold">@deco.home.rosario</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Column 2: Políticas de Cambio y Devolución (Requerimientos 1 y 6) */}
+              <div className="space-y-3">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-brand-300">Cambios y Devoluciones</h5>
+                <p className="text-[11px] text-brand-300 font-light leading-relaxed">
+                  Nuestra prioridad es que ames tu compra. Si necesitás gestionar cualquier cambio o devolución, ¡escribinos directamente por Instagram a <a href="https://instagram.com/deco.home.rosario" target="_blank" rel="noopener noreferrer" className="font-semibold text-white underline">@deco.home.rosario</a>! Te responderemos súper rápido para coordinarlo de forma 100% personalizada y sin trámites ni demoras.
+                </p>
+              </div>
+
+              {/* Column 3: Políticas de Envío (Requerimiento 1) */}
+              <div className="space-y-3">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-brand-300">Envíos a todo el país</h5>
+                <p className="text-[11px] text-brand-300 font-light leading-relaxed">
+                  Despachamos tu pedido de forma segura a cualquier punto de la Argentina. Las compras superiores a $50.000 incluyen envío bonificado. Los plazos de entrega estimados son de 2 a 5 días hábiles, y cada paquete es embalado con máxima protección para proteger tus productos.
+                </p>
+              </div>
+
+              {/* Column 4: Términos del Servicio (Requerimiento 7) */}
+              <div className="space-y-3">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-brand-300">Términos del Servicio</h5>
+                <p className="text-[11px] text-brand-300 font-light leading-relaxed">
+                  Los precios publicados corresponden a pagos con tarjeta de débito o crédito (en hasta 3 cuotas sin interés, sin recargos ocultos). El descuento especial del 15% off se aplica de forma exclusiva si elegís abonar vía Transferencia Bancaria. <strong className="text-brand-100 font-semibold">Importante:</strong> Si abonás vía transferencia, es obligatorio enviar el comprobante de pago junto con tu número de orden a nuestro Instagram para realizar el despacho correspondiente.
+                </p>
               </div>
             </div>
 
-            {/* Column 2: Políticas de Devolución (Requerimiento 8) */}
-            <div className="space-y-3">
-              <h5 className="text-xs font-bold uppercase tracking-wider text-brand-300">Políticas de Devolución</h5>
-              <p className="text-[11px] text-brand-300 font-light leading-relaxed">
-                Ofrecemos un plazo estricto de garantía de reembolso total de 14 días corridos desde la recepción de la mercadería si no estás plenamente conforme con las calidades. 
-                El producto debe estar en su caja e intacto. Escríbenos directamente a nuestro buzón de Instagram para generar la etiqueta de retiro gratuito de Correo Argentino.
-              </p>
+            {/* Bottom strip */}
+            <div className="border-t border-brand-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10.5px] text-brand-400">
+              <div>
+                <p>© 2026 Hogar y Estilo. Todos los derechos reservados.</p>
+                <p className="font-light mt-0.5 text-brand-500">Hecho de forma artesanal y optimizado para la mejor experiencia de compra.</p>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                {isAdminAuthenticated && (
+                  <button 
+                    onClick={() => {
+                      setIsAdminAuthenticated(false);
+                      setActiveTab("shop");
+                    }}
+                    className="text-brand-300 hover:text-white transition-colors cursor-pointer text-[10.5px] font-semibold tracking-wide flex items-center gap-1.5 bg-brand-800/80 hover:bg-brand-800 py-1 px-3.5 rounded-full border border-brand-700 animate-pulse"
+                  >
+                    🔒 Cerrar Sesión Admin
+                  </button>
+                )}
+                <span className="font-serif text-brand-300">Rosario, Santa Fe, Argentina</span>
+              </div>
             </div>
 
-            {/* Column 3: Políticas de Envío (Requerimiento 8) */}
-            <div className="space-y-3">
-              <h5 className="text-xs font-bold uppercase tracking-wider text-brand-300">Políticas de Envío</h5>
-              <p className="text-[11px] text-brand-300 font-light leading-relaxed">
-                Despachamos tu pedido por transportistas homologados garantizados. Las compras superiores a $50.000 ARS incluyen envío bonificado. 
-                Los plazos de entrega estimados para todo el territorio nacional (incluyendo Rosario y demás localidades del país) son estrictamente de 2 a 5 días hábiles. Cada bulto se envía con doble embalaje reforzado para resguardar la mercadería.
-              </p>
-            </div>
-
-            {/* Column 4: Términos del Servicio (Requerimiento 8) */}
-            <div className="space-y-3">
-              <h5 className="text-xs font-bold uppercase tracking-wider text-brand-300">Términos del Servicio</h5>
-              <p className="text-[11px] text-brand-300 font-light leading-relaxed">
-                Los precios de lista están expresados en ARS admisibles para 3 cuotas fijas sin interés. 
-                Los descuentos del 15% por transferencia se aplican únicamente previa verificación de la acreditación bancaria en un plazo máximo de 24hs. 
-                La marca no se responsabiliza por retrasos aduaneros ajenos en insumos de importaciones directas.
-              </p>
-            </div>
           </div>
-
-          {/* Bottom strip */}
-          <div className="border-t border-brand-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10.5px] text-brand-400">
-            <div>
-              <p>© 2026 Hogar y Estilo. Todos los derechos reservados.</p>
-              <p className="font-light mt-0.5 text-brand-500">Hecho de forma artesanal y optimizado para la mejor experiencia de compra.</p>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {isAdminAuthenticated && (
-                <button 
-                  onClick={() => {
-                    setIsAdminAuthenticated(false);
-                    setActiveTab("shop");
-                  }}
-                  className="text-brand-300 hover:text-white transition-colors cursor-pointer text-[10.5px] font-semibold tracking-wide flex items-center gap-1.5 bg-brand-800/80 hover:bg-brand-800 py-1 px-3.5 rounded-full border border-brand-700 animate-pulse"
-                >
-                  🔒 Cerrar Sesión Admin
-                </button>
-              )}
-              <span className="font-serif text-brand-300">Rosario, Santa Fe, Argentina</span>
-            </div>
-          </div>
-
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* SLIDE-OUT DYNAMIC CART DRAWER */}
       <SlideOutCart
@@ -791,6 +960,22 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING LIVE RECENT SALE ALERT POP-UP (Requerimiento 7) */}
+      {recentSaleAlert && (
+        <div className="fixed bottom-4 left-4 z-50 max-w-sm bg-white border border-brand-200 p-4 rounded-xl shadow-lg flex items-center gap-3 animate-bounce shadow-brand-900/10 transition-all duration-300 md:bottom-6 md:left-6">
+          <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse absolute top-3 right-3" />
+          <div className="bg-brand-50 p-2.5 rounded-full text-brand-800">
+            <ShoppingCart className="w-4 h-4 text-brand-800" />
+          </div>
+          <div className="text-left">
+            <p className="text-[11px] font-black text-brand-900 font-sans tracking-tight uppercase">🚨 Venta confirmada</p>
+            <p className="text-[11px] text-brand-700 font-medium mt-0.5 font-sans leading-tight">
+              {recentSaleAlert}
+            </p>
           </div>
         </div>
       )}
