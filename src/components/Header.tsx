@@ -76,7 +76,7 @@ export default function Header({
               Hogar & Estilo
             </h1>
             <p className="text-[10px] tracking-[0.25em] text-brand-500 uppercase">
-              Diseño de Interiores & Objetos de Autor
+              Cocina, Bazar & Organización Funcional
             </p>
           </div>
         </div>

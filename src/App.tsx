@@ -53,6 +53,7 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Elegant floating toast state for non-blocking notifications
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
@@ -462,7 +463,10 @@ export default function App() {
             {/* Elegant Hero Carousel Slider */}
             <HeroSlider 
               showcasePhotos={showcasePhotos} 
-              onSelectCategory={(cat) => setSelectedCategory(cat)} 
+              onSelectCategory={(cat) => {
+                setSelectedCategory(cat);
+                setIsExpanded(true);
+              }} 
             />
 
             {/* Quality USP Grid */}
@@ -504,32 +508,7 @@ export default function App() {
               </div>
             </section>
 
-            {/* Category Filters bar */}
-            {products.length > 0 && (
-              <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
-                <div className="flex items-center gap-2 border-b border-brand-200 pb-2">
-                  <Filter className="w-4 h-4 text-brand-600" />
-                  <span className="font-bold text-brand-800 text-xs uppercase tracking-widest">
-                    Colecciones de Diseño
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-4 sm:px-4.5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all border cursor-pointer ${
-                        selectedCategory === cat
-                          ? "bg-brand-900 text-white border-brand-900"
-                          : "bg-white text-brand-700 hover:text-brand-900 hover:bg-brand-100 border-brand-200"
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
+
 
             {/* MAIN PORTAFOLIO PRODUCT GRID */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2" id="productos">
@@ -586,7 +565,7 @@ export default function App() {
                         <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">✨ Productos Estrella</h3>
                         <p className="text-xs text-brand-500 font-light mt-0.5">Los favoritos de nuestros clientes, seleccionados por su estilo y funcionalidad.</p>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 font-sans">
+                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 font-sans">
                         {filteredProducts.filter(p => p.featured).map((product) => (
                           <ProductCard
                             key={product.id}
@@ -600,43 +579,203 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* SECCION 2: Resto de los Productos */}
-                  {filteredProducts.filter(p => !p.featured).length > 0 && (
-                    <div className="space-y-6 pt-6 border-t border-brand-100" id="seccion-resto-grilla">
-                      <div className="border-l-4 border-brand-800 pl-4 py-1">
-                        <span className="text-[10px] font-mono text-brand-600 uppercase tracking-widest font-bold">Colección de Estilo</span>
-                        <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">🏡 Más de Nuestro Catálogo</h3>
-                        <p className="text-xs text-brand-500 font-light mt-0.5">Explorá todos nuestros maravillosos elementos pensados para tu vida diaria.</p>
+                  {!isExpanded ? (
+                    <>
+                      {/* SECCION 2: 8 Productos Destacados o En Oferta (2 filas de 4 en desktop) */}
+                      {filteredProducts.filter(p => !p.featured).length > 0 && (
+                        <div className="space-y-6 pt-6 border-t border-brand-100 animate-fade-in" id="seccion-resto-grilla">
+                          <div className="border-l-4 border-brand-800 pl-4 py-1">
+                            <span className="text-[10px] font-mono text-brand-650 uppercase tracking-widest font-bold">Oportunidades</span>
+                            <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">🏡 Ofertas y Destacados</h3>
+                            <p className="text-xs text-brand-500 font-light mt-0.5">Explorá nuestra cuidada selección esencial en promoción para tus ambientes cotidianos.</p>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 font-sans">
+                            {filteredProducts.filter(p => !p.featured).slice(0, 8).map((product) => (
+                              <ProductCard
+                                key={product.id}
+                                product={product}
+                                onAddToCart={handleAddToCart}
+                                onViewDetails={(p) => setSelectedProduct(p)}
+                                onBuyNow={handleBuyNow}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* VER MÁS BUTTON */}
+                      <div className="flex flex-col items-center justify-center pt-10 border-t border-brand-100 max-w-5xl mx-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsExpanded(true);
+                            setTimeout(() => {
+                              const el = document.getElementById("seccion-categorias-expandidas");
+                              if (el) {
+                                el.scrollIntoView({ behavior: "smooth" });
+                              }
+                            }, 100);
+                          }}
+                          className="bg-brand-900 hover:bg-black text-brand-100 hover:text-white font-serif font-bold text-sm tracking-wide px-8 py-4 sm:py-5 rounded-full transition-all flex items-center gap-2.5 cursor-pointer shadow-md transform hover:scale-[1.03] active:scale-[0.98]"
+                        >
+                          <span>Ver más categorías y productos 📂</span>
+                        </button>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 font-sans">
-                        {filteredProducts.filter(p => !p.featured).map((product) => (
-                          <ProductCard
-                            key={product.id}
-                            product={product}
-                            onAddToCart={handleAddToCart}
-                            onViewDetails={(p) => setSelectedProduct(p)}
-                            onBuyNow={handleBuyNow}
-                          />
-                        ))}
+                    </>
+                  ) : (
+                    /* SECCION CATEGORIAS EXPANIDAS (Despliega secciones por categoría y "Ver Todos") */
+                    <div className="space-y-12 pt-8 border-t-2 border-dashed border-brand-200 mt-8 animate-fade-in" id="seccion-categorias-expandidas">
+                      
+                      {/* Category Selection Filter bar */}
+                      {products.length > 0 && (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 border-b border-brand-200 pb-2">
+                            <Filter className="w-4 h-4 text-brand-600" />
+                            <span className="font-bold text-brand-800 text-xs uppercase tracking-widest">
+                              Explorá por Secciones Especiales
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {categories.map((cat) => (
+                              <button
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat)}
+                                className={`px-4 sm:px-4.5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all border cursor-pointer ${
+                                  selectedCategory === cat
+                                    ? "bg-brand-900 text-white border-brand-900"
+                                    : "bg-white text-brand-700 hover:text-brand-900 hover:bg-brand-100 border-brand-200"
+                                }`}
+                              >
+                                {cat}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Rendering of categories inside expanded Workspace */}
+                      {selectedCategory === "Todos" ? (
+                        <div className="space-y-12">
+                          {["Cocina", "Hogar", "Belleza", "Herramientas", "Iluminación"].map((catName) => {
+                            const catProducts = filteredProducts.filter((p) => p.category === catName);
+                            if (catProducts.length === 0) return null;
+                            
+                            let emoji = "📦";
+                            if (catName === "Cocina") emoji = "🍳";
+                            else if (catName === "Hogar") emoji = "🛋️";
+                            else if (catName === "Belleza") emoji = "💅";
+                            else if (catName === "Herramientas") emoji = "🛠️";
+                            else if (catName === "Iluminación") emoji = "💡";
+
+                            return (
+                              <div key={catName} className="space-y-6 pt-6 border-t border-brand-100">
+                                <div className="border-l-4 border-brand-800 pl-4 py-1">
+                                  <span className="text-[10px] font-mono text-brand-500 uppercase tracking-widest font-bold">Catálogo</span>
+                                  <h3 className="font-serif text-xl sm:text-2xl font-bold text-brand-900 tracking-tight">
+                                    {emoji} Sección de {catName}
+                                  </h3>
+                                  <p className="text-xs text-brand-500 font-light mt-0.5 font-sans">Nuestros mejores artículos elegidos para {catName.toLowerCase()}.</p>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 font-sans">
+                                  {catProducts.map((product) => (
+                                    <ProductCard
+                                      key={product.id}
+                                      product={product}
+                                      onAddToCart={handleAddToCart}
+                                      onViewDetails={(p) => setSelectedProduct(p)}
+                                      onBuyNow={handleBuyNow}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Extra Catalog Fallback items */}
+                          {filteredProducts.filter(p => !p.featured).length > 8 && (
+                            <div className="space-y-6 pt-6 border-t border-brand-100">
+                              <div className="border-l-4 border-stone-600 pl-4 py-1">
+                                <span className="text-[10px] font-mono text-brand-500 uppercase tracking-widest font-bold font-sans">Catálogo Completo</span>
+                                <h3 className="font-serif text-xl sm:text-2xl font-bold text-brand-900 tracking-tight">🏡 Más de Nuestro Catálogo Completo</h3>
+                                <p className="text-xs text-brand-500 font-light mt-0.5">Todos los productos adicionales que tenemos disponibles.</p>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 font-sans">
+                                {filteredProducts.filter(p => !p.featured).slice(8).map((product) => (
+                                  <ProductCard
+                                    key={product.id}
+                                    product={product}
+                                    onAddToCart={handleAddToCart}
+                                    onViewDetails={(p) => setSelectedProduct(p)}
+                                    onBuyNow={handleBuyNow}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        /* Single selected category inside expanded area */
+                        <div className="space-y-6 text-left">
+                          <div className="border-l-4 border-brand-900 pl-4 py-1">
+                            <span className="text-[10px] font-mono text-brand-600 uppercase tracking-widest font-bold">
+                              {selectedCategory === "Destacados" ? "Favoritos" : "Colección"}
+                            </span>
+                            <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">
+                              {selectedCategory === "Destacados" ? "✨ Productos Estrella" : `Colección de ${selectedCategory}`}
+                            </h3>
+                            <p className="text-xs text-brand-500 font-light mt-0.5">
+                              Mostrando {filteredProducts.length} {filteredProducts.length === 1 ? "producto" : "productos"}.
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 font-sans">
+                            {filteredProducts.map((product) => (
+                              <ProductCard
+                                key={product.id}
+                                product={product}
+                                onAddToCart={handleAddToCart}
+                                onViewDetails={(p) => setSelectedProduct(p)}
+                                onBuyNow={handleBuyNow}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Collapse Button */}
+                      <div className="flex justify-center pt-8 border-t border-brand-100/60 font-serif">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsExpanded(false);
+                            setSelectedCategory("Todos");
+                            const el = document.getElementById("productos");
+                            if (el) {
+                              el.scrollIntoView({ behavior: "smooth" });
+                            }
+                          }}
+                          className="bg-brand-100 hover:bg-brand-200 border border-brand-300 text-brand-950 font-bold text-xs uppercase px-7 py-3 rounded-full cursor-pointer transition-all hover:scale-[1.03] active:scale-[0.97]"
+                        >
+                          ▲ Contraer Categorías
+                        </button>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="space-y-6 text-left">
-                  {/* Single Clean Filtered View */}
+                  {/* Single Clean Filtered View for Active Searches */}
                   <div className="border-l-4 border-brand-900 pl-4 py-1">
                     <span className="text-[10px] font-mono text-brand-600 uppercase tracking-widest font-bold">
-                      {selectedCategory === "Destacados" ? "Favoritos" : "Colección"}
+                      Resultados de Búsqueda
                     </span>
                     <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">
-                      {selectedCategory === "Destacados" ? "✨ Productos Estrella" : `Colección ${selectedCategory}`}
+                      🔎 Productos Encontrados
                     </h3>
                     <p className="text-xs text-brand-500 font-light mt-0.5">
-                      Mostrando {filteredProducts.length} {filteredProducts.length === 1 ? "producto" : "productos"}.
+                      Mostrando {filteredProducts.length} resultados para tu búsqueda "{searchQuery}".
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 font-sans">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 font-sans">
                     {filteredProducts.map((product) => (
                       <ProductCard
                         key={product.id}
