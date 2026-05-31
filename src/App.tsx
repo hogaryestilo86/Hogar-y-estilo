@@ -11,6 +11,7 @@ import SlideOutCart from "./components/SlideOutCart";
 import ProductDetailsModal from "./components/ProductDetailsModal";
 import CheckoutModal from "./components/CheckoutModal";
 import AdminPanel from "./components/AdminPanel";
+import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
@@ -49,7 +50,7 @@ export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"shop" | "admin">("shop");
+  const [activeTab, setActiveTab] = useState<"shop" | "admin" | "tracker">("shop");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
@@ -137,7 +138,7 @@ export default function App() {
   });
 
   // Argentine common real buyer combinations for live simulation alerts (Requerimiento 4 / 7)
-  // Dynamic Orders Database (Requerimiento 6 de Control de envíos) - Empieza vacío para ser completamente prolijo y profesional
+  // Dynamic Orders Database (Requerimiento 6 de Control de envíos)
   const [pendingOrders, setPendingOrders] = useState<any[]>(() => {
     const saved = localStorage.getItem("store_pending_orders_list");
     if (saved) {
@@ -146,8 +147,64 @@ export default function App() {
         if (Array.isArray(parsed)) return parsed;
       } catch (e) { /* ignore */ }
     }
-    return [];
+    // Pre-populate with a real sample order so that the administrator and the buyer can try the status updating loop immediately.
+    return [
+      {
+        id: "1024",
+        status: "preparing",
+        trackingCode: "", // blank, so the administrator can enter CP123456789AR or similar
+        items: [
+          {
+            quantity: 1,
+            product: {
+              id: "p_lamp_nordic",
+              title: "Lámpara de Mesa Nórdica de Madera Real",
+              basePrice: 54900,
+              category: "iluminacion"
+            }
+          }
+        ],
+        details: {
+          fullName: "Juan Pérez (Orden Demostración)",
+          email: "juan.perez@correo.com",
+          phone: "+54 341 555-1234",
+          address: "Av. Pellegrini 1450, Piso 3A",
+          city: "Rosario, Santa Fe",
+          zipCode: "2000",
+          paymentMethod: "transfer"
+        },
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: "1580",
+        status: "shipped",
+        trackingCode: "AR482103759", // Already shipped so we can test tracking ready!
+        items: [
+          {
+            quantity: 1,
+            product: {
+              id: "p_bazar_set",
+              title: "Set Bazar de Almacenamiento Hermético Modular",
+              basePrice: 38500,
+              category: "bazar"
+            }
+          }
+        ],
+        details: {
+          fullName: "María Laura Gómez (Orden Demostración)",
+          email: "marialaura@correo.com",
+          phone: "+54 11 4321-9876",
+          address: "Av. Cabildo 2400",
+          city: "Capital Federal",
+          zipCode: "1428",
+          paymentMethod: "card"
+        },
+        createdAt: new Date().toISOString()
+      }
+    ];
   });
+
+  const [initialOrderId, setInitialOrderId] = useState<string>("");
 
   // Dynamic Bank Transfer coordinates configuration (Requerimiento de datos bancarios)
   const [bankDetails, setBankDetails] = useState<BankDetails>(() => {
@@ -328,6 +385,20 @@ export default function App() {
     }
   };
 
+  const handleUpdateOrderStatus = (orderId: string, status: string, trackingCode?: string) => {
+    const updatedOrders = pendingOrders.map((ord) => {
+      if (ord.id === orderId) {
+        return {
+          ...ord,
+          status,
+          trackingCode: trackingCode !== undefined ? trackingCode : ord.trackingCode,
+        };
+      }
+      return ord;
+    });
+    setPendingOrders(updatedOrders);
+  };
+
   const handleResetMetrics = () => {
     const defaultStats = {
       viewsCount: 0,
@@ -417,7 +488,7 @@ export default function App() {
 
       {/* Main Content Areas */}
       <main className="flex-grow">
-        {activeTab === "shop" ? (
+        {activeTab === "shop" && (
           <div className="space-y-12">
             
             {/* Elegant Hero Carousel Slider */}
@@ -843,7 +914,16 @@ export default function App() {
             </section>
 
           </div>
-        ) : (
+        )}
+
+        {activeTab === "tracker" && (
+          <OrderTracker 
+            pendingOrders={pendingOrders} 
+            initialOrderId={initialOrderId}
+          />
+        )}
+
+        {activeTab === "admin" && (
           /* Administration Dashboard Tab Integrated (Requerimiento 3) */
           <AdminPanel
             products={products}
@@ -861,6 +941,7 @@ export default function App() {
             onDeleteOrder={handleDeleteOrder}
             onResetMetrics={handleResetMetrics}
             showToast={showToast}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
           />
         )}
       </main>
@@ -981,6 +1062,10 @@ export default function App() {
         onOrderComplete={handleOrderComplete}
         bankDetails={bankDetails}
         showToast={showToast}
+        onGoToTracking={(orderId) => {
+          setInitialOrderId(orderId);
+          setActiveTab("tracker");
+        }}
       />
 
       {/* STICKY INSTAGRAM FLOATING ATTENTION WIDGET Chat (Requerimiento 5) */}

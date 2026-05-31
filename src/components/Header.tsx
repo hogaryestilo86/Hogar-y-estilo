@@ -11,8 +11,8 @@ interface HeaderProps {
   onCartToggle: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  activeTab: "shop" | "admin";
-  onTabChange: (tab: "shop" | "admin") => void;
+  activeTab: "shop" | "admin" | "tracker";
+  onTabChange: (tab: "shop" | "admin" | "tracker") => void;
   isAdminAuthenticated?: boolean;
   onTriggerAdminLogin?: () => void;
 }
@@ -95,6 +95,17 @@ export default function Header({
               }`}
             >
               Tienda
+            </button>
+            <button
+              id="btn-nav-tracker"
+              onClick={() => onTabChange("tracker")}
+              className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide transition-all cursor-pointer ${
+                activeTab === "tracker"
+                  ? "bg-brand-900 text-brand-100 shadow-sm"
+                  : "text-brand-700 hover:text-brand-900"
+              }`}
+            >
+              Seguimiento
             </button>
             {isAdminAuthenticated && (
               <button

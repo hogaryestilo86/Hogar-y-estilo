@@ -30,6 +30,7 @@ interface AdminPanelProps {
   onDeleteOrder: (orderId: string) => void;
   onResetMetrics: () => void;
   showToast?: (message: string, type?: "success" | "error" | "info") => void;
+  onUpdateOrderStatus?: (orderId: string, status: string, trackingCode?: string) => void;
 }
 
 interface OrderRowProps {
@@ -41,6 +42,7 @@ interface OrderRowProps {
   setConfirmDeleteOrderId: (id: string | null) => void;
   notify: (msg: string, type?: "success" | "error" | "info") => void;
   onViewReceipt: (url: string) => void;
+  onUpdateOrderStatus?: (orderId: string, status: string, trackingCode?: string) => void;
 }
 
 function OrderRowComponent({
@@ -50,8 +52,15 @@ function OrderRowComponent({
   confirmDeleteOrderId,
   setConfirmDeleteOrderId,
   notify,
-  onViewReceipt
+  onViewReceipt,
+  onUpdateOrderStatus
 }: OrderRowProps) {
+  const [localTracking, setLocalTracking] = useState(order.trackingCode || "");
+
+  React.useEffect(() => {
+    setLocalTracking(order.trackingCode || "");
+  }, [order.trackingCode]);
+
   const subtotal = order.items.reduce((acc: number, item: any) => acc + (item.product.basePrice * item.quantity), 0);
   const isTransfer = order.details.paymentMethod === "transfer";
   const priceToPay = isTransfer ? Math.round(subtotal * 0.85) : subtotal;
@@ -76,6 +85,59 @@ function OrderRowComponent({
             <span className="font-medium text-brand-950 font-sans line-clamp-1">{item.product.title}</span>
           </div>
         ))}
+      </td>
+      <td className="px-5 py-4 space-y-3.5 text-left align-top min-w-[200px]">
+        {/* Status selection */}
+        <div className="space-y-1">
+          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Estado del Envío</span>
+          <select
+            value={order.status || "pending"}
+            onChange={(e) => {
+              if (onUpdateOrderStatus) {
+                onUpdateOrderStatus(order.id, e.target.value);
+                notify("¡Estado de Envío Actualizado!", "success");
+              }
+            }}
+            className="w-full bg-brand-50 border border-brand-200 text-brand-900 text-xs px-2 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-500 font-semibold cursor-pointer"
+          >
+            <option value="pending">🛒 1. Pedido Recibido</option>
+            <option value="preparing">📦 2. En preparación en depósito</option>
+            <option value="shipped">✈️ 3. Despachado / En viaje</option>
+            <option value="delivery">🏠 4. En camino a domicilio</option>
+            <option value="delivered">✅ 5. Entregado</option>
+          </select>
+        </div>
+
+        {/* Tracking code input */}
+        <div className="space-y-1">
+          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Código de Seguimiento / Envío</span>
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              placeholder="Ej: CP123456789AR"
+              value={localTracking}
+              onChange={(e) => setLocalTracking(e.target.value)}
+              onBlur={() => {
+                if (onUpdateOrderStatus) {
+                  onUpdateOrderStatus(order.id, order.status || "pending", localTracking);
+                }
+              }}
+              className="w-full bg-brand-50 border border-brand-200 text-brand-950 font-mono text-xs px-2.5 py-1.5 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (onUpdateOrderStatus) {
+                  onUpdateOrderStatus(order.id, order.status || "pending", localTracking);
+                }
+                notify("✓ ¡Código sincronizado con éxito!", "success");
+              }}
+              className="bg-brand-900 hover:bg-black text-white text-[10px] font-bold px-3 py-1.5 rounded-md transition-colors cursor-pointer select-none"
+            >
+              Ok
+            </button>
+          </div>
+        </div>
       </td>
       <td className="px-5 py-4 space-y-1.5 text-left align-top">
         <p className="text-sm font-black text-brand-950 font-serif">{formatCurrency(priceToPay)}</p>
@@ -149,6 +211,7 @@ export default function AdminPanel({
   onDeleteOrder,
   onResetMetrics,
   showToast,
+  onUpdateOrderStatus,
 }: AdminPanelProps) {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -390,7 +453,7 @@ A partir del título rudimentario y de la descripción o notas provistas por el 
 3. El SEO "todo" o tags clave: Una lista de 5 a 6 palabras clave o características destacadas de SEO, separadas exactamente por una coma (ej: "mármol travertino real, mesa auxiliar japandi, estilo rústico moderno, decoración de salas minimalistas, calidad artesanal premium").
 
 Reglas críticas:
-- No hables de dropshipping abiertamente. Los productos son seleccionados exclusivamente por Hogar & Estilo.
+- Los productos son seleccionados exclusivamente por Hogar & Estilo de forma directa.
 - Devuelve la respuesta STRICTLY en formato JSON válido de acuerdo al esquema solicitado sin markdown tags afuera. El campo de SEO debe ser "seoFeatures" con los tags de palabras clave separados por coma.`;
 
         const userMessage = `Título provisto: "${title || ""}"
@@ -725,6 +788,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   <th className="px-5 py-3.5">Cliente / Contacto</th>
                   <th className="px-5 py-3.5">Dirección de Destino</th>
                   <th className="px-5 py-3.5">Detalle Artículos</th>
+                  <th className="px-5 py-3.5">Estado de Envío / Código</th>
                   <th className="px-5 py-3.5">Metodo de Pago / Total</th>
                   <th className="px-5 py-3.5 text-center">Eliminar</th>
                 </tr>
@@ -740,6 +804,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     setConfirmDeleteOrderId={setConfirmDeleteOrderId}
                     notify={notify}
                     onViewReceipt={setSelectedReceipt}
+                    onUpdateOrderStatus={onUpdateOrderStatus}
                   />
                 ))}
               </tbody>
@@ -1392,7 +1457,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             <div className="text-[10.5px] text-brand-400 font-mono space-y-1">
               <p>✔ Margen de ganancia ideal: 2.5x</p>
               <p>✔ Enfoque canal: Instagram reels</p>
-              <p>✔ Envío sugerido: Correo Argentino</p>
+              <p>✔ Envío sugerido: Correo Postal</p>
             </div>
           </div>
         </div>

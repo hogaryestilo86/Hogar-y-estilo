@@ -18,6 +18,7 @@ interface CheckoutModalProps {
   onOrderComplete?: (orderDetails: OrderDetails, cartItems: CartItem[], generatedOrderId?: string) => void;
   bankDetails: BankDetails;
   showToast?: (message: string, type?: "success" | "error" | "info") => void;
+  onGoToTracking?: (orderId: string) => void;
 }
 
 export default function CheckoutModal({
@@ -30,6 +31,7 @@ export default function CheckoutModal({
   onOrderComplete,
   bankDetails,
   showToast,
+  onGoToTracking,
 }: CheckoutModalProps) {
   const [step, setStep] = useState<"form" | "payment" | "success">("form");
   const contentRef = useRef<HTMLDivElement>(null);
@@ -1222,10 +1224,25 @@ export default function CheckoutModal({
                 )}
 
                 {/* 6. OTROS CANALES */}
-                <div className="bg-[#FAF8F5] border border-brand-200 p-4 rounded-xl max-w-md mx-auto text-center space-y-2">
-                  <p className="text-[11px] text-brand-600 leading-relaxed font-light">
-                    Por consultas sobre el despacho o para seguir el paquete, puedes responder directamente al correo electrónico automatizado o consultarnos en Instagram en <a href="https://instagram.com/deco.home.rosario" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-900 hover:underline">@deco.home.rosario</a>.
+                <div className="bg-brand-50 border border-brand-200 p-5 rounded-md max-w-md mx-auto text-center space-y-2 shadow-xs">
+                  <p className="font-semibold text-xs text-brand-900 uppercase tracking-widest font-sans flex items-center justify-center gap-1.5">
+                    <span>📦 Seguimiento Online</span>
                   </p>
+                  <p className="text-[11px] text-brand-700 leading-relaxed font-light">
+                    Haciendo clic abajo podés conocer el estado nacional de tu paquete y copiar el código de seguimiento de tu compra <strong className="font-bold">#{generatedOrderId || "1024"}</strong>.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleFinish();
+                      if (onGoToTracking) {
+                        onGoToTracking(generatedOrderId || "1024");
+                      }
+                    }}
+                    className="w-full bg-brand-900 hover:bg-black text-white font-sans text-xs font-bold uppercase tracking-wider py-2.5 px-4 rounded-lg transition-all active:scale-95 cursor-pointer shadow-xs"
+                  >
+                    Ver mi Código de Seguimiento
+                  </button>
                 </div>
 
                 {/* 7. BOTÓN VOLVER */}
