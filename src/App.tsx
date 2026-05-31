@@ -14,7 +14,7 @@ import AdminPanel from "./components/AdminPanel";
 import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
-import { convertProductsIdbToBase64 } from "./indexedDbMedia";
+import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB } from "./indexedDbMedia";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
 // Helper to resolve image urls, stripping the local server proxy prefix if run in static hosts (Vercel, GitHub Pages)
@@ -59,28 +59,41 @@ export default function App() {
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
 
   // Fetch products from backend server on mount (shares catalog for all users)
+  // Fetch products from backend server on mount (shares catalog for all users)
   useEffect(() => {
-    fetch("/api/products")
-      .then((res) => {
-        if (!res.ok) throw new Error("Server response error");
-        return res.json();
-      })
-      .then((data) => {
-        // Find if we have a locally stored back-up catalog
+    async function loadCatalog() {
+      // 1. Get local backups
+      let loadedLocal: Product[] = [];
+      try {
+        // Try IndexedDB first (no 5MB size limit)
+        const idbProducts = await loadProductsFromIndexedDB();
+        if (idbProducts && Array.isArray(idbProducts)) {
+          loadedLocal = filterOutDemoProducts(idbProducts);
+        }
+      } catch (err) {
+        console.warn("Error reading from IndexedDB on startup:", err);
+      }
+
+      // If empty, try localStorage as secondary fallback
+      if (loadedLocal.length === 0) {
         const saved = localStorage.getItem("store_products_list");
-        let loadedLocal: Product[] = [];
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
             loadedLocal = filterOutDemoProducts(parsed);
           } catch (e) {}
         }
+      }
+
+      // 2. Fetch from remote server on Vercel or local Dev
+      try {
+        const res = await fetch("/api/products");
+        if (!res.ok) throw new Error("Server response error: " + res.status);
+        const data = await res.json();
 
         if (data && Array.isArray(data)) {
           const clean = filterOutDemoProducts(data);
           
-          // If the server returns empty products list but we possess products locally,
-          // load the local backup and synchronize them back to the server so they go live immediately!
           let initial = clean;
           if (clean.length === 0 && loadedLocal.length > 0) {
             initial = loadedLocal;
@@ -105,50 +118,45 @@ export default function App() {
             }
           });
         } else {
-          // No valid response or fallback required, load local backup
+          // No valid array returned or fallback required
           const initial = loadedLocal.length > 0 ? loadedLocal : INITIAL_PRODUCTS;
           setProducts(initial);
           setHasLoadedInitial(true);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.warn("Could not sync shared catalog from server, using local fallback:", err);
-        const saved = localStorage.getItem("store_products_list");
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            const clean = filterOutDemoProducts(parsed);
-            if (clean.length > 0) {
-              setProducts(clean);
-              convertProductsIdbToBase64(clean).then(({ updatedProducts, changed }) => {
-                if (changed) {
-                  setProducts(updatedProducts);
-                }
-              });
-            } else {
-              setProducts(INITIAL_PRODUCTS);
-            }
-          } catch (e) {
-            setProducts(INITIAL_PRODUCTS);
-          }
-        } else {
-          setProducts(INITIAL_PRODUCTS);
-        }
+        const initial = loadedLocal.length > 0 ? loadedLocal : INITIAL_PRODUCTS;
+        setProducts(initial);
         setHasLoadedInitial(true);
-      });
+        
+        if (loadedLocal.length > 0) {
+          convertProductsIdbToBase64(loadedLocal).then(({ updatedProducts, changed }) => {
+            if (changed) {
+              setProducts(updatedProducts);
+            }
+          });
+        }
+      }
+    }
+
+    loadCatalog();
   }, []);
 
-  // Sync state to local storage and backend server whenever modified
+  // Sync state to local storage, IndexedDB and remote server whenever modified
   useEffect(() => {
     if (!hasLoadedInitial) return;
 
+    // 1. Persist to IndexedDB (virtually unlimited size)
+    saveProductsToIndexedDB(products);
+
+    // 2. Persist to LocalStorage (5MB limit fallback)
     try {
       localStorage.setItem("store_products_list", JSON.stringify(products));
     } catch (e) {
-      console.warn("No se pudo persistir la lista de productos localmente:", e);
+      console.warn("No se pudo persistir la lista de productos en localStorage (es posible que exceda la cuota por las imágenes base64, pero se guardó con éxito en IndexedDB):", e);
     }
 
-    // Persist to Express server so everyone sees the updated catalog!
+    // 3. Persist to Express/Vercel server
     fetch("/api/products", {
       method: "POST",
       headers: {

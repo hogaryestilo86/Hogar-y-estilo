@@ -17,16 +17,24 @@ export default async function handler(req: any, res: any) {
     try {
       if (fs.existsSync(PRODUCTS_FILE)) {
         const fileContent = await fs.promises.readFile(PRODUCTS_FILE, "utf-8");
-        const parsed = JSON.parse(fileContent);
-        if (Array.isArray(parsed)) {
-          return res.status(200).json(parsed);
+        if (!fileContent || fileContent.trim() === "") {
+          return res.status(200).json([]);
+        }
+        try {
+          const parsed = JSON.parse(fileContent);
+          if (Array.isArray(parsed)) {
+            return res.status(200).json(parsed);
+          }
+        } catch (jsonErr) {
+          console.warn("products.json contains invalid JSON, returning empty list:", jsonErr);
+          return res.status(200).json([]);
         }
       }
       // Si no existe, devolver fallback dinámico en base a INITIAL_PRODUCTS
       return res.status(200).json({ fallback: true });
     } catch (err: any) {
       console.error("Error en Vercel Serverless leyendo products.json:", err);
-      return res.status(500).json({ error: "Error leyendo la base de datos de productos.", message: err.message });
+      return res.status(200).json([]);
     }
   }
 

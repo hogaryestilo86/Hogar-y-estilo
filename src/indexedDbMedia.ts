@@ -315,4 +315,43 @@ export function getCategoryPlaceholder(category: string | undefined): string {
   return "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
 }
 
+/**
+ * Saves the list of products directly in IndexedDB, bypassing the 5MB browser localStorage limits
+ * caused by embedded base64 camera images from uploading custom store inventory.
+ */
+export async function saveProductsToIndexedDB(products: Product[]): Promise<void> {
+  try {
+    const db = await getDb();
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    // Use a unique static key for the products catalog backup
+    store.put(products, "products_backup_list");
+  } catch (err) {
+    console.warn("No se pudo guardar la lista de productos en IndexedDB:", err);
+  }
+}
+
+/**
+ * Loads the list of products directly from IndexedDB backup
+ */
+export async function loadProductsFromIndexedDB(): Promise<Product[] | null> {
+  try {
+    const db = await getDb();
+    return new Promise((resolve) => {
+      const transaction = db.transaction(STORE_NAME, "readonly");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get("products_backup_list");
+      request.onsuccess = () => {
+        resolve(request.result || null);
+      };
+      request.onerror = () => {
+        resolve(null);
+      };
+    });
+  } catch (err) {
+    console.warn("No se pudo leer la lista de productos de IndexedDB:", err);
+    return null;
+  }
+}
+
 

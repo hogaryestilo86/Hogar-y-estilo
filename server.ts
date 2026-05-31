@@ -146,16 +146,24 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     try {
       if (fs.existsSync(PRODUCTS_FILE)) {
         const fileContent = await fs.promises.readFile(PRODUCTS_FILE, "utf-8");
-        const parsed = JSON.parse(fileContent);
-        if (Array.isArray(parsed)) {
-          return res.json(parsed);
+        if (!fileContent || fileContent.trim() === "") {
+          return res.json([]);
+        }
+        try {
+          const parsed = JSON.parse(fileContent);
+          if (Array.isArray(parsed)) {
+            return res.json(parsed);
+          }
+        } catch (jsonErr) {
+          console.warn("products.json contains invalid JSON, returning empty list:", jsonErr);
+          return res.json([]);
         }
       }
       // Return a special fallback flag if the file doesn't exist yet
       return res.json({ fallback: true });
     } catch (err: any) {
       console.error("Error reading products.json:", err);
-      return res.status(500).json({ error: "Error de servidor leyendo productos." });
+      return res.json([]);
     }
   });
 

@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
-import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database } from "lucide-react";
+import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache, getMedia } from "../indexedDbMedia";
 
 interface AdminPanelProps {
@@ -234,11 +234,115 @@ export default function AdminPanel({
   const [description, setDescription] = useState("");
   const [copiedJsonValue, setCopiedJsonValue] = useState<string | null>(null);
 
+  // States for automated seamless GitHub catalog persistence
+  const [githubToken, setGithubToken] = useState(() => localStorage.getItem("github_sync_token") || "");
+  const [githubRepo, setGithubRepo] = useState(() => localStorage.getItem("github_sync_repo") || "");
+  const [githubBranch, setGithubBranch] = useState(() => localStorage.getItem("github_sync_branch") || "main");
+  const [githubPath, setGithubPath] = useState(() => localStorage.getItem("github_sync_path") || "products.json");
+  const [isSyncingGithub, setIsSyncingGithub] = useState(false);
+  const [showGithubSettings, setShowGithubSettings] = useState(false);
+
   const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
     if (showToast) {
       showToast(msg, type);
     } else {
       console.log(`[Toast Fallback] ${type.toUpperCase()}: ${msg}`);
+    }
+  };
+
+  const handleSyncToGithub = async (catalogToSync?: Product[]) => {
+    const tokenToUse = githubToken.trim();
+    const repoToUse = githubRepo.trim();
+    const branchToUse = githubBranch.trim() || "main";
+    const pathToUse = githubPath.trim() || "products.json";
+    const dataToSave = catalogToSync || products;
+
+    if (!tokenToUse) {
+      notify("Por favor, introduce tu Token de Acceso Personal de GitHub en la configuración.", "error");
+      setShowGithubSettings(true);
+      return;
+    }
+    if (!repoToUse) {
+      notify("Por favor, introduce tu repositorio de GitHub (ejemplo: tadeobeltran1986/rep-name).", "error");
+      setShowGithubSettings(true);
+      return;
+    }
+
+    setIsSyncingGithub(true);
+    notify("Conectando con la API de GitHub para actualizar productos...", "info");
+
+    try {
+      const cleanRepo = repoToUse.replace(/\s+/g, "");
+      
+      // Save details to remember
+      localStorage.setItem("github_sync_token", tokenToUse);
+      localStorage.setItem("github_sync_repo", cleanRepo);
+      localStorage.setItem("github_sync_branch", branchToUse);
+      localStorage.setItem("github_sync_path", pathToUse);
+
+      const jsonStr = JSON.stringify(dataToSave, null, 2);
+
+      // Query GitHub API for existing file metadata to obtain SHA hash
+      const fileUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}?ref=${branchToUse}`;
+      const getResponse = await fetch(fileUrl, {
+        headers: {
+          "Accept": "application/vnd.github.v3+json",
+          "Authorization": `token ${tokenToUse}`
+        }
+      });
+
+      let sha: string | undefined = undefined;
+      if (getResponse.ok) {
+        const fileData = await getResponse.json();
+        sha = fileData.sha;
+      } else if (getResponse.status === 401) {
+        throw new Error("Token de GitHub inválido. Por favor, revísalo.");
+      } else if (getResponse.status === 404) {
+        // Safe: File might not exist yet, we will create it!
+        console.log("File not found, creating a new file on repository...");
+      } else {
+        throw new Error(`Error de comunicación con GitHub (Código: ${getResponse.status})`);
+      }
+
+      // Convert content to safe UTF-8 base64 encoding
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(jsonStr);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Content = btoa(binary);
+
+      const putUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}`;
+      const putBody = {
+        message: "Actualizar productos.json desde el Panel de Administración Hogar & Estilo 🛍️",
+        content: base64Content,
+        branch: branchToUse,
+        ...(sha ? { sha } : {})
+      };
+
+      const putResponse = await fetch(putUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/vnd.github.v3+json",
+          "Authorization": `token ${tokenToUse}`
+        },
+        body: JSON.stringify(putBody)
+      });
+
+      if (!putResponse.ok) {
+        const errJson = await putResponse.json().catch(() => ({}));
+        throw new Error(errJson.message || `No se pudo guardar el archivo (Código: ${putResponse.status})`);
+      }
+
+      notify("✨ ¡ÉXITO! Catálogo de productos guardado directamente en tu repositorio de GitHub.", "success");
+      notify("⚡ Vercel ahora está regenerando tu sitio web. Estará actualizado en vivo en 30-40 segundos sin perder nada.", "info");
+    } catch (err: any) {
+      console.error("Error sincronizando catálogo con Github:", err);
+      notify(`No se pudo sincronizar en GitHub: ${err.message || err}`, "error");
+    } finally {
+      setIsSyncingGithub(false);
     }
   };
   const [featuresText, setFeaturesText] = useState(""); // Comma separated key features
@@ -725,29 +829,64 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               </span>
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(copiedJsonValue);
+                    notify("✨ ¡Código JSON copiado al portapapeles con éxito!", "success");
+                  } catch (err) {
+                    // Fallback using older method or alerting
+                    try {
+                      const aux = document.createElement("textarea");
+                      aux.value = copiedJsonValue;
+                      document.body.appendChild(aux);
+                      aux.select();
+                      document.execCommand("copy");
+                      document.body.removeChild(aux);
+                      notify("✨ ¡Copiado con método alternativo de respaldo!", "success");
+                    } catch (e2) {
+                      notify("No se pudo copiar de forma automática. Por favor selecciona el código del cuadro de texto de arriba y cópialo manualmente.", "error");
+                    }
+                  }
+                }}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-md"
+              >
+                <Copy className="w-4 h-4 text-white" />
+                <span>Copiar Automático</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
                   try {
-                    navigator.clipboard.writeText(copiedJsonValue);
-                    notify("¡Copiado al portapapeles con éxito!", "success");
-                  } catch (err) {
-                    notify("No se pudo copiar automáticamente: selecciona el código de abajo y cópialo manualmente con Ctrl+C.", "error");
+                    const blob = new Blob([copiedJsonValue], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "products.json";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    notify("✨ ¡Archivo products.json descargado con éxito! Guárdalo en tu dispositivo.", "success");
+                  } catch (err: any) {
+                    notify("No se pudo descargar el archivo: " + err.message, "error");
                   }
                 }}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-4 rounded-lg text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-md"
               >
-                <Copy className="w-4 h-4" />
-                <span>Copiar Automático</span>
+                <Download className="w-4 h-4 text-white" />
+                <span>Descargar products.json</span>
               </button>
               
               <button
                 type="button"
                 onClick={() => setCopiedJsonValue(null)}
-                className="bg-brand-100 hover:bg-brand-200 text-brand-800 font-bold py-2.5 px-5 rounded-lg text-xs sm:text-sm tracking-wider uppercase transition-all active:scale-95 cursor-pointer"
+                className="bg-brand-100 hover:bg-brand-200 text-brand-800 font-bold py-3 px-5 rounded-lg text-xs tracking-wider uppercase transition-all active:scale-95 cursor-pointer"
               >
-                Listo, ya lo copié
+                Listo
               </button>
             </div>
           </div>
@@ -1582,7 +1721,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 {/* BOTÓN REQUERIDO POR EL USUARIO: Copiar JSON antes de publicar / cargar el producto */}
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     const cleanTitle = title.trim();
                     const cleanDesc = description.trim();
                     if (!cleanTitle && !cleanDesc) {
@@ -1632,10 +1771,20 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       const jsonStr = JSON.stringify(listToExport, null, 2);
                       setCopiedJsonValue(jsonStr);
                       try {
-                        navigator.clipboard.writeText(jsonStr);
+                        await navigator.clipboard.writeText(jsonStr);
                         notify("¡Código JSON copiado al portapapeles! Abrimos también el asistente de copia.", "success");
                       } catch (clipErr) {
-                        notify("Se habilitó el asistente visual de copia manual.", "info");
+                        try {
+                          const aux = document.createElement("textarea");
+                          aux.value = jsonStr;
+                          document.body.appendChild(aux);
+                          aux.select();
+                          document.execCommand("copy");
+                          document.body.removeChild(aux);
+                          notify("¡Código JSON copiado al portapapeles con método alternativo! Asistente disponible.", "success");
+                        } catch (e2) {
+                          notify("Se habilitó el asistente visual de copia manual.", "info");
+                        }
                       }
                     } catch (err: any) {
                       notify("No se pudo estructurar el JSON: " + err.message, "error");
@@ -1811,14 +1960,139 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               Sincronización y Respaldo Inteligente (Vercel)
             </h4>
             <p className="text-xs text-brand-600 font-light leading-relaxed">
-              Vercel utiliza sistemas sin servidor de solo lectura. Para asegurarte de que los productos se queden guardados de forma permanente para todos los clientes (en vivo):
+              Vercel utiliza un sistema temporal. Para que tus productos nuevos o modificados se guarden <strong>para siempre en vivo</strong> para todos tus clientes, puedes sincronizarlos directamente con tu cuenta de GitHub.
             </p>
-            <div className="bg-purple-50 rounded-xl p-3 border border-purple-100 text-[11px] text-purple-900 leading-relaxed space-y-2">
-              <p className="font-semibold">⚡ Saca copias de tu catálogo cuando quieras:</p>
-              <ul className="list-disc list-inside space-y-1 text-purple-800">
-                <li>Agrega, edita o quita productos desde esta pantalla administrada.</li>
-                <li>Presiona <strong>"Copiar Código JSON"</strong> y pégalo en el archivo <code>products.json</code> de tu código fuente o repositorio de GitHub/Vercel.</li>
-                <li>Si alguna vez se borran los productos por cambios en la nube, simplemente pega ese código de respaldo aquí abajo y presiona <strong>"Importar e Iniciar Sincronización"</strong> para que vuelva a estar vivo al instante.</li>
+
+            {/* SINCRONIZACIÓN AUTOMÁTICA DE GITHUB */}
+            <div className="bg-purple-50/70 border border-purple-150 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="block text-xs font-bold text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Github className="w-4 h-4 text-purple-800 animate-bounce" />
+                  Sincronización con 1-Clic a GitHub
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowGithubSettings(!showGithubSettings)}
+                  className="px-2 py-1 bg-white border border-purple-200 hover:bg-purple-100 text-purple-900 rounded-lg transition-all flex items-center gap-1 text-[10px] uppercase font-bold cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-purple-700" />
+                  <span>{showGithubSettings ? "Cerrar Config" : "Configurar"}</span>
+                </button>
+              </div>
+
+              <p className="text-[11px] text-purple-900 leading-relaxed font-light">
+                Introduce tus datos de repositorio una vez. Al presionar <strong>"Sincronizar en GitHub"</strong>, tus productos se guardan directo en tu repositorio y Vercel actualiza tu web en vivo en 30 segundos. ¡No más cansancio ni archivos manuales!
+              </p>
+
+              {showGithubSettings && (
+                <div className="bg-white border border-purple-200 rounded-xl p-3.5 space-y-3.5 animate-in slide-in-from-top-2 duration-200 text-xs text-brand-900">
+                  <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-brand-800 uppercase pb-1 border-b border-brand-100">
+                    <Settings className="w-3.5 h-3.5 text-brand-700" />
+                    Ajustes de Sincronización
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-brand-700 mb-1">Repositorio GitHub (Usuario/Repo):</label>
+                      <input
+                        type="text"
+                        value={githubRepo}
+                        onChange={(e) => {
+                          setGithubRepo(e.target.value);
+                          localStorage.setItem("github_sync_repo", e.target.value);
+                        }}
+                        placeholder="ej. tadeobeltran1986/hogaryestilo"
+                        className="w-full text-xs p-2 bg-brand-50 hover:bg-brand-100/50 border border-brand-200 rounded-lg focus:ring-1 focus:ring-brand-200 outline-hidden transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-brand-700 mb-1">Rama (Branch):</label>
+                      <input
+                        type="text"
+                        value={githubBranch}
+                        onChange={(e) => {
+                          setGithubBranch(e.target.value);
+                          localStorage.setItem("github_sync_branch", e.target.value);
+                        }}
+                        placeholder="main"
+                        className="w-full text-xs p-2 bg-brand-50 hover:bg-brand-100/50 border border-brand-200 rounded-lg focus:ring-1 focus:ring-brand-200 outline-hidden transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-brand-700 mb-1">Nombre del Archivo en tu Repositorio:</label>
+                    <input
+                      type="text"
+                      value={githubPath}
+                      onChange={(e) => {
+                        setGithubPath(e.target.value);
+                        localStorage.setItem("github_sync_path", e.target.value);
+                      }}
+                      placeholder="products.json"
+                      className="w-full text-xs p-2 bg-brand-50 hover:bg-brand-100/50 border border-brand-200 rounded-lg focus:ring-1 focus:ring-brand-200 outline-hidden transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-brand-700 mb-1 flex items-center justify-between">
+                      <span>Token de Acceso Personal de GitHub (Classic PAT):</span>
+                      <a
+                        href="https://github.com/settings/tokens/new?scopes=repo&description=HogarYEstiloCatalogSync"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9.5px] text-purple-700 hover:underline font-extrabold uppercase tracking-wide flex items-center gap-0.5"
+                      >
+                        ¿Cómo obtener un Token?
+                      </a>
+                    </label>
+                    <input
+                      type="password"
+                      value={githubToken}
+                      onChange={(e) => {
+                        setGithubToken(e.target.value);
+                        localStorage.setItem("github_sync_token", e.target.value);
+                      }}
+                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      className="w-full text-xs p-2 bg-brand-50 hover:bg-brand-100/50 border border-brand-200 rounded-lg focus:ring-1 focus:ring-brand-200 outline-hidden transition-all font-mono"
+                    />
+                    <p className="text-[10px] text-brand-500 font-light mt-1.5 leading-snug">
+                      Se necesita un Token con permiso de <strong className="font-semibold text-brand-700">"repo"</strong> activado para poder escribir el archivo en tu código. Este token se almacena de forma segura únicamente en el navegador de tu dispositivo.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={isSyncingGithub}
+                onClick={() => handleSyncToGithub()}
+                className={`w-full py-3 px-4 rounded-xl font-bold uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-md text-white border border-black/10 transition-colors ${
+                  isSyncingGithub 
+                    ? "bg-purple-400 cursor-not-allowed" 
+                    : "bg-purple-600 hover:bg-purple-700 active:bg-purple-800"
+                }`}
+              >
+                {isSyncingGithub ? (
+                  <>
+                    <RotateCw className="w-3.5 h-3.5 animate-spin text-white" />
+                    <span>Guardando directo en GitHub...</span>
+                  </>
+                ) : (
+                  <>
+                    <Github className="w-3.5 h-3.5 text-white animate-pulse" />
+                    <span>Sincronizar Catálogo en GitHub</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="bg-brand-50 rounded-xl p-3 border border-brand-150 text-[11px] text-brand-850 leading-relaxed space-y-2">
+              <p className="font-semibold">💾 Respaldo Manual Alternativo (En código de texto):</p>
+              <ul className="list-disc list-inside space-y-1 text-brand-700">
+                <li>Puedes agregar, editar o quitar tus productos en este panel de administrador.</li>
+                <li>Presiona <strong>"Copiar Código JSON"</strong> y péguelo en el archivo <code>products.json</code> de tu GitHub de manera manual si prefieres no usar el token automático.</li>
+                <li>Puedes descargar el archivo <code>products.json</code> listo para arrastrarlo a tu repositorio de GitHub directamente.</li>
               </ul>
             </div>
 
@@ -1827,7 +2101,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     try {
                       let listToExport = [...products];
                       
@@ -1868,10 +2142,20 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       const jsonStr = JSON.stringify(listToExport, null, 2);
                       setCopiedJsonValue(jsonStr);
                       try {
-                        navigator.clipboard.writeText(jsonStr);
+                        await navigator.clipboard.writeText(jsonStr);
                         notify("¡Código JSON del catálogo copiado con éxito! Además abrimos la ventana de copia manual.", "success");
                       } catch (copyErr) {
-                        notify("Se habilitó el asistente visual de copia manual.", "info");
+                        try {
+                          const aux = document.createElement("textarea");
+                          aux.value = jsonStr;
+                          document.body.appendChild(aux);
+                          aux.select();
+                          document.execCommand("copy");
+                          document.body.removeChild(aux);
+                          notify("¡Código JSON copiado con método alternativo! Asistente disponible.", "success");
+                        } catch (e2) {
+                          notify("Se habilitó el asistente visual de copia manual.", "info");
+                        }
                       }
                     } catch (e) {
                       notify("No se pudo preparar el JSON para la copia: " + (e as any).message, "error");
@@ -1882,6 +2166,33 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 >
                   <Copy className="w-3.5 h-3.5 text-brand-800" />
                   <span>Copiar Código JSON</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      let listToExport = [...products];
+                      const jsonStr = JSON.stringify(listToExport, null, 2);
+                      const blob = new Blob([jsonStr], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "products.json";
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      notify("✨ ¡Catálogo completo descargado como products.json con éxito!", "success");
+                    } catch (err: any) {
+                      notify("No se pudo descargar el catálogo: " + err.message, "error");
+                    }
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-150 border border-emerald-200 hover:border-emerald-300 text-emerald-900 text-[11px] font-bold uppercase tracking-wider py-2.5 rounded-lg transition-all active:scale-95 cursor-pointer"
+                  title="Descargar archivo products.json para guardar en la computadora o subirlo directamente"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-800" />
+                  <span>Descargar Archivo</span>
                 </button>
                 
                 {/* WIPE Catalog button */}
