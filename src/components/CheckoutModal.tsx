@@ -39,6 +39,7 @@ export default function CheckoutModal({
       contentRef.current.scrollTop = 0;
     }
   }, [step, isOpen]);
+
   const [formData, setFormData] = useState<OrderDetails>({
     fullName: "",
     email: "",
@@ -146,7 +147,7 @@ export default function CheckoutModal({
       setMpPreferenceLoading(true);
       setMpError("");
 
-       const initializeBrick = async () => {
+      const initializeBrick = async () => {
         try {
           // 1. Dynamic script load
           await new Promise<void>((resolve, reject) => {
@@ -284,9 +285,14 @@ export default function CheckoutModal({
             },
           };
 
-          // Mount to container
+          // Mount to container (safety check and clear leftover DOM nodes)
           const paymentContainer = document.getElementById("paymentCardBrickContainer");
           if (paymentContainer && active) {
+            try {
+              paymentContainer.innerHTML = "";
+            } catch (e) {
+              console.warn("No se pudo limpiar el contenedor de Mercado Pago antes de montar:", e);
+            }
             brickInstanceRef.current = await bricksBuilder.create("payment", "paymentCardBrickContainer", settings);
           }
         } catch (err: any) {
@@ -306,9 +312,28 @@ export default function CheckoutModal({
       return () => {
         active = false;
         clearTimeout(delayTimer);
-        if (brickInstanceRef.current) {
-          brickInstanceRef.current.unmount().catch(console.error);
+        
+        const instance = brickInstanceRef.current;
+        if (instance) {
           brickInstanceRef.current = null;
+          try {
+            const p = instance.unmount();
+            if (p && typeof p.catch === "function") {
+              p.catch((err: any) => console.warn("Error asincrónico al desmontar el Brick de Mercado Pago:", err));
+            }
+          } catch (err) {
+            console.warn("Error sincrónico al desmontar el Brick de Mercado Pago:", err);
+          }
+        }
+
+        // Empty the container DOM element as a backup to avoid duplicate iframes
+        const container = document.getElementById("paymentCardBrickContainer");
+        if (container) {
+          try {
+            container.innerHTML = "";
+          } catch (e) {
+            console.warn("No se pudo vaciar el contenedor de Mercado Pago:", e);
+          }
         }
       };
     }
@@ -420,7 +445,7 @@ export default function CheckoutModal({
               {step === "payment" && "Paso 2: Método de Pago"}
               {step === "success" && "¡Pedido Confirmado!"}
             </h3>
-            <p className="text-xs text-brand-500">
+            <p className="text-xs text-brand-505">
               {step !== "success" ? "Comercio seguro certificado por Hogar y Estilo" : "Tu compra ha sido procesada de forma segura"}
             </p>
           </div>
@@ -722,8 +747,8 @@ export default function CheckoutModal({
               </div>
 
               {/* Detalles dinámicos según el método elegido */}
-              <div className={!formData.paymentMethod ? "block" : "hidden"}>
-                <div className="bg-[#FFFDF9] border-2 border-dashed border-amber-300 rounded-xl p-6 text-center space-y-3 shadow-xs">
+              {!formData.paymentMethod && (
+                <div key="payment-none" className="bg-[#FFFDF9] border-2 border-dashed border-amber-300 rounded-xl p-6 text-center space-y-3 shadow-xs">
                   <div className="p-3 bg-amber-50 rounded-full inline-block text-amber-600 animate-bounce">
                     <HelpCircle className="w-6 h-6" />
                   </div>
@@ -736,170 +761,176 @@ export default function CheckoutModal({
                     </p>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className={formData.paymentMethod === "transfer" ? "block animate-in fade-in duration-300" : "hidden"}>
-                <div className="bg-white border-2 border-brand-200 rounded-xl p-5 sm:p-6 space-y-4 shadow-sm">
-                  <div className="flex items-center gap-2 border-b border-brand-100 pb-3">
-                    <Landmark className="w-5 h-5 text-brand-900" />
-                    <h4 className="font-serif font-bold text-brand-900 text-sm">
-                      Paso de Pago por Transferencia:
-                    </h4>
-                  </div>
-                  
-                  <div className="space-y-3.5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-brand-800">
-                      <div className="bg-brand-50 p-3 rounded-lg">
-                        <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Banco</span>
-                        <span className="font-semibold text-brand-900">{bankDetails?.bankName || "Banco de la Nación Argentina"}</span>
-                      </div>
-                      
-                      <div className="bg-brand-50 p-3 rounded-lg">
-                        <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Titular de Cuenta</span>
-                        <span className="font-semibold text-brand-900">{bankDetails?.accountHolder || "Hogar y Estilo S.H."}</span>
-                      </div>
-                      
-                      <div className="bg-brand-50 p-3 rounded-lg">
-                        <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Tipo de Cuenta</span>
-                        <span className="font-semibold text-brand-900">Caja de Ahorros Pesos</span>
-                      </div>
-
-                      <div className="bg-brand-50 p-3 rounded-lg">
-                        <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">CUIT / Identificación</span>
-                        <span className="font-semibold text-brand-900">{bankDetails?.cuit || "20-35890432-1"}</span>
-                      </div>
-
-                      <div className="bg-brand-50 p-3 rounded-lg col-span-1 sm:col-span-2">
-                        <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">CBU / CVU Bancario (Copiar manualmente de ser necesario)</span>
-                        <span className="font-mono font-bold text-brand-900 text-xs sm:text-sm break-all select-all">{bankDetails?.cbu || ""}</span>
-                      </div>
+              {formData.paymentMethod === "transfer" && (
+                <div key="payment-transfer" className="block animate-in fade-in duration-300">
+                  <div className="bg-white border-2 border-brand-200 rounded-xl p-5 sm:p-6 space-y-4 shadow-sm">
+                    <div className="flex items-center gap-2 border-b border-brand-100 pb-3">
+                      <Landmark className="w-5 h-5 text-brand-900" />
+                      <h4 className="font-serif font-bold text-brand-900 text-sm">
+                        Paso de Pago por Transferencia:
+                      </h4>
                     </div>
+                    
+                    <div className="space-y-3.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-brand-800">
+                        <div className="bg-brand-50 p-3 rounded-lg">
+                          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Banco</span>
+                          <span className="font-semibold text-brand-900">{bankDetails?.bankName || "Banco de la Nación Argentina"}</span>
+                        </div>
+                        
+                        <div className="bg-brand-50 p-3 rounded-lg">
+                          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Titular de Cuenta</span>
+                          <span className="font-semibold text-brand-900">{bankDetails?.accountHolder || "Hogar y Estilo S.H."}</span>
+                        </div>
+                        
+                        <div className="bg-brand-50 p-3 rounded-lg">
+                          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Tipo de Cuenta</span>
+                          <span className="font-semibold text-brand-900">Caja de Ahorros Pesos</span>
+                        </div>
 
-                    {/* Copy interactive Alias line (ONLY ALIAS COPIABLE WITH A TAP) */}
-                    <div className="flex flex-col sm:flex-row justify-between items-center bg-green-50/70 border border-green-200 p-4 rounded-xl gap-4 text-left">
-                      <div>
-                        <span className="block text-[10px] text-green-700 uppercase tracking-widest font-bold mb-0.5">Alias de Cobro (Toca para copiar)</span>
-                        <span className="font-sans font-black text-brand-950 text-base tracking-wider select-all">{bankDetails?.alias || "deco.home.rosario"}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (bankDetails?.alias) {
-                            navigator.clipboard.writeText(bankDetails.alias);
-                            notify("¡Alias copiado! Úsalo para transferir", "success");
-                          } else {
-                            notify("No hay un alias configurado.", "error");
-                          }
-                        }}
-                        className="px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white rounded-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer font-bold text-xs shadow-xs w-full sm:w-auto"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-white" />
-                        <span>Copiar Alias</span>
-                      </button>
-                    </div>
+                        <div className="bg-brand-50 p-3 rounded-lg">
+                          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">CUIT / Identificación</span>
+                          <span className="font-semibold text-brand-900">{bankDetails?.cuit || "20-35890432-1"}</span>
+                        </div>
 
-                    {/* Drag and Drop Zone or Button for uploading Transfer Receipt */}
-                    <div className="border-2 border-dashed border-brand-300 bg-brand-50/50 p-5 rounded-xl text-center space-y-3 font-sans transition-all hover:bg-brand-50 hover:border-brand-400">
-                      <div className="w-10 h-10 bg-brand-200 text-brand-700 rounded-full flex items-center justify-center mx-auto">
-                        <Upload className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-bold text-brand-900">
-                          {receiptImage ? "✓ ¡Comprobante de Pago Adjuntado!" : "Adjuntar Captura o Comprobante de Pago"}
-                        </p>
-                        <p className="text-[10px] text-brand-500 font-light max-w-xs mx-auto leading-relaxed">
-                          {receiptImage ? "Subiste con éxito una imagen. Si querés cambiarla, podés volver a subir otra." : "Subí una captura de pantalla de la transferencia desde tu celular para que validemos tu pago al instante."}
-                        </p>
+                        <div className="bg-brand-50 p-3 rounded-lg col-span-1 sm:col-span-2">
+                          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">CBU / CVU Bancario (Copiar manualmente de ser necesario)</span>
+                          <span className="font-mono font-bold text-brand-900 text-xs sm:text-sm break-all select-all">{bankDetails?.cbu || ""}</span>
+                        </div>
                       </div>
 
-                      {receiptImage && (
-                        <div className="relative inline-block border border-brand-250 rounded-lg overflow-hidden max-w-[125px] shadow-xs">
-                          <ResolvedImage 
-                            src={receiptImage}
-                            alt="Vista previa comprobante"
-                            className="h-16 w-auto object-cover mx-auto"
+                      {/* Copy interactive Alias line (ONLY ALIAS COPIABLE WITH A TAP) */}
+                      <div className="flex flex-col sm:flex-row justify-between items-center bg-green-50/70 border border-green-200 p-4 rounded-xl gap-4 text-left">
+                        <div>
+                          <span className="block text-[10px] text-green-700 uppercase tracking-widest font-bold mb-0.5">Alias de Cobro (Toca para copiar)</span>
+                          <span className="font-sans font-black text-brand-950 text-base tracking-wider select-all">{bankDetails?.alias || "deco.home.rosario"}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (bankDetails?.alias) {
+                              navigator.clipboard.writeText(bankDetails.alias);
+                              notify("¡Alias copiado! Úsalo para transferir", "success");
+                            } else {
+                              notify("No hay un alias configurado.", "error");
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-green-700 hover:bg-green-800 text-white rounded-lg transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer font-bold text-xs shadow-xs w-full sm:w-auto"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-white" />
+                          <span>Copiar Alias</span>
+                        </button>
+                      </div>
+
+                      {/* Drag and Drop Zone or Button for uploading Transfer Receipt */}
+                      <div className="border-2 border-dashed border-brand-300 bg-brand-50/50 p-5 rounded-xl text-center space-y-3 font-sans transition-all hover:bg-brand-50 hover:border-brand-400">
+                        <div className="w-10 h-10 bg-brand-200 text-brand-700 rounded-full flex items-center justify-center mx-auto">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-brand-900">
+                            {receiptImage ? "✓ ¡Comprobante de Pago Adjuntado!" : "Adjuntar Captura o Comprobante de Pago"}
+                          </p>
+                          <p className="text-[10px] text-brand-500 font-light max-w-xs mx-auto leading-relaxed">
+                            {receiptImage ? "Subiste con éxito una imagen. Si querés cambiarla, podés volver a subir otra." : "Subí una captura de pantalla de la transferencia desde tu celular para que validemos tu pago al instante."}
+                          </p>
+                        </div>
+
+                        {receiptImage && (
+                          <div className="relative inline-block border border-brand-250 rounded-lg overflow-hidden max-w-[125px] shadow-xs">
+                            <ResolvedImage 
+                              src={receiptImage}
+                              alt="Vista previa comprobante"
+                              className="h-16 w-auto object-cover mx-auto"
+                            />
+                            <span className="absolute bottom-0 inset-x-0 bg-brand-900/85 text-white text-[8px] py-0.5 font-bold">VISTA PREVIA</span>
+                          </div>
+                        )}
+
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            disabled={uploadingReceipt}
+                            onClick={() => fileInputRef.current?.click()}
+                            className={`px-4.5 py-2 rounded-lg font-bold text-xs uppercase tracking-wide cursor-pointer transition-colors ${
+                              receiptImage 
+                                ? "bg-brand-800 text-white hover:bg-black" 
+                                : "bg-white border border-brand-300 text-brand-800 hover:bg-brand-50"
+                            }`}
+                          >
+                            {uploadingReceipt ? "Procesando comprobante..." : receiptImage ? "Cambiar Imagen" : "Seleccionar Imagen / Captura"}
+                          </button>
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleReceiptUpload}
+                            accept="image/*"
+                            className="hidden"
                           />
-                          <span className="absolute bottom-0 inset-x-0 bg-brand-900/85 text-white text-[8px] py-0.5 font-bold">VISTA PREVIA</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-brand-600 font-light mt-2 leading-relaxed bg-[#FFFDF9] border border-brand-200 p-2.5 rounded-lg">
+                      💡 <strong>Recordá:</strong> Copiá el Alias para transferir desde la aplicación de tu banco o billetera virtual. No hace falta que envíes capturas, asociamos automáticamente con tus datos.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {formData.paymentMethod === "credit" && (
+                <div key="payment-credit" className="block animate-in fade-in duration-300">
+                  <div className="bg-[#001b33] border-2 border-[#009ee3] rounded-xl p-5 sm:p-6 space-y-4 shadow-sm text-left font-sans">
+                    <div className="flex items-center justify-between border-b border-[#009ee3]/40 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1 px-2.5 text-[9px] bg-[#009ee3] text-white rounded-full font-bold uppercase tracking-wider shrink-0">Seguro</span>
+                        <h4 className="font-serif font-black text-[#009ee3] text-sm">
+                          Plataforma Oficial Mercado Pago
+                        </h4>
+                      </div>
+                      <span className="text-xs text-blue-300 bg-[#002f54] px-2 py-0.5 rounded-md font-mono font-semibold">🔒 Conexión Segura</span>
+                    </div>
+
+                    <p className="text-xs text-blue-100 leading-relaxed font-sans">
+                      Pagá de forma segura con tu tarjeta de crédito/débito o por transferencia bancaria automática (DEBIN/Red Link) utilizando la pasarela oficial integrada.
+                    </p>
+
+                    {mpError && (
+                      <div className="p-4 bg-red-950/70 border border-red-500 rounded-xl mb-4">
+                        <p className="text-xs text-red-200 font-medium">{mpError}</p>
+                      </div>
+                    )}
+
+                    {/* Mercado Pago Brick will render inside this container */}
+                    <div key="mp-brick-container" className="w-full relative min-h-[250px]">
+                      {mpPreferenceLoading && (
+                        <div className="absolute inset-0 bg-[#001b33]/90 flex flex-col items-center justify-center space-y-3 z-10 rounded-xl">
+                          <span className="w-8 h-8 border-3 border-blue-900 border-t-[#009ee3] rounded-full animate-spin" />
+                          <p className="text-xs text-blue-200 font-semibold animate-pulse">
+                            Cargando módulo de Mercado Pago seguro...
+                          </p>
                         </div>
                       )}
 
-                      <div className="pt-1">
-                        <button
-                          type="button"
-                          disabled={uploadingReceipt}
-                          onClick={() => fileInputRef.current?.click()}
-                          className={`px-4.5 py-2 rounded-lg font-bold text-xs uppercase tracking-wide cursor-pointer transition-colors ${
-                            receiptImage 
-                              ? "bg-brand-800 text-white hover:bg-black" 
-                              : "bg-white border border-brand-300 text-brand-800 hover:bg-brand-50"
-                          }`}
-                        >
-                          {uploadingReceipt ? "Procesando comprobante..." : receiptImage ? "Cambiar Imagen" : "Seleccionar Imagen / Captura"}
-                        </button>
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleReceiptUpload}
-                          accept="image/*"
-                          className="hidden"
-                        />
+                      <div 
+                        id="paymentCardBrickContainer" 
+                        className="w-full min-h-[250px]"
+                      ></div>
+                    </div>
+
+                    {mpIsSimulator && (
+                      <div className="bg-[#002f54]/70 border border-[#009ee3]/30 rounded-xl p-3.5 text-[10.5px] text-blue-100 leading-relaxed flex gap-2 font-sans">
+                        <span className="text-sm select-none">💡</span>
+                        <div>
+                          <strong>Modo Democación Activo:</strong> Como todavía no has configurado tus claves privadas reales (<code>MP_ACCESS_TOKEN</code>) en las variables de entorno de tu servidor, Mercado Pago opera en modo simulador para que pruebes tarjetas y transferencias de prueba.
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-
-                  <p className="text-[11px] text-brand-600 font-light mt-2 leading-relaxed bg-[#FFFDF9] border border-brand-200 p-2.5 rounded-lg">
-                    💡 <strong>Recordá:</strong> Copiá el Alias para transferir desde la aplicación de tu banco o billetera virtual. No hace falta que envíes capturas, asociamos automáticamente con tus datos.
-                  </p>
                 </div>
-              </div>
-
-              <div className={formData.paymentMethod === "credit" ? "block animate-in fade-in duration-300" : "hidden"}>
-                <div className="bg-[#001b33] border-2 border-[#009ee3] rounded-xl p-5 sm:p-6 space-y-4 shadow-sm text-left font-sans">
-                  <div className="flex items-center justify-between border-b border-[#009ee3]/40 pb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1 px-2.5 text-[9px] bg-[#009ee3] text-white rounded-full font-bold uppercase tracking-wider shrink-0">Seguro</span>
-                      <h4 className="font-serif font-black text-[#009ee3] text-sm">
-                        Plataforma Oficial Mercado Pago
-                      </h4>
-                    </div>
-                    <span className="text-xs text-blue-300 bg-[#002f54] px-2 py-0.5 rounded-md font-mono font-semibold">🔒 Conexión Segura</span>
-                  </div>
-
-                  <p className="text-xs text-blue-100 leading-relaxed font-sans">
-                    Pagá de forma segura con tu tarjeta de crédito/débito o por transferencia bancaria automática (DEBIN/Red Link) utilizando la pasarela oficial integrada.
-                  </p>
-
-                  {mpPreferenceLoading && (
-                    <div className="py-12 flex flex-col items-center justify-center space-y-3">
-                      <span className="w-8 h-8 border-3 border-blue-900 border-t-[#009ee3] rounded-full animate-spin" />
-                      <p className="text-xs text-blue-200 font-semibold animate-pulse">
-                        Cargando módulo de Mercado Pago seguro...
-                      </p>
-                    </div>
-                  )}
-
-                  {mpError && (
-                    <div className="p-4 bg-red-950/70 border border-red-505 rounded-xl">
-                      <p className="text-xs text-red-200 font-medium">{mpError}</p>
-                    </div>
-                  )}
-
-                  {/* Mercado Pago Brick will render inside this container */}
-                  <div 
-                    id="paymentCardBrickContainer" 
-                    className={`w-full min-h-[250px] ${mpPreferenceLoading ? "hidden" : "block"}`}
-                  ></div>
-
-                  {mpIsSimulator && (
-                    <div className="bg-[#002f54]/70 border border-[#009ee3]/30 rounded-xl p-3.5 text-[10.5px] text-blue-100 leading-relaxed flex gap-2 font-sans">
-                      <span className="text-sm select-none">💡</span>
-                      <div>
-                        <strong>Modo Democación Activo:</strong> Como todavía no has configurado tus claves privadas reales (<code>MP_ACCESS_TOKEN</code>) en las variables de entorno de tu servidor, Mercado Pago opera en modo simulador para que pruebes tarjetas y transferencias de prueba.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              )}
 
               <div className="flex justify-between items-center pt-4 border-t border-brand-200">
                 <button
@@ -976,7 +1007,7 @@ export default function CheckoutModal({
             return (
               <div className="py-6 text-center space-y-6">
                 
-                {/* 1. SECCIÓN PRINCIPAL: AGRADECIMIENTO E INSTAGRAM DIRECTO AL INCIAR LA PÁGINA (A pedido del usuario) */}
+                {/* 1. SECCIÓN PRINCIPAL: AGRADECIMIENTO E INSTAGRAM DIRECTO */}
                 <div className="bg-brand-100 border-2 border-brand-200 p-5 sm:p-6 rounded-2xl max-w-md mx-auto text-center space-y-4 shadow-sm animate-fade-in">
                   <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-700 shadow-md">
                     <CheckCircle className="w-8 h-8 animate-bounce" />
@@ -1012,7 +1043,7 @@ export default function CheckoutModal({
                   </div>
                 </div>
 
-                {/* 2. BADGE DE ESTADO DEL PAGO SÚPER CLARO SEGÚN TRANSFER/TARJETA */}
+                {/* 2. BADGE DE ESTADO DEL PAGO CLARO SEGÚN TRANSFER/TARJETA */}
                 {isTransfer ? (
                   <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-3.5 shadow-xs">
                     <div className="space-y-1.5">
@@ -1089,7 +1120,7 @@ export default function CheckoutModal({
                   </div>
                 )}
 
-                {/* 3. GIGANTE Order Number widget space as requested */}
+                {/* 3. NÚMERO DE ORDEN DESTACADO */}
                 <div className="flex flex-col items-center space-y-2">
                   <div 
                     onClick={() => {
@@ -1128,7 +1159,7 @@ export default function CheckoutModal({
                 </div>
 
                 {/* Recordatorio de envío de comprobante y nro de orden */}
-                <div className="bg-[#FFFDF9] border border-amber-205 rounded-xl p-4 max-w-md mx-auto text-center space-y-1 shadow-xs">
+                <div className="bg-[#FFFDF9] border border-amber-250 rounded-xl p-4 max-w-md mx-auto text-center space-y-1 shadow-xs">
                   <p className="text-[11px] sm:text-xs text-brand-900 leading-relaxed font-sans">
                     ⚠️ <strong>Si abonás por Transferencia Bancaria:</strong> Recordá que para poder despachar tu pedido, debés enviarnos por Instagram tanto tu <strong>Número de Orden ({generatedOrderId || "#1024"})</strong> como la <strong>captura o comprobante de pago</strong>. ¡Así corroboramos y preparamos tu despacho más rápido!
                   </p>
