@@ -33,173 +33,243 @@ export const PRESET_REVIEWS = [
 
 export const INITIAL_PRODUCTS: Product[] = [
   {
-    id: "prod-alba-aura",
-    title: "Velador Nórdico de Mesa Alba Aura",
-    description: "Un velador diseñado con sutiles curvas de madera natural de fresno seleccionada y una pantalla de hilo tejida a mano que difunde una luz cálida y orgánica. Ideal para transformar cualquier mesa de luz o escritorio en un oasis de serenidad.",
-    basePrice: 38500,
-    beforePrice: 48000,
+    id: "prod-contadora-billetes",
+    title: "Contadora de Billetes Profesional con Detector Falsos",
+    description: "Llevá la tranquilidad y el control de tus finanzas al siguiente nivel. Cuenta fajos con absoluta velocidad y precisión e integra sistemas avanzados de detección UV/MG para billetes sospechosos de forma automática.",
+    basePrice: 139777,
+    beforePrice: 154789,
+    category: "Hogar",
+    media: [
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1564982752979-3f7bc974d29a?auto=format&fit=crop&w=800&q=85"
+      }
+    ],
+    features: [
+      "Cuenta hasta 1000 billetes por minuto de forma silenciosa y precisa.",
+      "Detección ultravioleta (UV) y magnética (MG) integrada para máxima seguridad.",
+      "Pantalla digital LED de alta resolución para conteo y control claro.",
+      "Función de loteo y suma (batch/add) para armar fajos con facilidad."
+    ],
+    reviews: [
+      {
+        id: "rev-contadora-1",
+        author: "Rodrigo F. - Rosario",
+        rating: 5,
+        comment: "Un antes y un después para mi local. Cuenta rapidísimo y el sensor de billetes falsos me ahorró más de un dolor de cabeza. Muy recomendable.",
+        date: "Ayer"
+      }
+    ],
+    featured: true
+  },
+  {
+    id: "prod-reflector-solar",
+    title: "Reflector Solar LED Exterior Potente con Sensor",
+    description: "¿Querés ver tus espacios exteriores siempre iluminados y seguros sin gastar un solo peso en la factura eléctrica? Con reflector solar LED de alta eficiencia, sensor crepuscular y de cercanía automático.",
+    basePrice: 169334,
+    beforePrice: 186788,
     category: "Iluminación",
     media: [
       {
         type: "image",
-        url: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=800&q=85"
-      },
+        url: "https://images.unsplash.com/photo-1565814329452-e1efa11c5b89?auto=format&fit=crop&w=800&q=85"
+      }
+    ],
+    features: [
+      "Cero costo de electricidad: se alimenta 100% con energía solar sustentable.",
+      "Sensor de movimiento inteligente PIR con alcance de hasta 8 metros.",
+      "Resistencia extrema a la intemperie con certificación impermeable IP65.",
+      "Batería de litio recargable de alta duración de 2200mAh incorporada."
+    ],
+    reviews: [
+      {
+        id: "rev-reflector-1",
+        author: "Maximiliano T. - Funes",
+        rating: 5,
+        comment: "Excelente potencia para el patio. Ideal que no requiera cables, lo instalé en 5 minutos y al detectar movimiento ilumina todo impecable.",
+        date: "Hace 4 días"
+      }
+    ],
+    featured: true
+  },
+  {
+    id: "prod-bolso-carrito-compras",
+    title: "Bolso Carrito de Compras Plegable con Ruedas",
+    description: "Olvidate por completo de cargar peso y complicarte al hacer tus compras diarias. Este práctico bolso de lona impermeable incluye ruedas plegables ultra resistentes para un transporte sumamente cómodo.",
+    basePrice: 19850,
+    beforePrice: 24900,
+    category: "Hogar",
+    media: [
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=85"
+      }
+    ],
+    features: [
+      "Estructura plegable que se convierte de bolso de mano a carrito en segundos.",
+      "Ruedas reforzadas con rulemanes para un deslizamiento suave y sin esfuerzo.",
+      "Tela de lona oxford impermeable de alta densidad y fácil lavado.",
+      "Capacidad de carga superior a los 15 kg sin deformarse."
+    ],
+    reviews: [
+      {
+        id: "rev-bolso-1",
+        author: "Norma G. - Rosario Centro",
+        rating: 5,
+        comment: "Súper liviano y práctico. Lo uso para ir a la verdulería y me salvó la espalda. Al terminar lo pliego y no ocupa nada.",
+        date: "Hace una semana"
+      }
+    ],
+    featured: false
+  },
+  {
+    id: "prod-set-juegos-mesa",
+    title: "Set de Juegos de Mesa Madera 3 en 1",
+    description: "Compartir momentos únicos con los tuyos nunca pasa de moda. Este set compacto de alta calidad reúne ludo, damas y ajedrez para divertirse sin pantallas en cualquier lugar.",
+    basePrice: 24500,
+    beforePrice: 32000,
+    category: "Niños",
+    media: [
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1611195974226-a6a9be9dd763?auto=format&fit=crop&w=800&q=85"
+      }
+    ],
+    features: [
+      "Tablero de madera premium bifaz con acabados finos y suaves al tacto.",
+      "Fichas magnéticas de madera tallada listas para horas de juego.",
+      "Compartimento interno acolchado para guardar todas las piezas de forma segura.",
+      "El regalo perfecto para incentivar la estrategia en familia."
+    ],
+    reviews: [
+      {
+        id: "rev-juegos-1",
+        author: "Florencia S. - San Lorenzo",
+        rating: 5,
+        comment: "La calidad de la madera es espectacular. Los chicos se engancharon al instante y las piezas quedan bien guardadas adentro del maletín.",
+        date: "Hace 3 días"
+      }
+    ],
+    featured: false
+  },
+  {
+    id: "prod-lampara-mesa-rgb",
+    title: "Lámpara de Mesa RGB Conexión Inteligente Aura",
+    description: "Transformá por completo la atmósfera de tus espacios con un abanico infinito de colores y tonos cálidos. Perfecta para ambientar tus momentos de relax, lectura o trabajo.",
+    basePrice: 38234,
+    beforePrice: 44351,
+    category: "Iluminación",
+    media: [
       {
         type: "image",
         url: "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85"
       }
     ],
     features: [
-      "Base de madera natural premium tratada con aceites ecológicos.",
-      "Pantalla de hilo de algodón de alta resistencia.",
-      "Interruptor de mano de diseño moderno integrado.",
-      "Compatible con lámparas LED bajo consumo de calidez regulable."
+      "16 millones de colores ajustables y control de calidez de luz blanca (3000K - 6500K).",
+      "Control táctil directo en la base o mediante asistente inteligente de voz y app móvil.",
+      "Modo ritmo musical que sincroniza los destellos con tus canciones o películas favoritas.",
+      "Alimentación USB directa y bajo consumo energético con tecnología LED Aura."
     ],
-    reviews: [PRESET_REVIEWS[0]],
-    featured: true
-  },
-  {
-    id: "prod-utensilios-bambu",
-    title: "Set de Utensilios de Cocina Bambú Natural Orgánico",
-    description: "Conjunto de 5 herramientas esenciales de cocina fabricadas íntegramente de bambú de crecimiento certificado. Su dureza natural es altamente superior a las maderas tradicionales, protegiendo tus sartenes antiadherentes y aportando un aire fresco y rústico a tu mesada.",
-    basePrice: 19500,
-    beforePrice: 26000,
-    category: "Cocina",
-    media: [
+    reviews: [
       {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1590794056226-79ef3a8147e1?auto=format&fit=crop&w=800&q=85"
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1581084324492-c8076f130f86?auto=format&fit=crop&w=800&q=85"
+        id: "rev-lampara-1",
+        author: "Carla D. - Rosario",
+        rating: 5,
+        comment: "Los colores son divinos y los modos de relajación ayudan un montón para antes de dormir. La manejo toda con el teléfono.",
+        date: "Hace 2 semanas"
       }
     ],
-    features: [
-      "Fabricación artesanal libre de melaminas y pegamentos tóxicos.",
-      "Antibacteriano y repelente de olores de manera natural.",
-      "No raya revestimientos de cerámica o teflón.",
-      "Incluye recipiente organizador cilíndrico de diseño contemporáneo."
-    ],
-    reviews: [PRESET_REVIEWS[1]],
-    featured: true
+    featured: false
   },
   {
-    id: "prod-sillon-boucle",
-    title: "Sillón de Lectura Bouclé Confort",
-    description: "Sillón individual tapizado con la exclusiva tela bouclé (ovejita), conocida por su textura sumamente suave y su estética de vanguardia europea. Su estructura acolchada y ergonómica te abraza en cada momento de lectura.",
-    basePrice: 145000,
-    beforePrice: 180000,
+    id: "prod-set-accesorios-bano",
+    title: "Soporte de Baño y Set de Accesorios Premium",
+    description: "¿Querés darle un toque de distinción y originalidad a tu baño? Este juego de accesorios de cerámica mate y detalles en bambú nórdico organiza tu espacio con máxima elegancia.",
+    basePrice: 9486,
+    beforePrice: 14378,
     category: "Hogar",
     media: [
       {
         type: "image",
-        url: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?auto=format&fit=crop&w=800&q=85"
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1592078615290-033ee584e267?auto=format&fit=crop&w=800&q=85"
+        url: "https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=800&q=85"
       }
     ],
     features: [
-      "Tapizado de textura bouclé ultrasuave de alta gramatura.",
-      "Relleno de espuma de poliuretano de alta densidad con memoria y resiliencia.",
-      "Patas cilíndricas en elegante terminación madera o metal negro satinado.",
-      "Costuras de alta resistencia reforzadas."
+      "Material cerámico premium de alta resistencia con acabado mate texturado.",
+      "Detalles y bases de bambú natural tratado contra la humedad e impermeabilizado.",
+      "Incluye dispenser de jabón con pico dosificador, portacepillos y jabonera.",
+      "Estilo minimalista nórdico que eleva instantáneamente la estética del baño."
     ],
-    reviews: [PRESET_REVIEWS[2]],
+    reviews: [
+      {
+        id: "rev-bano-1",
+        author: "Bautista K. - Granadero Baigorria",
+        rating: 5,
+        comment: "Precioso. Le dio un toque súper pro y ordenado al antebaño. La cerámica tiene una textura muy linda.",
+        date: "Hace 2 días"
+      }
+    ],
+    featured: false
+  },
+  {
+    id: "prod-cafetera-expreso-vintage",
+    title: "Cafetera Expreso Vintage Black Premium 20 Bar",
+    description: "¿Hay algo más lindo que despertarte con el aroma del café recién hecho inundando tu cocina? Con nuestra Cafetera Expresso Vintage de 20 Bar y vaporizador de leche integrado, prepará espressos, cappuccinos y lattes de barista profesional.",
+    basePrice: 187144,
+    beforePrice: 201245,
+    category: "Cocina",
+    media: [
+      {
+        type: "image",
+        url: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=800&q=85"
+      }
+    ],
+    features: [
+      "Bomba de presión italiana premium de 20 bares de fuerza para un espresso cremoso.",
+      "Vaporizador espumador ajustable para preparar lattes y capuchinos perfectos.",
+      "Estética única retro vintage con detalles analógicos y acabados cromados elegantísimos.",
+      "Depósito de agua transparente desmontable con capacidad para 1.5 litros."
+    ],
+    reviews: [
+      {
+        id: "rev-cafetera-1",
+        author: "Lucía M. - Alberdi",
+        rating: 5,
+        comment: "Súper feliz con esta cafetera. Además de que es hermosa y decora la cocina, la presión que tiene saca el café con una espumita increíble.",
+        date: "Ayer"
+      }
+    ],
     featured: true
   },
   {
-    id: "prod-serum-rosa",
-    title: "Serum Rejuvenecedor de Belleza Rosa Mosqueta",
-    description: "Elixir facial hidratante formulado con extracto puro prensado en frío de semillas de Rosa Mosqueta patagónica y enriquecido con ácido hialurónico concentrado. Regenera el tejido, unifica el tono de la piel y aporta una luminosidad natural inolvidable.",
-    basePrice: 16200,
-    beforePrice: 22000,
-    category: "Belleza",
-    media: [
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?auto=format&fit=crop&w=800&q=85"
-      }
-    ],
-    features: [
-      "100% libre de parabenos, fragancias artificiales e ingredientes animales.",
-      "Contiene Vitamina A, C y E que actúan como poderosos antioxidantes.",
-      "Textura ligera de rápida absorción, no grasosa.",
-      "Gotero dosificador de vidrio para una aplicación higiénica e integrada."
-    ],
-    reviews: [PRESET_REVIEWS[3]],
-    featured: false
-  },
-  {
-    id: "prod-organizador-negro",
-    title: "Organizador Multifuncional Metálico Negro",
-    description: "Repisa y organizador modular multiuso, ideal tanto para condimentos en la cocina como para toallas en el baño o herramientas en el taller. Fabricado de acero reforzado con pintura termoestable de alta duración, totalmente a prueba de óxido.",
-    basePrice: 24500,
-    beforePrice: 32000,
-    category: "Herramientas",
-    media: [
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=800&q=85"
-      }
-    ],
-    features: [
-      "Chapa de acero soldada de alta rigidez estructural.",
-      "Pintura en polvo electrostática negro microtexturado.",
-      "Doble estante con barandas de contención anticaídas de alta eficiencia.",
-      "Ganchos laterales de encastre integrados para repasadores o llaves."
-    ],
-    reviews: [],
-    featured: false
-  },
-  {
-    id: "prod-bloques-madera",
-    title: "Set de Cubos Apilables de Madera Cuentacuentos",
-    description: "Un hermoso set de 12 bloques apilables didácticos construidos íntegramente en madera natural pulida. Decorados con pinturas no tóxicas al agua en tonos pastel. Estimula la motricidad fina, la coordinación ojo-mano y el pensamiento lógico-espacial en los más chicos.",
-    basePrice: 15400,
-    beforePrice: 21000,
+    id: "prod-set-almohada-cobertor",
+    title: "Set Premium de Almohadilla y Cobertor",
+    description: "Envolvé a tu bebé en un abrazo de pura suavidad. Confeccionado con materiales hipoalergénicos ultra blandos, este set incluye una almohadita ergonómica y un cobertor acolchado súper abrigado para asegurar su mejor descanso diario.",
+    basePrice: 38710,
+    beforePrice: 42647,
     category: "Niños",
     media: [
       {
         type: "image",
-        url: "https://images.unsplash.com/photo-1515488042361-404e9250afef?auto=format&fit=crop&w=800&q=85"
-      },
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&w=800&q=85"
+        url: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=85"
       }
     ],
     features: [
-      "Maderas sustentables y bordes redondeados anti-astillas.",
-      "Pinturas ecológicas premium seguras para morder y chupar.",
-      "Bolsita de lienzo orgánico para guardar las piezas con facilidad.",
-      "Estimula el desarrollo cognitivo sensorial y la pinza fina."
+      "Tejido extrasuave transpirable, óptimo para la piel sensible del recién nacido.",
+      "Almohada ergonómica diseñada para prevenir la plagiocefalia postural.",
+      "Manta cobertora de microfibra soft térmica extra abrigada y confortable.",
+      "Hermosa presentación en maletín de regalo ecológico transparente."
     ],
-    reviews: [],
+    reviews: [
+      {
+        id: "rev-bebe-1",
+        author: "Gimena L. - Rosario Centro",
+        rating: 5,
+        comment: "Súper suave y calentito. Lo compramos para el moisés de nuestro gordo y es hermoso el diseño. Súper abrigado.",
+        date: "Hace 5 días"
+      }
+    ],
     featured: true
-  },
-  {
-    id: "prod-doudou-conejito",
-    title: "Confección Apego Bebé Gasa Algodón Orgánico",
-    description: "Tierno sonajero y doudou con diseño de conejito dormilón, ideal para brindar seguridad y calma a tu bebé desde sus primeros días. Confeccionado con gasa doble de algodón orgánico certificado de máxima suavidad y sumamente transpirable.",
-    basePrice: 9800,
-    beforePrice: 14000,
-    category: "Niños",
-    media: [
-      {
-        type: "image",
-        url: "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?auto=format&fit=crop&w=800&q=85"
-      }
-    ],
-    features: [
-      "100% Algodón orgánico certificado hipoalergénico y ultrasuave.",
-      "Nudos en extremos testeados para que el bebé muerda calmadamente.",
-      "Evita irritaciones y alergias en pieles de recién nacidos.",
-      "Fácil de lavar, mantiene su suavidad incluso tras múltiples lavados."
-    ],
-    reviews: [],
-    featured: false
   }
 ];

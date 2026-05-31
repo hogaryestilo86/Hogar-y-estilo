@@ -29,10 +29,26 @@ export default function App() {
   // Main states with deep local storage recovery
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem("store_products_list");
+    const legacyIds = [
+      "prod-alba-aura",
+      "prod-utensilios-bambu",
+      "prod-sillon-boucle",
+      "prod-serum-rosa",
+      "prod-organizador-negro",
+      "prod-bloques-madera",
+      "prod-doudou-conejito"
+    ];
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          // Purge legacy trial products
+          const filtered = parsed.filter(p => p && !legacyIds.includes(p.id));
+          if (filtered.length > 0) {
+            return filtered;
+          }
+        }
       } catch (e) { /* ignore */ }
     }
     return INITIAL_PRODUCTS;
@@ -544,27 +560,34 @@ export default function App() {
             {/* MAIN PORTAFOLIO PRODUCT GRID */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2" id="productos">
               {products.length === 0 ? (
-                <div className="text-center py-20 px-6 bg-white rounded-2xl border border-brand-200">
+                <div className="text-center py-24 px-6 bg-[#FAF9F6] rounded-2xl border border-brand-200 shadow-sm max-w-2xl mx-auto my-12 animate-in fade-in duration-500">
                   <div className="h-16 w-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto text-brand-800">
-                    <Sparkles className="w-8 h-8 text-amber-500 animate-pulse" />
+                    <Sparkles className="w-7 h-7 text-brand-900 animate-pulse" />
                   </div>
-                  <h4 className="font-serif text-xl sm:text-2xl font-bold text-brand-900 mt-5">
-                    No hay productos disponibles por el momento
+                  <h4 className="font-serif text-2xl font-bold text-brand-900 mt-6 tracking-tight">
+                    Próximamente nuevos ingresos
                   </h4>
-                  <p className="text-xs sm:text-sm text-brand-500 font-light mt-2 max-w-md mx-auto">
-                    Estamos actualizando nuestro catálogo exclusivo de Hogar & Estilo con nuevos productos selectos elegidos para tus espacios cotidianos. ¡Te invitamos a volver pronto!
+                  <p className="text-xs sm:text-sm text-brand-650 font-light mt-3 max-w-sm mx-auto leading-relaxed">
+                    Estamos actualizando nuestro catálogo exclusivo. Cargando productos... Te invitamos a visitarnos nuevamente en unos minutos.
                   </p>
-                  {isAdminAuthenticated && (
-                    <button
-                      onClick={() => {
-                        setActiveTab("admin");
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="mt-6 bg-brand-800 hover:bg-brand-900 text-white px-6 py-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer inline-flex items-center gap-2"
-                    >
-                      <span>Cargar Primer Producto</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                  {isAdminAuthenticated ? (
+                    <div className="pt-4">
+                      <button
+                        onClick={() => {
+                          setActiveTab("admin");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="mt-4 bg-brand-900 hover:bg-black text-white px-7 py-3 rounded-md text-xs font-bold uppercase tracking-wider transition-all cursor-pointer inline-flex items-center gap-2 shadow-xs hover:shadow-sm"
+                      >
+                        <span>Cargar Primer Producto</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-8 flex justify-center items-center gap-2.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-ping" />
+                      <span className="text-[11px] font-mono uppercase tracking-widest text-brand-500 font-bold">Actualización en tiempo real</span>
+                    </div>
                   )}
                 </div>
               ) : filteredProducts.length === 0 ? (
