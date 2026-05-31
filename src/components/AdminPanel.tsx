@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
-import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil } from "lucide-react";
+import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache, getMedia } from "../indexedDbMedia";
 
 interface AdminPanelProps {
@@ -18,6 +18,8 @@ interface AdminPanelProps {
   onAdminEmailChange: (email: string) => void;
   adminPhone?: string;
   onAdminPhoneChange?: (phone: string) => void;
+  adminWebhookUrl?: string;
+  onAdminWebhookUrlChange?: (url: string) => void;
   storeMetrics: {
     viewsCount: number;
     abandonedCartCount: number;
@@ -204,6 +206,8 @@ export default function AdminPanel({
   onAdminEmailChange,
   adminPhone = "5493416555555",
   onAdminPhoneChange = () => {},
+  adminWebhookUrl = "",
+  onAdminWebhookUrlChange = () => {},
   storeMetrics,
   pendingOrders,
   bankDetails,
@@ -234,6 +238,7 @@ export default function AdminPanel({
   };
   const [featuresText, setFeaturesText] = useState(""); // Comma separated key features
   const [featured, setFeatured] = useState(false);
+  const [paused, setPaused] = useState(false);
 
   // Slideshow local state for main showcase customizing
   const [newSlideUrl, setNewSlideUrl] = useState("");
@@ -547,6 +552,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     setFeaturesText("");
     setMediaList([]);
     setFeatured(false);
+    setPaused(false);
     setEditingProductId(null);
   };
 
@@ -593,6 +599,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         features: featuresArray,
         media: productMedia,
         featured: featured,
+        paused: paused,
         reviews: original?.reviews || [
           {
             id: `rev-auto-${Date.now()}`,
@@ -621,6 +628,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       media: productMedia,
       isCustom: true,
       featured: featured,
+      paused: paused,
       reviews: [
         {
           id: `rev-auto-${Date.now()}`,
@@ -643,6 +651,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     setFeaturesText("");
     setMediaList([]);
     setFeatured(false);
+    setPaused(false);
     notify(`¡El producto "${newProduct.title}" ha sido creado con éxito y ya está mapeado en la tienda online!`, "success");
   };
 
@@ -1015,6 +1024,78 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         </div>
       </div>
 
+      {/* SECCIÓN CONFIGURACIÓN ALERTAS DE VENTA AUTOMÁTICAS (Requerimiento de notificaciones en tiempo real) */}
+      <div className="bg-white p-6 rounded-2xl border border-brand-200 shadow-xs space-y-4 text-left font-sans">
+        <div>
+          <h3 className="font-serif text-lg font-bold text-brand-900 flex items-center gap-2">
+            <span className="text-purple-700">📢 Configuración de Alertas y Notificaciones Automáticas</span>
+            <span className="text-[9px] uppercase tracking-wider bg-purple-600 text-white font-sans py-0.5 px-2 rounded-full font-bold">100% Invisible</span>
+          </h3>
+          <p className="text-xs text-brand-600 font-light mt-1">
+            Recibí avisos automáticos al instante de cada venta (por tarjeta o transferencia) de forma silenciosa para el comprador. Podés configurar tu e-mail o un Webhook personalizado conectado a herramientas externas (como Discord, Telegram o Make.com) para recibir notificaciones directas en tu celular.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <div>
+            <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1.5">
+              Email para Alertas de Venta
+            </label>
+            <input
+              type="email"
+              value={adminEmail}
+              onChange={(e) => onAdminEmailChange(e.target.value)}
+              className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-brand-800 text-brand-900"
+              placeholder="tu-email@gmail.com"
+            />
+            <span className="text-[9.5px] text-brand-500 mt-1 block leading-relaxed">
+              Dirección de correo a donde se enviarán las alertas automáticas de transacciones y pedidos.
+            </span>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1.5">
+              URL de Webhook Directo (Discord, Telegram, Zapier, Make)
+            </label>
+            <input
+              type="text"
+              value={adminWebhookUrl}
+              onChange={(e) => onAdminWebhookUrlChange(e.target.value)}
+              className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-brand-800 text-brand-900 font-mono"
+              placeholder="https://discord.com/api/webhooks/... o https://hooks.zapier.com/..."
+            />
+            <span className="text-[9.5px] text-brand-500 mt-1 block leading-relaxed">
+              Al pegar una URL de webhook, enviaremos los datos de ventas al instante. ¡Ideal para recibir alertas en tiempo real de forma discreta!
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-brand-50/50 p-4 rounded-xl border border-brand-100 flex items-start gap-3 mt-2">
+          <Sparkles className="w-5 h-5 text-purple-600 shrink-0 mt-0.5 animate-pulse" />
+          <div className="space-y-1">
+            <h4 className="text-[11px] font-bold text-brand-800">💡 ¿Cómo recibir la alerta en mi celular o Instagram?</h4>
+            <p className="text-[10px] text-brand-600 font-light leading-relaxed">
+              Instagram restringe el envío automatizado a cuentas comerciales verificadas por Meta. La solución estándar, más segura y profesional para estar alertado al instante en todo momento es mediante webhooks:
+              <br />
+              1. <strong>Discord / Telegram</strong>: Creá un canal en Discord o un bot en Telegram, obtené su webhook gratis y pegalo arriba. Recibirás un mensaje estético con todo el detalle de ventas de inmediato.
+              <br />
+              2. <strong>Zapier o Make.com</strong>: Creá un automatismo con disparador "Webhook" y acción "Enviar DM en Instagram", "Mensaje de WhatsApp" o "Notificación Push" para alertarte a vos mismo.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              notify("¡Canales de Notificación actualizados con éxito! El sistema se mantendrá alerta ante compras.", "success");
+            }}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 h-[38px] flex items-center justify-center shadow-sm select-none animate-in fade-in"
+          >
+            Confirmar Canales de Notificación
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Creation Form block (Left 2 columns) */}
@@ -1142,18 +1223,34 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               </div>
 
               {/* Opción de Producto Destacado en vitrina */}
-              <div className="bg-brand-50/70 border border-brand-200 rounded-xl p-4 flex items-center gap-3 select-none">
-                <input
-                  type="checkbox"
-                  id="featured-product-checkbox"
-                  checked={featured}
-                  onChange={(e) => setFeatured(e.target.checked)}
-                  className="w-4.5 h-4.5 text-brand-900 border-brand-300 rounded focus:ring-brand-800 focus:ring-offset-0 cursor-pointer accent-brand-900"
-                />
-                <label htmlFor="featured-product-checkbox" className="cursor-pointer text-xs sm:text-sm font-medium text-brand-800 flex flex-col select-none">
-                  <strong className="text-brand-900">✨ Marcar como Destacado para la Vitrina</strong>
-                  <span className="text-xs text-brand-600 font-light mt-0.5">Si marcas esta casilla, el producto aparecerá arriba en la parte superior del inicio como una atracción deslizable horizontalmente.</span>
-                </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-brand-50/70 border border-brand-200 rounded-xl p-4 flex items-center gap-3 select-none">
+                  <input
+                    type="checkbox"
+                    id="featured-product-checkbox"
+                    checked={featured}
+                    onChange={(e) => setFeatured(e.target.checked)}
+                    className="w-4.5 h-4.5 text-brand-900 border-brand-300 rounded focus:ring-brand-800 focus:ring-offset-0 cursor-pointer accent-brand-900"
+                  />
+                  <label htmlFor="featured-product-checkbox" className="cursor-pointer text-xs sm:text-sm font-medium text-brand-800 flex flex-col select-none text-left">
+                    <strong className="text-brand-900">✨ Marcar como Destacado para la Vitrina</strong>
+                    <span className="text-[10.5px] sm:text-xs text-brand-600 font-light mt-0.5 leading-normal">Aparecerá arriba de todo en el carrusel de inicio destacado.</span>
+                  </label>
+                </div>
+
+                <div className="bg-amber-50/40 border border-amber-200 rounded-xl p-4 flex items-center gap-3 select-none">
+                  <input
+                    type="checkbox"
+                    id="paused-product-checkbox"
+                    checked={paused}
+                    onChange={(e) => setPaused(e.target.checked)}
+                    className="w-4.5 h-4.5 text-amber-700 border-amber-300 rounded focus:ring-amber-500 focus:ring-offset-0 cursor-pointer accent-amber-700"
+                  />
+                  <label htmlFor="paused-product-checkbox" className="cursor-pointer text-xs sm:text-sm font-medium text-amber-900 flex flex-col select-none text-left">
+                    <strong className="text-amber-800">⏸️ Pausar Venta (Sin Stock)</strong>
+                    <span className="text-[10.5px] sm:text-xs text-amber-600 font-light mt-0.5 leading-normal">Si se tilda, el producto se ocultará de la catálogo temporalmente sin perder sus datos.</span>
+                  </label>
+                </div>
               </div>
 
               {/* Media loader drag & drop component */}
@@ -1418,6 +1515,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     className={`flex rounded-lg p-2.5 border items-center justify-between transition-all ${
                       editingProductId === item.id 
                         ? "bg-brand-50 border-brand-800 ring-1 ring-brand-800" 
+                        : item.paused
+                        ? "bg-neutral-50 border-neutral-300 opacity-60 grayscale-[40%]"
                         : "bg-brand-50/50 border-brand-200 hover:border-brand-300"
                     }`}
                   >
@@ -1425,7 +1524,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       {item.media && item.media[0]?.type === "video" ? (
                         <ResolvedVideo
                           src={item.media[0]?.url}
-                          className="w-12 h-12 rounded object-cover border border-brand-200 shrink-0 bg-brand-100"
+                          className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
                           muted
                           playsInline
                         />
@@ -1433,13 +1532,20 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                         <ResolvedImage
                           src={(item.media && item.media[0]?.url) || getCategoryPlaceholder(item.category)}
                           alt={item.title}
-                          className="w-12 h-12 rounded object-cover border border-brand-200 shrink-0 bg-brand-100"
+                          className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
                           referrerPolicy="no-referrer"
                         />
                       )}
-                      <div>
-                        <h5 className="text-xs font-serif font-bold text-brand-900 line-clamp-1">{item.title}</h5>
-                        <p className="text-[10px] text-brand-500 mt-0.5 uppercase tracking-wide">{item.category}</p>
+                      <div className="text-left">
+                        <h5 className={`text-xs font-serif font-bold text-brand-900 line-clamp-1 ${item.paused ? "line-through text-brand-500" : ""}`}>{item.title}</h5>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <p className="text-[10px] text-brand-500 uppercase tracking-wide">{item.category}</p>
+                          {item.paused && (
+                            <span className="text-[8px] font-sans font-bold bg-amber-100 text-amber-800 border border-amber-200 px-1 rounded uppercase tracking-wide">
+                              ⏸️ Pausado
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[10px] font-bold text-brand-800">{formatCurrency(listPrice)}</span>
                           <span className="text-[9px] bg-green-50 border border-green-200 text-green-700 px-1 rounded">15% OFF transf.</span>
@@ -1448,6 +1554,28 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
+                      {/* Toggle Pause button (Pausar sin eliminar) */}
+                      <button
+                        onClick={() => {
+                          const updatedProduct = {
+                            ...item,
+                            paused: !item.paused
+                          };
+                          onUpdateProduct(updatedProduct);
+                          notify(
+                            `El producto "${item.title}" ahora está ${!item.paused ? "PAUSADO (Oculto en tienda)" : "ACTIVO (Visible de nuevo)"}.`,
+                            "info"
+                          );
+                        }}
+                        className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                          item.paused 
+                            ? "text-amber-700 bg-amber-100 border border-amber-300 hover:bg-amber-200" 
+                            : "text-brand-400 hover:text-brand-900 hover:bg-brand-200/50"
+                        }`}
+                        title={item.paused ? "Re-activar venta (Hacer visible)" : "Pausar venta (Ocultar)"}
+                      >
+                        {item.paused ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                       {/* Modify Product button */}
                       <button
                         onClick={() => {
@@ -1460,6 +1588,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                           setFeaturesText(item.features ? item.features.join(", ") : "");
                           setMediaList(item.media || []);
                           setFeatured(!!item.featured);
+                          setPaused(!!item.paused);
                           
                           // Smooth scroll to form in touch screens or desktops
                           const formEl = document.getElementById("admin-creation-form-panel");

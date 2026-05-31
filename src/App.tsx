@@ -14,6 +14,7 @@ import AdminPanel from "./components/AdminPanel";
 import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
+import { convertProductsIdbToBase64 } from "./indexedDbMedia";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
 // Helper to resolve image urls, stripping the local server proxy prefix if run in static hosts (Vercel, GitHub Pages)
@@ -25,43 +26,148 @@ export function resolveImageUrl(url: string | undefined): string {
   return url;
 }
 
-export default function App() {
-  // Main states with deep local storage recovery
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem("store_products_list");
-    const legacyIds = [
-      "prod-alba-aura",
-      "prod-utensilios-bambu",
-      "prod-sillon-boucle",
-      "prod-serum-rosa",
-      "prod-organizador-negro",
-      "prod-bloques-madera",
-      "prod-doudou-conejito"
-    ];
-
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Purge legacy trial products
-          const filtered = parsed.filter(p => p && !legacyIds.includes(p.id));
-          if (filtered.length > 0) {
-            return filtered;
-          }
-        }
-      } catch (e) { /* ignore */ }
-    }
-    return INITIAL_PRODUCTS;
+// Robust cleaner helper to completely purge old mock/trial assets from localStorage/state so only user's custom designs are loaded
+const filterOutDemoProducts = (list: any[]): Product[] => {
+  if (!Array.isArray(list)) return [];
+  const demoIds = [
+    "prod-contadora-billetes",
+    "prod-reflector-solar",
+    "prod-bolso-carrito-compras",
+    "prod-set-juegos-mesa",
+    "prod-lampara-mesa-rgb",
+    "prod-set-accesorios-bano",
+    "prod-cafetera-expreso-vintage",
+    "prod-set-almohada-cobertor",
+    "prod-alba-aura",
+    "prod-utensilios-bambu",
+    "prod-sillon-boucle",
+    "prod-serum-rosa",
+    "prod-organizador-negro",
+    "prod-bloques-madera",
+    "prod-doudou-conejito"
+  ];
+  return list.filter((p) => {
+    if (!p) return false;
+    // Keep only actual products explicitly created and configured by the user
+    if (p.isCustom) return true;
+    if (demoIds.includes(p.id)) return false;
+    if (p.id && p.id.startsWith("prod-custom-")) return true;
+    // Reject anything matching legacy catalogs
+    return false;
   });
+};
 
+export default function App() {
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+
+  // Fetch products from backend server on mount (shares catalog for all users)
   useEffect(() => {
+    fetch("/api/products")
+      .then((res) => {
+        if (!res.ok) throw new Error("Server response error");
+        return res.json();
+      })
+      .then((data) => {
+        if (data && Array.isArray(data)) {
+          const clean = filterOutDemoProducts(data);
+          const initial = clean.length > 0 ? clean : INITIAL_PRODUCTS;
+          setProducts(initial);
+          setHasLoadedInitial(true);
+
+          // Auto-migrate legacy idb:// media to highly portable base64 data URLs
+          convertProductsIdbToBase64(initial).then(({ updatedProducts, changed }) => {
+            if (changed) {
+              setProducts(updatedProducts);
+              console.log("Migrated loaded server products to embedded Base64!");
+            }
+          });
+        } else if (data && data.fallback) {
+          // No server data yet, check client local storage to auto-migrate user's uploaded products
+          const saved = localStorage.getItem("store_products_list");
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              const clean = filterOutDemoProducts(parsed);
+              if (clean.length > 0) {
+                // Auto-migrate to server so other users can see them immediately!
+                setProducts(clean);
+                fetch("/api/products", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ products: clean })
+                }).catch((e) => console.warn("Failed to synchronize migrated products to server:", e));
+
+                convertProductsIdbToBase64(clean).then(({ updatedProducts, changed }) => {
+                  if (changed) {
+                    setProducts(updatedProducts);
+                  }
+                });
+              } else {
+                setProducts(INITIAL_PRODUCTS); // Start with preset catalog
+              }
+            } catch (e) {
+              setProducts(INITIAL_PRODUCTS);
+            }
+          } else {
+            setProducts(INITIAL_PRODUCTS); // Preset catalog by default
+          }
+          setHasLoadedInitial(true);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not sync shared catalog from server, using local fallback:", err);
+        const saved = localStorage.getItem("store_products_list");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            const clean = filterOutDemoProducts(parsed);
+            if (clean.length > 0) {
+              setProducts(clean);
+              convertProductsIdbToBase64(clean).then(({ updatedProducts, changed }) => {
+                if (changed) {
+                  setProducts(updatedProducts);
+                }
+              });
+            } else {
+              setProducts(INITIAL_PRODUCTS);
+            }
+          } catch (e) {
+            setProducts(INITIAL_PRODUCTS);
+          }
+        } else {
+          setProducts(INITIAL_PRODUCTS);
+        }
+        setHasLoadedInitial(true);
+      });
+  }, []);
+
+  // Sync state to local storage and backend server whenever modified
+  useEffect(() => {
+    if (!hasLoadedInitial) return;
+
     try {
       localStorage.setItem("store_products_list", JSON.stringify(products));
     } catch (e) {
-      console.warn("No se pudo persistir la lista de productos en el almacenamiento local por límite de cuota (datos multimedia de gran tamaño):", e);
-      // We don't want to show an annoying alert/toast constantly on every render, but we log it for diagnostic
+      console.warn("No se pudo persistir la lista de productos localmente:", e);
     }
-  }, [products]);
+
+    // Persist to Express server so everyone sees the updated catalog!
+    fetch("/api/products", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ products })
+    })
+    .then((r) => r.json())
+    .then((res) => {
+      console.log("Portafolio sincronizado en el servidor:", res);
+    })
+    .catch((err) => {
+      console.warn("Error enviando cambios al servidor de catálogos:", err);
+    });
+  }, [products, hasLoadedInitial]);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -89,7 +195,7 @@ export default function App() {
 
   // Calculamos los productos destacados dinámicamente para la vitrina deslizable manualmente
   const showcasePhotos = products
-    .filter(p => p && p.featured)
+    .filter(p => p && p.featured && !p.paused)
     .map(p => ({
       url: p.media?.[0]?.url || "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85",
       type: p.media?.[0]?.type || "image",
@@ -135,6 +241,16 @@ export default function App() {
   const handleAdminPhoneChange = (newPhone: string) => {
     setAdminPhone(newPhone);
     localStorage.setItem("admin_notification_phone", newPhone);
+  };
+
+  // Custom configured Admin background notification Webhook (loaded dynamically & persisted)
+  const [adminWebhookUrl, setAdminWebhookUrl] = useState<string>(() => {
+    return localStorage.getItem("admin_notification_webhook") || "";
+  });
+
+  const handleAdminWebhookUrlChange = (newWebhookUrl: string) => {
+    setAdminWebhookUrl(newWebhookUrl);
+    localStorage.setItem("admin_notification_webhook", newWebhookUrl);
   };
 
   // Analytics Metrics (Requerimiento 6 de Estadísticas)
@@ -370,6 +486,30 @@ export default function App() {
 
     setPendingOrders((prev) => [newOrder, ...prev]);
     
+    // Disparar Webhook / Email automático en segundo plano de forma 100% silenciosa e invisible para el comprador
+    try {
+      fetch("/api/send-order-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          order: newOrder,
+          adminEmail,
+          webhookUrl: adminWebhookUrl
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        console.log("Automatic sale notification dispatched:", data);
+      })
+      .catch((err) => {
+        console.warn("Background notification fetch failed:", err);
+      });
+    } catch (e) {
+      console.warn("Silent notification failed:", e);
+    }
+    
     // Recalculate metrics:
     // +1 Completed Purchase
     // +1 Pending Dispatches
@@ -446,6 +586,7 @@ export default function App() {
   // Searching filter and categories
   const filteredProducts = (products || []).filter((p) => {
     if (!p) return false;
+    if (p.paused) return false; // Skip paused/out-of-stock items for clients
     const titleStr = p.title || "";
     const categoryStr = p.category || "";
     const descStr = p.description || "";
@@ -957,6 +1098,8 @@ export default function App() {
             onAdminEmailChange={handleAdminEmailChange}
             adminPhone={adminPhone}
             onAdminPhoneChange={handleAdminPhoneChange}
+            adminWebhookUrl={adminWebhookUrl}
+            onAdminWebhookUrlChange={handleAdminWebhookUrlChange}
             storeMetrics={storeMetrics}
             pendingOrders={pendingOrders}
             bankDetails={bankDetails}

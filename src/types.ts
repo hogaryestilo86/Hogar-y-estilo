@@ -28,6 +28,7 @@ export interface Product {
   features: string[];
   isCustom?: boolean;
   featured?: boolean;
+  paused?: boolean;
 }
 
 export interface CartItem {
