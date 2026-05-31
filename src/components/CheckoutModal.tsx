@@ -1,7 +1,12 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState, useEffect, useRef } from "react";
 import { OrderDetails, CartItem, BankDetails } from "../types";
 import { X, CreditCard, Landmark, CheckCircle, ArrowRight, ClipboardCheck, ArrowLeft, ShieldAlert, DollarSign, HelpCircle, Copy, Instagram, Upload, Image } from "lucide-react";
-import { storeMedia, ResolvedImage } from "../indexedDbMedia";
+import { storeMedia, ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -34,7 +39,7 @@ export default function CheckoutModal({
       contentRef.current.scrollTop = 0;
     }
   }, [step, isOpen]);
-
+  
   const [formData, setFormData] = useState<OrderDetails>({
     fullName: "",
     email: "",
@@ -46,6 +51,33 @@ export default function CheckoutModal({
     installments: 3,
   });
 
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [receiptImage, setReceiptImage] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      notify("El comprobante debe ser una imagen o captura de pantalla.", "error");
+      return;
+    }
+
+    setUploadingReceipt(true);
+    try {
+      const idbUrl = await storeMedia(file);
+      setReceiptImage(idbUrl);
+      setFormData(prev => ({ ...prev, receiptImage: idbUrl }));
+      notify("¡Comprobante adjuntado con éxito! Se guardará con tu pedido.", "success");
+    } catch (err) {
+      console.error(err);
+      notify("Hubo un error al procesar la imagen del comprobante.", "error");
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
+
   const [cardData, setCardData] = useState({
     number: "",
     name: "",
@@ -53,12 +85,30 @@ export default function CheckoutModal({
     cvv: "",
   });
 
-  const [receiptImage, setReceiptImage] = useState<string>("");
-  const [uploading, setUploading] = useState<boolean>(false);
-  const [copiedText, setCopiedText] = useState<boolean>(false);
-  const [copiedOrder, setCopiedOrder] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const handleCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { name, value } = e.target;
+    if (name === "number") {
+      value = value.replace(/\D/g, "")
+                  .replace(/(\d{4})/g, "$1 ")
+                  .trim()
+                  .substring(0, 19);
+    } else if (name === "expiry") {
+      value = value.replace(/\D/g, "");
+      if (value.length > 2) {
+        value = value.substring(0, 2) + "/" + value.substring(2, 4);
+      }
+      value = value.substring(0, 5);
+    } else if (name === "cvv") {
+      value = value.replace(/\D/g, "").substring(0, 4);
+    }
+    setCardData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const [loading, setLoading] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
+  const [generatedOrderId, setGeneratedOrderId] = useState("");
+  const [copiedOrder, setCopiedOrder] = useState(false);
+  const [copiedMsg, setCopiedMsg] = useState(false);
 
   // Automatic Mercado Pago Brick states
   const [mpPreferenceUrl, setMpPreferenceUrl] = useState<string>("");
@@ -69,27 +119,13 @@ export default function CheckoutModal({
   const [hasPrivateToken, setHasPrivateToken] = useState<boolean>(false);
   const brickInstanceRef = useRef<any>(null);
 
-  const [dragActive, setDragActive] = useState<boolean>(false);
-
-  const notify = (msg: string, type: "success" | "error" | "info" = "info") => {
+  const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
     if (showToast) {
       showToast(msg, type);
     } else {
-      alert(msg);
+      console.log(`[Toast Fallback] ${type.toUpperCase()}: ${msg}`);
     }
   };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setCardData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const [generatedOrderId, setGeneratedOrderId] = useState<string>("");
 
   const subtotal = cartItems.reduce(
     (acc, item) => acc + item.product.basePrice * item.quantity,
@@ -110,145 +146,142 @@ export default function CheckoutModal({
     if (isOpen && step === "payment" && formData.paymentMethod === "credit") {
       setMpPreferenceLoading(true);
       setMpError("");
-      
+
       const initializeBrick = async () => {
         try {
-          // 1. Inject Mercado Pago SDK
-          if (!(window as any).MercadoPago) {
+          // 1. Dynamic script load
+          await new Promise<void>((resolve, reject) => {
+            if (window.hasOwnProperty("MercadoPago")) {
+              resolve();
+              return;
+            }
             const script = document.createElement("script");
             script.src = "https://sdk.mercadopago.com/js/v2";
             script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("No se pudo cargar el SDK de Mercado Pago."));
             document.body.appendChild(script);
-            await new Promise((resolve) => {
-              script.onload = resolve;
-            });
-          }
+          });
 
           if (!active) return;
 
-          // 2. Clear old instances
-          if (brickInstanceRef.current) {
-            await brickInstanceRef.current.unmount().catch(console.error);
-            brickInstanceRef.current = null;
-          }
-
-          // 3. Obtain Credentials via safe server API endpoint
+          // 2. Fetch config
           const configRes = await fetch("/api/mercadopago/config");
           if (!configRes.ok) {
             throw new Error("No se pudo obtener la clave pública de configuración.");
           }
           const { publicKey, hasPrivateToken: isReal } = await configRes.json();
-          
-          if (!active) return;
           setHasPrivateToken(isReal);
+          setMpIsSimulator(!isReal);
+
+          if (!active) return;
 
           // 3. Initialize MP
           const mp = new (window as any).MercadoPago(publicKey, { locale: "es-AR" });
           const bricksBuilder = mp.bricks();
 
+          // 4. Cleanup old brick
+          if (brickInstanceRef.current) {
+            try {
+              await brickInstanceRef.current.unmount();
+            } catch (e) {
+              console.warn("Error unmounting previous Brick instance:", e);
+            }
+            brickInstanceRef.current = null;
+          }
+
           if (!active) return;
 
-          // 4. Render native Brick controller targeting target element
-          const renderCardBrick = async (builder: any) => {
-            brickInstanceRef.current = await builder.create(
-              "cardPayment",
-              "paymentCardBrickContainer",
-              {
-                initialization: {
-                  amount: finalListTotal,
-                  payer: {
-                    email: formData.email || "correo@ejemplo.com",
-                    firstName: formData.fullName.split(" ")[0] || "Cliente",
-                    lastName: formData.fullName.split(" ").slice(1).join(" ") || "DecoHome",
-                  },
+          // 5. Build settings and mount
+          const settings = {
+            initialization: {
+              amount: finalListTotal,
+              payer: {
+                email: formData.email || "correo@ejemplo.com",
+                firstName: (formData.fullName || "").split(" ")[0] || "Cliente",
+                lastName: (formData.fullName || "").split(" ").slice(1).join(" ") || "DecoHome",
+              },
+            },
+            customization: {
+              paymentMethods: {
+                creditCard: "all",
+                debitCard: "all",
+                bankTransfer: "all", // DEBIN / Red Link automatic transfer natively!
+              },
+              visual: {
+                style: {
+                  theme: "default",
                 },
-                customization: {
-                  visual: {
-                    style: {
-                      theme: "flat",
-                      customVariables: {
-                        formBackgroundColor: "#FFFFFF",
-                        baseColor: "#4B2E1E",
-                        borderRadius: "12px",
-                      }
-                    }
-                  },
-                  paymentMethods: {
-                    maxInstallments: 3,
-                    minInstallments: 1,
-                    types: {
-                      excluded: ["debit_card"]
-                    }
+              },
+            },
+            callbacks: {
+              onReady: () => {
+                if (active) setMpPreferenceLoading(false);
+              },
+              onSubmit: async ({ selectedPaymentMethod, formData: paymentFormData }: any) => {
+                if (!active) return;
+                setLoading(true);
+                try {
+                  const res = await fetch("/api/mercadopago/payment", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      paymentData: paymentFormData,
+                      cartItems,
+                      shipping,
+                      payerDetails: formData,
+                    }),
+                  });
+
+                  const paymentResult = await res.json();
+                  if (!res.ok) {
+                    throw new Error(paymentResult.error || "Error al procesar el pago.");
                   }
-                },
-                callbacks: {
-                  onReady: () => {
-                    if (active) setMpPreferenceLoading(false);
-                  },
-                  onSubmit: async (cardFormData: any) => {
-                    if (!active) return;
-                    setMpPreferenceLoading(true);
-                    try {
-                      const res = await fetch("/api/mercadopago/payment", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          token: cardFormData.token,
-                          issuer_id: cardFormData.issuer_id,
-                          payment_method_id: cardFormData.payment_method_id,
-                          transaction_amount: cardFormData.transaction_amount,
-                          installments: cardFormData.installments,
-                          payer: cardFormData.payer,
-                          orderData: {
-                            fullName: formData.fullName,
-                            email: formData.email,
-                            phone: formData.phone,
-                            address: formData.address,
-                            city: formData.city,
-                            zipCode: formData.zipCode,
-                            cartItems: cartItems.map(i => ({ title: i.product.title, quantity: i.quantity, price: i.product.basePrice })),
-                          }
-                        })
-                      });
 
-                      if (!res.ok) {
-                        const errData = await res.json().catch(() => ({}));
-                        throw new Error(errData.details || "Error procesando el pago seguro offline.");
-                      }
+                  if (paymentResult.isSimulator) {
+                    setMpIsSimulator(true);
+                  }
 
-                      const paymentResult = await res.json();
-                      setGeneratedOrderId(paymentResult.id ? `MP-${paymentResult.id}` : `#${Math.floor(1000 + Math.random() * 9000)}`);
-                      setStep("success");
-                      
-                      if (onOrderComplete) {
-                        onOrderComplete(
-                          { 
-                            ...formData, 
-                            paymentMethod: "credit", 
-                            receiptImage: paymentResult.point_of_interaction?.transaction_data?.ticket_url || "" 
-                          }, 
-                          cartItems, 
-                          paymentResult.id ? `MP-${paymentResult.id}` : undefined
-                        );
-                      }
-                    } catch (err: any) {
-                      console.error("Payment brick submission error:", err);
-                      // Notify friendly error to make customer clear
-                      notify("⚠️ Error al debitar la tarjeta: " + err.message, "error");
-                    } finally {
-                      if (active) setMpPreferenceLoading(false);
-                    }
-                  },
-                  onError: (error: any) => {
-                    console.error("Error crítico de Brick:", error);
-                    notify("No pudimos conectar con los servidores de Mercado Pago.", "error");
-                  },
-                },
-              }
-            );
+                  // Retrieve barcode, point_of_interaction or deep links for transfers (DEBIN instructions) if available:
+                  if (paymentResult.point_of_interaction) {
+                    setMpTransferDetails(paymentResult.point_of_interaction);
+                  }
+
+                  setGeneratedOrderId(paymentResult.id ? `MP-${paymentResult.id}` : `#${Math.floor(1000 + Math.random() * 9000)}`);
+                  setStep("success");
+
+                  if (onOrderComplete) {
+                    onOrderComplete(
+                      { 
+                        ...formData, 
+                        paymentMethod: "credit", 
+                        receiptImage: paymentResult.point_of_interaction?.transaction_data?.ticket_url || "" 
+                      }, 
+                      cartItems, 
+                      paymentResult.id ? `MP-${paymentResult.id}` : undefined
+                    );
+                  }
+                } catch (err: any) {
+                  console.error("Submitting payment Brick error:", err);
+                  notify(err.message || "Error procesando el pago. Por favor verificá tus datos e intentá de nuevo.", "error");
+                } finally {
+                  if (active) setLoading(false);
+                }
+              },
+              onError: (error: any) => {
+                console.error("Mercado Pago Brick error callback:", error);
+                if (active) setMpError("Error de validación o inicialización en el widget. Corregí los datos de la tarjeta.");
+              },
+            },
           };
 
-          await renderCardBrick(bricksBuilder);
+          // Mount to container
+          const paymentContainer = document.getElementById("paymentCardBrickContainer");
+          if (paymentContainer && active) {
+            brickInstanceRef.current = await bricksBuilder.create("payment", "paymentCardBrickContainer", settings);
+          }
         } catch (err: any) {
           console.error("Error al inicializar Mercado Pago Brick:", err);
           if (active) {
@@ -258,6 +291,7 @@ export default function CheckoutModal({
         }
       };
 
+      // Add a slight latency to allow the React container element to mount safely first!
       const delayTimer = setTimeout(() => {
         initializeBrick();
       }, 100);
@@ -273,11 +307,11 @@ export default function CheckoutModal({
     }
   }, [isOpen, step, formData.paymentMethod, cartItems, shipping, formData.fullName, formData.email]);
 
-  const copyCBU = () => {
-    const cbuText = `CBU: ${bankDetails?.cbu || ""} - Alias: ${bankDetails?.alias || ""} - Titular: ${bankDetails?.accountHolder || ""} - CUIT: ${bankDetails?.cuit || ""} (${bankDetails?.bankName || ""})`;
-    navigator.clipboard.writeText(cbuText);
-    setCopiedText(true);
-    setTimeout(() => setCopiedText(false), 2000);
+  if (!isOpen) return null;
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -287,6 +321,13 @@ export default function CheckoutModal({
       return;
     }
     setStep("payment");
+  };
+
+  const copyCBU = () => {
+    const cbuText = `CBU: ${bankDetails?.cbu || ""} - Alias: ${bankDetails?.alias || ""} - Titular: ${bankDetails?.accountHolder || ""} - CUIT: ${bankDetails?.cuit || ""} (${bankDetails?.bankName || ""})`;
+    navigator.clipboard.writeText(cbuText);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2000);
   };
 
   const handleConfirmPayment = async () => {
@@ -333,72 +374,21 @@ export default function CheckoutModal({
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // Max 10MB to verify safe storage limits
-    if (file.size > 10 * 1024 * 1024) {
-      notify("La imagen del comprobante no debe superar los 10 Megabytes.", "error");
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const savedUrl = await storeMedia(file);
-      setReceiptImage(savedUrl);
-      notify("¡Comprobante cargado correctamente!", "success");
-    } catch (err) {
-      console.error("Local file upload error:", err);
-      notify("Ocurrió un error al cargar localmente el comprobante en la memoria segura del navegador.", "error");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      if (!file.type.startsWith("image/")) {
-        notify("Por favor, arrastrá un archivo de formato de imagen válido (JPG, PNG, WEBP).", "error");
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        notify("La imagen del comprobante no debe superar los 10 MB.", "error");
-        return;
-      }
-      
-      setUploading(true);
-      try {
-        const savedUrl = await storeMedia(file);
-        setReceiptImage(savedUrl);
-        notify("¡Comprobante arrastrado y cargado correctamente!", "success");
-      } catch (err) {
-        console.error("Drag and drop register error:", err);
-        notify("No pudimos guardar el archivo arrastrado.", "error");
-      } finally {
-        setUploading(false);
-      }
-    }
-  };
-
-  const removeReceipt = () => {
+  const handleFinish = () => {
+    clearCart();
+    onClose();
+    setStep("form");
     setReceiptImage("");
-    notify("Comprobante removido correctamente.", "info");
+    setFormData({
+      fullName: "",
+      email: "",
+      phone: "",
+      address: "",
+      city: "",
+      zipCode: "",
+      paymentMethod: "" as any,
+      installments: 3,
+    });
   };
 
   const formatCurrency = (val: number) => {
@@ -409,8 +399,6 @@ export default function CheckoutModal({
       maximumFractionDigits: 0,
     }).format(val);
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-brand-900/60 backdrop-blur-xs">
@@ -425,7 +413,7 @@ export default function CheckoutModal({
               {step === "payment" && "Paso 2: Método de Pago"}
               {step === "success" && "¡Pedido Confirmado!"}
             </h3>
-            <p className="text-xs text-brand-505">
+            <p className="text-xs text-brand-500">
               {step !== "success" ? "Comercio seguro certificado por Hogar y Estilo" : "Tu compra ha sido procesada de forma segura"}
             </p>
           </div>
@@ -454,7 +442,7 @@ export default function CheckoutModal({
           {step === "form" && (
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
-                <div>
+                <div className="col-span-1">
                   <label className="block text-xs font-semibold text-brand-700 uppercase tracking-wider mb-1.5">
                     Nombre Completo *
                   </label>
@@ -469,7 +457,7 @@ export default function CheckoutModal({
                   />
                 </div>
 
-                <div>
+                <div className="col-span-1">
                   <label className="block text-xs font-semibold text-brand-700 uppercase tracking-wider mb-1.5">
                     Email de contacto *
                   </label>
@@ -484,7 +472,7 @@ export default function CheckoutModal({
                   />
                 </div>
 
-                <div>
+                <div className="col-span-1">
                   <label className="block text-xs font-semibold text-brand-700 uppercase tracking-wider mb-1.5">
                     Teléfono Celular *
                   </label>
@@ -499,7 +487,22 @@ export default function CheckoutModal({
                   />
                 </div>
 
-                <div>
+                <div className="col-span-1">
+                  <label className="block text-xs font-semibold text-brand-700 uppercase tracking-wider mb-1.5">
+                    Código Postal *
+                  </label>
+                  <input
+                    type="text"
+                    name="zipCode"
+                    required
+                    value={formData.zipCode || ""}
+                    onChange={handleInputChange}
+                    placeholder="2000"
+                    className="w-full bg-white border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 shadow-2xs"
+                  />
+                </div>
+
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-semibold text-brand-700 uppercase tracking-wider mb-1.5">
                     Dirección de Entrega *
                   </label>
@@ -514,7 +517,7 @@ export default function CheckoutModal({
                   />
                 </div>
 
-                <div>
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-semibold text-brand-700 uppercase tracking-wider mb-1.5">
                     Ciudad / Localidad *
                   </label>
@@ -528,52 +531,110 @@ export default function CheckoutModal({
                     className="w-full bg-white border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 shadow-2xs"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-brand-700 uppercase tracking-wider mb-1.5">
-                    Código Postal *
-                  </label>
-                  <input
-                    type="text"
-                    name="zipCode"
-                    required
-                    value={formData.zipCode || ""}
-                    onChange={handleInputChange}
-                    placeholder="2000"
-                    className="w-full bg-white border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 shadow-2xs"
-                  />
-                </div>
               </div>
 
               {/* Order total preview */}
               <div className="bg-brand-100 p-4 rounded-xl border border-brand-200 mt-6 space-y-3">
-                <h4 className="font-serif font-bold text-brand-900 text-sm">Resumen de Compra</h4>
-                <div className="space-y-1.5 text-xs text-brand-700">
+                <h4 className="font-serif font-bold text-brand-900 text-sm border-b border-brand-200/60 pb-1.5">
+                  Resumen de Compra
+                </h4>
+                
+                {/* Visual Cart Items List with Photos */}
+                <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                  {cartItems.map((item) => {
+                    const product = item.product;
+                    const activeMedia = product.media && product.media.length > 0 ? product.media[0] : null;
+                    const isVideoMedia = activeMedia?.type === "video";
+                    const mediaUrl = activeMedia?.url || getCategoryPlaceholder(product.category);
+
+                    return (
+                      <div key={product.id} className="flex items-center justify-between bg-white/70 p-2 rounded-lg border border-brand-200/50 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded border border-brand-200 overflow-hidden shrink-0 bg-brand-50 flex items-center justify-center">
+                            {isVideoMedia ? (
+                              <ResolvedVideo
+                                src={mediaUrl}
+                                className="w-full h-full object-cover"
+                                muted
+                                playsInline
+                                autoPlay
+                                loop
+                              />
+                            ) : (
+                              <ResolvedImage
+                                src={mediaUrl}
+                                alt={product.title}
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-brand-900 line-clamp-1 pr-1 font-serif">
+                              {product.title}
+                            </p>
+                            <p className="text-[10px] text-brand-500 font-light">
+                              Cant: {item.quantity} • {product.category || "General"}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-brand-900 font-mono">
+                          {formatCurrency(product.basePrice * item.quantity)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-1.5 text-xs text-brand-700 border-t border-brand-200/60 pt-2 bg-brand-100/50">
                   <div className="flex justify-between">
                     <span>Subtotal de productos:</span>
                     <span>{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Costo de envío:</span>
+                    <span>Envío:</span>
                     <span className={shipping === 0 ? "text-green-700 font-bold" : ""}>
                       {shipping === 0 ? "¡ENVÍO GRATIS!" : formatCurrency(shipping)}
                     </span>
                   </div>
-                  <div className="border-t border-brand-200 my-2 pt-2 flex justify-between font-bold text-brand-900 text-sm sm:text-base">
+                  {shipping > 0 && (
+                    <div className="text-[10.5px] text-amber-700 bg-amber-50 border border-amber-100 p-1.5 rounded-sm">
+                      💡 <strong>Falta {formatCurrency(50000 - subtotal)}</strong> para activar el <strong>Envío Gratis</strong>.
+                    </div>
+                  )}
+                  <div className="border-t border-brand-200 pt-2 flex justify-between font-bold text-sm text-brand-900">
                     <span>Total estimado:</span>
                     <span>{formatCurrency(finalListTotal)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Navigation */}
-              <div className="flex justify-end pt-4">
+              {/* Confidence badge tags */}
+              <div className="bg-[#FAF8F5] p-3 rounded-xl border border-brand-250 flex flex-col gap-2 mt-4 text-[11px] text-brand-700">
+                <div className="flex items-center gap-2">
+                  <span className="text-[#00a6f3]">🛡️</span>
+                  <span>Compra Asegurada y Protegida por <strong>Mercado Pago</strong></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>🚚</span>
+                  <span>Entrega coordinada nacional a domicilio (2 a 5 días)</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-5 py-2.5 text-xs sm:text-sm font-medium tracking-wider uppercase bg-transparent text-brand-700 hover:bg-brand-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
                 <button
                   type="submit"
-                  className="bg-brand-900 hover:bg-brand-950 text-white font-bold py-3 px-6 rounded-xl text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                  className="px-6 py-2.5 text-xs sm:text-sm font-medium tracking-wider uppercase bg-brand-900 hover:bg-black text-brand-50 rounded-lg flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                 >
                   <span>Continuar a Pago</span>
-                  <ArrowRight className="w-4 h-4 text-white" />
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </form>
@@ -614,18 +675,18 @@ export default function CheckoutModal({
                     </p>
                   </div>
                   <div className="text-right mt-4 pt-2 border-t border-brand-100">
-                    <span className="text-[9px] text-brand-505 block">Total con descuento:</span>
+                    <span className="text-[9px] text-brand-500 block">Total con descuento:</span>
                     <p className="text-base font-bold text-green-700 font-serif">
                       {formatCurrency(transferTotal)}
                     </p>
                   </div>
                 </div>
 
-                {/* Tarjetas Bancarias (Mercado Pago Bricks Directas, 3 cuotas sin interés) */}
+                {/* Tarjeta de Crédito (3 cuotas sin interés) */}
                 <div
                   className={`border-2 p-4 rounded-xl cursor-pointer transition-all flex flex-col justify-between ${
                     formData.paymentMethod === "credit"
-                      ? "border-brand-850 bg-brand-100"
+                      ? "border-brand-800 bg-brand-100"
                       : "border-brand-200 bg-white hover:border-brand-400"
                   }`}
                   onClick={() => setFormData((prev) => ({ ...prev, paymentMethod: "credit" }))}
@@ -633,19 +694,19 @@ export default function CheckoutModal({
                   <div>
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-brand-900 flex items-center gap-1.5 text-xs sm:text-sm">
-                        <CreditCard className="w-4 h-4 text-brand-900 shrink-0" />
-                        Tarjeta Crédito / Débito
+                        <CreditCard className="w-4 h-4 text-brand-800 shrink-0" />
+                        Tarjeta de Crédito / Débito
                       </h4>
-                      <span className="bg-brand-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                        3 CUOTAS SIN INTERÉS
+                      <span className="bg-brand-800 text-brand-50 text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0">
+                        3 Sin Interés
                       </span>
                     </div>
                     <p className="text-[11px] text-brand-600 font-light mt-2 leading-relaxed">
-                      Paga de forma 100% nativa con tarjetas Visa, MasterCard o Cabal sin salir de nuestra tienda.
+                      Cobro online inmediato sin enviar fotos ni comprobantes de pago.
                     </p>
                   </div>
                   <div className="text-right mt-4 pt-2 border-t border-brand-100">
-                    <span className="text-[9px] text-brand-505 block">3 cuotas fijas de:</span>
+                    <span className="text-[9px] text-brand-500 block">3 cuotas fijas de:</span>
                     <p className="text-base font-bold text-brand-900 font-serif">
                       {formatCurrency(installmentAmount)}
                     </p>
@@ -653,15 +714,23 @@ export default function CheckoutModal({
                 </div>
               </div>
 
-              {/* FRIENDLY SHIELD: Certifies merchant safety */}
-              <div className="bg-[#FAF8F5] border border-brand-200 p-3.5 rounded-xl flex items-start gap-2.5 max-w-lg mx-auto">
-                <ShieldAlert className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[10.5px] sm:text-xs text-brand-800 leading-normal">
-                  🔐 <strong>Protocolo Hogar y Estilo:</strong> Tus transacciones con tarjeta se encriptan bajo certificado bancario AES-256. Ninguno de tus números de tarjeta es visible para nuestros servidores ni se guardan localmente en ningún momento.
-                </p>
-              </div>
+              {/* Detalles dinámicos según el método elegido */}
+              {!formData.paymentMethod && (
+                <div className="bg-[#FFFDF9] border-2 border-dashed border-amber-300 rounded-xl p-6 text-center space-y-3 shadow-xs">
+                  <div className="p-3 bg-amber-50 rounded-full inline-block text-amber-600 animate-bounce">
+                    <HelpCircle className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-serif font-black text-brand-900 text-sm">
+                      Por favor, seleccioná tu Medio de Pago arriba:
+                    </h4>
+                    <p className="text-xs text-brand-600 max-w-md mx-auto leading-relaxed">
+                      Elegí <strong>Transferencia Bancaria</strong> para disfrutar de un 15% de descuento inmediato, o <strong>Tarjeta de Crédito / Débito</strong> para financiar en hasta 3 cuotas fijas sin interés.
+                    </p>
+                  </div>
+                </div>
+              )}
 
-              {/* Sub-paso dinámico 1: TRANSFERENCIA BANCARIA */}
               {formData.paymentMethod === "transfer" && (
                 <div className="bg-white border-2 border-brand-200 rounded-xl p-5 sm:p-6 space-y-4 shadow-sm">
                   <div className="flex items-center gap-2 border-b border-brand-100 pb-3">
@@ -723,113 +792,85 @@ export default function CheckoutModal({
                     </div>
 
                     {/* Drag and Drop Zone or Button for uploading Transfer Receipt */}
-                    <div className="space-y-2">
-                      <label className="block text-xs font-semibold text-brand-800">
-                        Compártenos la captura de tu comprobante de transferencia bancaria *
-                      </label>
-                      
-                      <div 
-                        onDragEnter={handleDrag}
-                        onDragOver={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDrop={handleDrop}
-                        className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
-                          dragActive 
-                            ? "border-green-600 bg-green-50/50" 
-                            : receiptImage 
-                              ? "border-brand-300 bg-brand-50/40" 
-                              : "border-brand-200 bg-brand-50/20 hover:border-brand-400"
-                        }`}
-                      >
+                    <div className="border-2 border-dashed border-brand-300 bg-brand-50/50 p-5 rounded-xl text-center space-y-3 font-sans transition-all hover:bg-brand-50 hover:border-brand-400">
+                      <div className="w-10 h-10 bg-brand-200 text-brand-700 rounded-full flex items-center justify-center mx-auto">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-brand-900">
+                          {receiptImage ? "✓ ¡Comprobante de Pago Adjuntado!" : "Adjuntar Captura o Comprobante de Pago"}
+                        </p>
+                        <p className="text-[10px] text-brand-500 font-light max-w-xs mx-auto leading-relaxed">
+                          {receiptImage ? "Subiste con éxito una imagen. Si querés cambiarla, podés volver a subir otra." : "Subí una captura de pantalla de la transferencia desde tu celular para que validemos tu pago al instante."}
+                        </p>
+                      </div>
+
+                      {receiptImage && (
+                        <div className="relative inline-block border border-brand-250 rounded-lg overflow-hidden max-w-[125px] shadow-xs">
+                          <ResolvedImage 
+                            src={receiptImage}
+                            alt="Vista previa comprobante"
+                            className="h-16 w-auto object-cover mx-auto"
+                          />
+                          <span className="absolute bottom-0 inset-x-0 bg-brand-900/85 text-white text-[8px] py-0.5 font-bold">VISTA PREVIA</span>
+                        </div>
+                      )}
+
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          disabled={uploadingReceipt}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`px-4.5 py-2 rounded-lg font-bold text-xs uppercase tracking-wide cursor-pointer transition-colors ${
+                            receiptImage 
+                              ? "bg-brand-800 text-white hover:bg-black" 
+                              : "bg-white border border-brand-300 text-brand-800 hover:bg-brand-50"
+                          }`}
+                        >
+                          {uploadingReceipt ? "Procesando comprobante..." : receiptImage ? "Cambiar Imagen" : "Seleccionar Imagen / Captura"}
+                        </button>
                         <input
-                          ref={fileInputRef}
                           type="file"
+                          ref={fileInputRef}
+                          onChange={handleReceiptUpload}
                           accept="image/*"
-                          onChange={handleFileChange}
                           className="hidden"
-                          id="receipt-file-input"
                         />
-                        
-                        {!receiptImage ? (
-                          <div className="space-y-2 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                            <div className="p-3 bg-brand-200 rounded-full inline-block text-brand-800">
-                              <Upload className="w-5 h-5 text-brand-900" />
-                            </div>
-                            <p className="text-xs text-brand-800 font-sans font-medium">
-                              <span className="text-brand-950 underline font-black">Haz clic para cargar</span> o arrastra tu captura de pantalla aquí
-                            </p>
-                            <p className="text-[10px] text-brand-500 font-sans font-light">Formatos admitidos: JPG, PNG, WEBP de hasta 10MB</p>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                            <div className="flex items-center gap-3 text-left">
-                              <div className="p-2 sm:p-2.5 bg-green-100 rounded-xl">
-                                <ClipboardCheck className="w-5-h-5 text-green-700" />
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-green-800">¡Imagen de comprobante adjuntada!</p>
-                                <p className="text-[10px] text-brand-500 font-light">Guardada localmente de forma temporal para corroborar.</p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                              {/* Open interactive thumbnail visualizer */}
-                              {receiptImage && (
-                                <div className="relative inline-block border border-brand-250 rounded-lg overflow-hidden max-w-[125px] shadow-xs">
-                                  <ResolvedImage 
-                                    src={receiptImage}
-                                    alt="Vista previa comprobante"
-                                    className="h-16 w-auto object-cover mx-auto"
-                                  />
-                                  <span className="absolute bottom-0 inset-x-0 bg-brand-900/85 text-white text-[8px] py-0.5 font-bold">VISTA PREVIA</span>
-                                </div>
-                              )}
-                              <button
-                                type="button"
-                                onClick={removeReceipt}
-                                className="px-3.5 py-2 hover:bg-brand-100 text-red-700 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-brand-200 bg-white"
-                              >
-                                Quitar captura
-                              </button>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
+
+                  <p className="text-[11px] text-brand-600 font-light mt-2 leading-relaxed bg-[#FFFDF9] border border-brand-200 p-2.5 rounded-lg">
+                    💡 <strong>Recordá:</strong> Copiá el Alias para transferir desde la aplicación de tu banco o billetera virtual. No hace falta que envíes capturas, asociamos automáticamente con tus datos.
+                  </p>
                 </div>
               )}
 
-              {/* Sub-paso dinámico 2: TARJETAS DE CRÉDITO DE MERCADO PAGO BRICKS (Directas nativas) */}
               {formData.paymentMethod === "credit" && (
                 <div className="bg-white border-2 border-[#009ee3] rounded-xl p-5 sm:p-6 space-y-4 shadow-sm text-left font-sans animate-in fade-in duration-300">
-                  <div className="flex items-center gap-2 border-b border-brand-100 pb-3">
-                    <img 
-                      src="https://img.icons8.com/color/48/mercadopin.png" 
-                      alt="Logo Mercado Pago" 
-                      className="w-5 h-5 shrink-0" 
-                    />
-                    <h4 className="font-serif font-black text-[#009ee3] text-sm tracking-wide">
-                      Módulo de Pago Seguro Directo:
+                  <div className="flex items-center gap-2 border-b border-[#009ee3]/30 pb-3">
+                    <span className="p-1 px-2.5 text-[9px] bg-[#009ee3] text-white rounded-full font-bold uppercase tracking-wider shrink-0">Seguro</span>
+                    <h4 className="font-serif font-black text-[#009ee3] text-sm">
+                      Mercado Pago Directo Sin Salir de la Tienda
                     </h4>
                   </div>
 
-                  {mpError && (
-                    <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl text-xs space-y-1">
-                      <p className="font-bold">⚠️ Detalle de pasarela Mercado Pago:</p>
-                      <p>{mpError}</p>
+                  <p className="text-xs text-brand-700 leading-relaxed font-sans">
+                    Pagá de forma segura con tu tarjeta de crédito/débito o por transferencia bancaria automática (DEBIN/Red Link) utilizando la pasarela oficial integrada.
+                  </p>
+
+                  {mpPreferenceLoading && (
+                    <div className="py-12 flex flex-col items-center justify-center space-y-3">
+                      <span className="w-8 h-8 border-3 border-brand-200 border-t-[#009ee3] rounded-full animate-spin" />
+                      <p className="text-xs text-brand-600 font-semibold animate-pulse">
+                        Cargando módulo seguro de Mercado Pago...
+                      </p>
                     </div>
                   )}
 
-                  {mpPreferenceLoading && (
-                    <div className="flex flex-col items-center justify-center py-10 space-y-3.5 text-center">
-                      <div className="relative flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#009ee3]"></div>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-brand-900 tracking-wide">Conectando con la API de Mercado Pago...</p>
-                        <p className="text-[10px] text-brand-500">Cifrando formulario AES-256 para recibir la respuesta.</p>
-                      </div>
+                  {mpError && (
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                      <p className="text-xs text-red-800 font-medium">{mpError}</p>
                     </div>
                   )}
 
@@ -839,44 +880,48 @@ export default function CheckoutModal({
                     className={`w-full min-h-[250px] ${mpPreferenceLoading ? "hidden" : "block"}`}
                   ></div>
 
-                  {/* Inform customer that token is set explicitly */}
-                  {hasPrivateToken ? (
-                    <p className="text-[10px] text-green-700 italic text-center font-sans">
-                      ✓ Credenciales activas: Mercado Pago configurado en producción mediante Vercel environment variables.
-                    </p>
-                  ) : (
-                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-[10px] text-amber-800 leading-normal">
-                      🔌 <strong>Modo Simulado Activo:</strong> MP_ACCESS_TOKEN o MP_PUBLIC_KEY no configurado en Vercel. Puedes usar la tarjeta de simulación genérica para completar el pedido de desarrollo.
+                  {mpIsSimulator && (
+                    <div className="bg-amber-50/85 border border-amber-200 rounded-xl p-3.5 text-[10.5px] text-amber-900 leading-relaxed flex gap-2 font-sans">
+                      <span className="text-sm select-none">💡</span>
+                      <div>
+                        <strong>Modo Democación Activo:</strong> Como todavía no has configurado tus claves privadas reales (<code>MP_ACCESS_TOKEN</code>) en las variables de entorno de tu servidor, Mercado Pago opera en modo simulador para que pruebes tarjetas y transferencias de prueba.
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Botonera de navegación del paso 2 */}
               <div className="flex justify-between items-center pt-4 border-t border-brand-200">
                 <button
                   type="button"
                   onClick={() => setStep("form")}
-                  className="px-5 py-3 rounded-xl border border-brand-300 text-brand-900 font-bold hover:bg-brand-100 transition-colors flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm active:scale-95"
+                  className="px-4 py-2 text-xs sm:text-sm font-medium text-brand-700 hover:bg-brand-100 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
                 >
-                  <ArrowLeft className="w-4 h-4 text-brand-900" />
-                  <span>Volver a Envío</span>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Volver a Datos</span>
                 </button>
-
-                {/* Confirm transfer manually from buttons only if paymentMethod is transfer (since MP Card Brick triggers submit automatically) */}
-                {formData.paymentMethod === "transfer" && (
+                {formData.paymentMethod !== "credit" && (
                   <button
                     type="button"
                     onClick={handleConfirmPayment}
-                    disabled={loading || uploading || !receiptImage}
-                    className="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-xl text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                    disabled={loading || !formData.paymentMethod}
+                    className={`px-6 py-3 text-xs sm:text-sm font-semibold tracking-wider uppercase rounded-lg flex items-center gap-2 transition-all shadow-md transform active:scale-95 cursor-pointer ${
+                      !formData.paymentMethod
+                        ? "bg-brand-200 text-brand-400 border border-brand-300 cursor-not-allowed shadow-none"
+                        : "bg-green-700 hover:bg-green-800 text-white"
+                    }`}
                   >
                     {loading ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      <>
+                        <span className="w-4 h-4 border-2 border-brand-100 border-t-brand-900 rounded-full animate-spin" />
+                        <span>Procesando...</span>
+                      </>
                     ) : (
-                      <ClipboardCheck className="w-4.5 h-4.5 text-white" />
+                      <>
+                        <span>Registrar Pedido y Ver Alias</span>
+                        <CheckCircle className="w-4 h-4" />
+                      </>
                     )}
-                    <span>{loading ? "Confirmando..." : "Confirmar Transferencia"}</span>
                   </button>
                 )}
               </div>
@@ -886,44 +931,176 @@ export default function CheckoutModal({
           {step === "success" && (() => {
             const isTransfer = formData.paymentMethod === "transfer";
             const toPay = isTransfer ? transferTotal : finalListTotal;
+            
+            const buildOrderSummaryText = () => {
+              let methodText = "Tarjeta de Crédito (3 cuotas sin interés)";
+              if (isTransfer) methodText = "Transferencia Bancaria (-15% OFF)";
+              
+              let text = `📦 NUEVO COMPROBANTE DE COMPRA - HOGAR & ESTILO\n\n`;
+              text += `👤 Cliente: ${formData.fullName}\n`;
+              text += `📞 Teléfono: ${formData.phone}\n`;
+              text += `📧 Email: ${formData.email}\n`;
+              text += `📍 Envío a: ${formData.address}, ${formData.city} (CP: ${formData.zipCode || "N/A"})\n`;
+              text += `💳 Método de Pago: ${methodText}\n\n`;
+              text += `🛒 Detalle del Pedido:\n`;
+              
+              cartItems.forEach((item) => {
+                text += `• ${item.quantity}x ${item.product.title} - $${new Intl.NumberFormat("es-AR").format(item.product.basePrice)}\n`;
+              });
+              
+              text += `\n💵 Importe Total: ${formatCurrency(toPay)}\n`;
+              
+              if (isTransfer) {
+                text += `\n🏦 CBU Bancario para Transferir:\n`;
+                text += `Banco: ${bankDetails.bankName}\n`;
+                text += `CBU: ${bankDetails.cbu}\n`;
+                text += `Alias: ${bankDetails.alias}\n`;
+                text += `Titular: ${bankDetails.accountHolder}\n`;
+              }
+              
+              return text;
+            };
 
+            const orderText = buildOrderSummaryText();
+            const directMessageText = `Hola Hogar y Estilo, ya realicé mi compra y quedo a la espera del código de seguimiento una vez despachado`;
             return (
-              <div className="space-y-6 py-6 text-center max-w-xl mx-auto">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-700 animate-bounce">
-                  <CheckCircle className="w-10 h-10" />
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="font-serif text-2xl font-black text-brand-900">¡Muchísimas gracias por tu compra!</h4>
-                  <p className="text-xs sm:text-sm text-brand-800 max-w-md mx-auto leading-relaxed">
-                    Hemos registrado tu pedido correctamente. Tus detalles de envío y comprobante de pago han sido guardados temporalmente para su corroboración.
-                  </p>
-                </div>
-
-                {/* 1. RESUMEN COMPACTO DEL PEDIDO */}
-                <div className="bg-white border border-brand-200 rounded-2xl p-5 shadow-xs max-w-md mx-auto space-y-4 text-left font-sans">
-                  <div className="border-b border-brand-100 pb-2.5 flex justify-between items-center">
-                    <span className="text-[10px] text-brand-500 font-bold uppercase tracking-widest">Estado del Pedido</span>
-                    <span className="bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">Esperando Corroborar</span>
+              <div className="py-6 text-center space-y-6">
+                
+                {/* 1. SECCIÓN PRINCIPAL: AGRADECIMIENTO E INSTAGRAM DIRECTO AL INCIAR LAS ACCIONES */}
+                <div className="bg-brand-100 border-2 border-brand-200 p-5 sm:p-6 rounded-2xl max-w-md mx-auto text-center space-y-4 shadow-sm animate-fade-in">
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-700 shadow-md">
+                    <CheckCircle className="w-8 h-8 animate-bounce" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-serif text-2xl sm:text-3xl font-bold text-brand-900">
+                      ¡Gracias por elegirnos!
+                    </h4>
+                    <p className="text-xs sm:text-sm text-brand-700 max-w-xs mx-auto font-light leading-relaxed">
+                      Registramos el pedido de forma exitosa para <strong>{formData.fullName}</strong>.
+                    </p>
                   </div>
 
-                  <div className="space-y-2 text-xs text-brand-800">
-                    <p><strong>Comprador:</strong> {formData.fullName}</p>
-                    <p><strong>Enviado a:</strong> {formData.address}, {formData.city}</p>
-                    <p><strong>Contacto Mail:</strong> {formData.email}</p>
-                    <p><strong>Método de pago seleccionado:</strong> <span className="font-extrabold text-brand-900">{isTransfer ? "Transferencia Bancaria (-15% OFF)" : "Tarjeta de Crédito / Débito (Nativo)"}</span></p>
-                    <div className="border-t border-brand-100 pt-3 mt-3 flex justify-between items-center text-brand-950">
-                      <span className="font-bold text-xs uppercase tracking-wider">Total final abonado:</span>
-                      <span className="font-serif font-black text-base text-brand-950">{formatCurrency(toPay)}</span>
+                  <div className="border-t border-brand-250 pt-3 space-y-3">
+                    <p className="text-xs sm:text-sm text-brand-950 font-semibold leading-relaxed font-sans">
+                      📲 <strong>¡Aviso Importante!</strong> Para confirmar la compra y coordinar el despacho rápido de tus productos, por favor envianos una captura o foto del comprobante de pago a nuestro Instagram.
+                    </p>
+
+                    <a
+                      href="https://instagram.com/deco.home.rosario"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        navigator.clipboard.writeText(directMessageText);
+                        notify("¡Mensaje de aviso copiado! Pegalo al chatear en Instagram.", "success");
+                      }}
+                      className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:brightness-110 text-white py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] active:scale-95 text-center cursor-pointer font-sans shadow-md"
+                    >
+                      <Instagram className="w-4.5 h-4.5 text-white" />
+                      <span>Avisar Compra por Instagram</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* 2. BADGE DE ESTADO DEL PAGO SÚPER CLARO SEGÚN TRANSFER/TARJETA */}
+                {isTransfer ? (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-3.5 shadow-xs">
+                    <div className="space-y-1.5">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-955 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full font-serif">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                        Estado: Reserva Confirmada - Pago Pendiednte
+                      </div>
+                      <p className="text-[11px] text-brand-700 leading-relaxed font-light">
+                        Tu pedido está reservado por 24 horas. Realizá la transferencia de <strong>{formatCurrency(transferTotal)}</strong> usando el <strong>Alias de abajo</strong>, y envianos el comprobante por Instagram para que preparemos tu paquete de inmediato.
+                      </p>
                     </div>
-                  </div>
-                </div>
 
-                {/* 2. COPÌAR NRO ORDEN */}
-                <div className="p-4 bg-brand-100 border border-brand-200 rounded-2xl max-w-md mx-auto">
-                  <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-black mb-1">Número de orden generado:</span>
-                  <div className="flex items-center justify-center gap-3.5">
-                    <span className="font-mono font-bold text-brand-950 text-base sm:text-lg tracking-wider select-all">{generatedOrderId || "#1024"}</span>
+                    {receiptImage && (
+                      <div className="bg-white border border-amber-200 p-3 rounded-xl space-y-1.5 text-center mt-1 animate-in fade-in duration-300">
+                        <span className="block text-[10px] text-green-700 font-bold uppercase tracking-wider font-sans">📄 Comprobante Adjuntado con éxito:</span>
+                        <div className="relative inline-block border border-brand-200 rounded-lg overflow-hidden max-w-[140px] shadow-xs mx-auto">
+                          <ResolvedImage 
+                            src={receiptImage} 
+                            alt="Comprobante en base" 
+                            className="h-20 w-auto object-cover max-w-full"
+                          />
+                        </div>
+                        <p className="text-[9.5px] text-brand-500 font-sans italic">
+                          ¡El comprobante ya fue adjuntado a la orden! Tadeo lo verá directo en su Panel de Administración.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : mpTransferDetails ? (
+                  <div className="bg-blue-50 border border-blue-200 text-blue-955 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-3 shadow-xs">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-955 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full font-serif font-bold">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                      Estado: Transferencia Automática Mercado Pago
+                    </div>
+                    <p className="text-[11px] text-brand-700 leading-relaxed font-light">
+                      Se generó una solicitud de transferencia bancaria inmediata (DEBIN/Red Link) de <strong>{formatCurrency(finalListTotal)}</strong> mediante Mercado Pago.
+                    </p>
+                    {mpTransferDetails.transaction_data?.qr_code && (
+                      <div className="bg-white p-3.5 rounded-xl border border-blue-100 max-w-[280px] mx-auto text-center space-y-1">
+                        <p className="text-[9px] text-brand-500 font-bold uppercase tracking-wider">Código de Transferencia Automática</p>
+                        <p className="font-mono text-xs text-brand-900 break-all select-all font-bold p-2 bg-blue-50/50 rounded-lg">{mpTransferDetails.transaction_data.qr_code}</p>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(mpTransferDetails.transaction_data.qr_code);
+                            notify("¡Código copiado! Pegalo en tu home banking.", "success");
+                          }}
+                          className="text-[10px] text-blue-600 font-bold underline cursor-pointer hover:text-blue-800"
+                        >Copiar código de transferencia</button>
+                      </div>
+                    )}
+                    {mpTransferDetails.transaction_data?.ticket_url && (
+                      <div className="pt-1">
+                        <a 
+                          href={mpTransferDetails.transaction_data.ticket_url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="inline-block bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4.5 py-2.5 text-xs font-bold transition-all shadow-md active:scale-95 text-center font-sans"
+                        >
+                          Ver Detalle de Transferencia / Pagar con MP
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-green-50 border border-green-200 text-green-955 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-1.5 shadow-xs">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-955 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full font-serif">
+                      <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                      Estado: Pago Seguro Aprobado 🎉
+                    </div>
+                    <p className="text-[11px] text-brand-700 leading-relaxed font-light">
+                      El pago de <strong>{formatCurrency(finalListTotal)}</strong> con tarjeta fue procesado y confirmado con éxito. ¡Ya estamos preparando tu pedido para despacharlo!
+                    </p>
+                  </div>
+                )}
+
+                {/* 3. GIGANTE Order Number widget space as requested */}
+                <div className="flex flex-col items-center space-y-2">
+                  <div 
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedOrderId || "#1024");
+                      setCopiedOrder(true);
+                      notify("¡Número de orden copiado!", "success");
+                      setTimeout(() => setCopiedOrder(false), 2000);
+                    }}
+                    className="bg-brand-900 hover:bg-black text-brand-50 rounded-xl px-10 py-5 shadow-lg border border-brand-800 inline-block cursor-pointer group active:scale-95 transition-all text-center select-none"
+                    title="¡Toca para copiar!"
+                  >
+                    <span className="block text-[9px] text-brand-300 font-black uppercase tracking-widest mb-1 font-sans group-hover:text-amber-300 transition-colors">
+                      {copiedOrder ? "¡Copiado con éxito! 🎉" : "Número de tu Orden (Toca para copiar)"}
+                    </span>
+                    <span className="font-mono text-3xl sm:text-4xl font-black text-white tracking-wider group-hover:text-amber-300 transition-colors">
+                      {generatedOrderId || "#1024"}
+                    </span>
+                  </div>
+                  
+                  {/* Copy Order ID Button */}
+                  <div className="pt-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -981,36 +1158,41 @@ export default function CheckoutModal({
                       <p className="text-[10px] text-brand-600 font-sans italic leading-tight pt-1">
                         ⚠️ Por seguridad y para evitar errores de un número que puedan errar, solo se puede copiar con un toque el Alias. Por favor, utilizalo para transferir.
                       </p>
+
+                      <p className="border-t border-brand-100 pt-2 shrink-0">
+                        <strong>Monto neto a transferir:</strong> <strong className="text-green-800 text-sm font-bold font-mono">{formatCurrency(transferTotal)}</strong>
+                      </p>
                     </div>
                   </div>
                 )}
 
-                {/* 5. REDIRECT DIRECT BUTTON TO INSTAGRAM */}
-                <div className="space-y-4 max-w-sm mx-auto pt-4 font-sans">
-                  <button
-                    onClick={() => {
-                      clearCart();
-                      onClose();
-                      setStep("form");
-                      setMpPreferenceUrl("");
-                      setReceiptImage("");
-                    }}
-                    className="w-full text-brand-850 hover:text-brand-950 hover:underline text-xs tracking-wider transition-colors font-semibold uppercase cursor-pointer text-center bg-transparent py-2"
-                  >
-                    Cerrar y Volver a la Tienda
-                  </button>
-                  
-                  <div>
-                    <a
-                      href="https://instagram.com/deco.home.rosario"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:brightness-110 text-white py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] active:scale-95 text-center cursor-pointer font-sans shadow-md"
-                    >
-                      <Instagram className="w-4.5 h-4.5 text-white" />
-                      <span>Avisar Compra por Instagram</span>
-                    </a>
+                {/* 5. ACREDITACIÓN DE TARJETA (SI ES TARJETA) */}
+                {!isTransfer && (
+                  <div className="bg-blue-50 border border-blue-200 p-5 rounded-xl max-w-md mx-auto text-left text-xs space-y-1.5 shadow-xs">
+                    <p className="font-semibold text-blue-800 flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                      💳 Acreditación de Pago Segura:
+                    </p>
+                    <p className="text-[11px] text-brand-700 leading-relaxed font-light">
+                      Tu pago de <strong className="text-brand-900 font-bold">{formatCurrency(finalListTotal)}</strong> ha sido validado y acreditado con éxito en criptografía SSL de extremo a extremo. Los artículos ya pasaron a control de logística y empaque reforzado.
+                    </p>
                   </div>
+                )}
+
+                {/* 6. OTROS CANALES */}
+                <div className="bg-[#FAF8F5] border border-brand-200 p-4 rounded-xl max-w-md mx-auto text-center space-y-2">
+                  <p className="text-[11px] text-brand-600 leading-relaxed font-light">
+                    Por consultas sobre el despacho o para seguir el paquete, puedes responder directamente al correo electrónico automatizado o consultarnos en Instagram en <a href="https://instagram.com/deco.home.rosario" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-900 hover:underline">@deco.home.rosario</a>.
+                  </p>
+                </div>
+
+                {/* 7. BOTÓN VOLVER */}
+                <div className="pt-2">
+                  <button
+                    onClick={handleFinish}
+                    className="bg-brand-900 hover:bg-black text-brand-50 px-8 py-3 rounded-full text-xs sm:text-sm font-semibold tracking-wider uppercase transition-all shadow-md cursor-pointer"
+                  >
+                    Volver a la Tienda
+                  </button>
                 </div>
               </div>
             );
