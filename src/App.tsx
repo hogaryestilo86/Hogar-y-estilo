@@ -137,58 +137,6 @@ export default function App() {
   });
 
   // Argentine common real buyer combinations for live simulation alerts (Requerimiento 4 / 7)
-  const ARGENTINE_BUYERS = [
-    { name: "Sofía", city: "Rosario" },
-    { name: "Matías", city: "Funes" },
-    { name: "Lucas", city: "Córdoba" },
-    { name: "Florencia", city: "San Lorenzo" },
-    { name: "Valentina", city: "Godoy Cruz" },
-    { name: "Juan", city: "Salta" },
-    { name: "Bautista", city: "Mendoza" },
-    { name: "Mateo", city: "Santa Fe" },
-    { name: "Catalina", city: "San Isidro" },
-    { name: "Camila", city: "Mar del Plata" },
-    { name: "Felipe", city: "San Miguel" },
-    { name: "Agustina", city: "Rafaela" },
-    { name: "Joaquín", city: "Neuquén" },
-    { name: "Martina", city: "Paraná" },
-    { name: "Thiago", city: "Ramos Mejía" },
-    { name: "Delfina", city: "La Plata" },
-    { name: "Benjamín", city: "Tigre" },
-    { name: "Victoria", city: "San Luis" },
-    { name: "Facundo", city: "Bahía Blanca" },
-    { name: "Lautaro", city: "San Carlos" },
-    { name: "Emilia", city: "Yerba Buena" },
-    { name: "Brisa", city: "Santo Tomé" },
-    { name: "Julián", city: "Roldán" },
-    { name: "Milagros", city: "Corrientes" }
-  ];
-
-  const [recentSaleAlert, setRecentSaleAlert] = useState<string | null>(null);
-
-  useEffect(() => {
-    const showRandomAlert = () => {
-      const buyer = ARGENTINE_BUYERS[Math.floor(Math.random() * ARGENTINE_BUYERS.length)];
-      setRecentSaleAlert(`¡${buyer.name} de ${buyer.city} realizó una compra hace un momento!`);
-
-      // Dismiss after 6 seconds
-      setTimeout(() => {
-        setRecentSaleAlert(null);
-      }, 6000);
-    };
-
-    // Show initial alert after 35 seconds to avoid initial mounting layout shifts
-    const initialTimer = setTimeout(showRandomAlert, 35000);
-
-    // Repeat every 85 seconds
-    const intervalTimer = setInterval(showRandomAlert, 85000);
-
-    return () => {
-      clearTimeout(initialTimer);
-      clearInterval(intervalTimer);
-    };
-  }, []);
-
   // Dynamic Orders Database (Requerimiento 6 de Control de envíos) - Empieza vacío para ser completamente prolijo y profesional
   const [pendingOrders, setPendingOrders] = useState<any[]>(() => {
     const saved = localStorage.getItem("store_pending_orders_list");
@@ -205,7 +153,16 @@ export default function App() {
   const [bankDetails, setBankDetails] = useState<BankDetails>(() => {
     const saved = localStorage.getItem("store_bank_details");
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+      try { 
+        const parsed = JSON.parse(saved);
+        // Ensure new fields exist on reload
+        return {
+          mpEmail: "tadeobeltran1986@gmail.com",
+          mpAlias: "deco.home.rosario",
+          mpLink: "",
+          ...parsed
+        };
+      } catch (e) { /* ignore */ }
     }
     return {
       bankName: "Banco de la Nación Argentina (BNA)",
@@ -213,6 +170,9 @@ export default function App() {
       cbu: "0000003100012345678901",
       alias: "deco.home.rosario",
       cuit: "20-35890432-1",
+      mpEmail: "tadeobeltran1986@gmail.com",
+      mpAlias: "deco.home.rosario",
+      mpLink: "",
     };
   });
 
@@ -1110,22 +1070,6 @@ export default function App() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* FLOATING LIVE RECENT SALE ALERT POP-UP (Requerimiento 7) */}
-      {recentSaleAlert && (
-        <div className="fixed bottom-4 left-4 z-50 max-w-sm bg-white border border-brand-200 p-4 rounded-xl shadow-lg flex items-center gap-3 animate-bounce shadow-brand-900/10 transition-all duration-300 md:bottom-6 md:left-6">
-          <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse absolute top-3 right-3" />
-          <div className="bg-brand-50 p-2.5 rounded-full text-brand-800">
-            <ShoppingCart className="w-4 h-4 text-brand-800" />
-          </div>
-          <div className="text-left">
-            <p className="text-[11px] font-black text-brand-900 font-sans tracking-tight uppercase">🚨 Venta confirmada</p>
-            <p className="text-[11px] text-brand-700 font-medium mt-0.5 font-sans leading-tight">
-              {recentSaleAlert}
-            </p>
           </div>
         </div>
       )}

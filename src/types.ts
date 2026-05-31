@@ -44,6 +44,7 @@ export interface OrderDetails {
   zipCode: string;
   paymentMethod: "credit" | "debit" | "transfer";
   installments?: number;
+  receiptImage?: string;
 }
 
 export interface BankDetails {
@@ -52,5 +53,8 @@ export interface BankDetails {
   cbu: string;
   alias: string;
   cuit: string;
+  mpEmail?: string;
+  mpAlias?: string;
+  mpLink?: string;
 }
 

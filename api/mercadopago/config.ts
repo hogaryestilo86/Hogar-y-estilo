@@ -9,8 +9,8 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
-  // Se extrae la clave pública de tus variables de entorno en Vercel
-  const publicKey = process.env.MP_PUBLIC_KEY || process.env.VITE_MP_PUBLIC_KEY || "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849"; // Test default
+  // Public key should be configured in Vercel as MP_PUBLIC_KEY or VITE_MP_PUBLIC_KEY
+  const publicKey = process.env.MP_PUBLIC_KEY || process.env.VITE_MP_PUBLIC_KEY || "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849"; // Default test public key
 
   return res.status(200).json({
     publicKey,

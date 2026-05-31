@@ -39,7 +39,7 @@ export default async function handler(req: any, res: any) {
         payment_method_id: paymentMethodId,
         transaction_amount: Number(paymentData.transaction_amount),
         isSimulator: true,
-        message: "Operando en modo de simulación. Registrate y configura MP_ACCESS_TOKEN en Vercel."
+        message: "Operando en modo de simulación. Registrate y configura MP_ACCESS_TOKEN en Vercel para conectividad de producción."
       });
     }
 
@@ -76,7 +76,7 @@ export default async function handler(req: any, res: any) {
           unit_price: Math.round(Number(item.product?.basePrice || item.price)),
           category_id: "home_decor",
           picture_url: item.product?.media?.[0]?.url || ""
-         })) || [],
+        })) || [],
         shipments: {
           receiver_address: {
             zip_code: payerDetails?.postalCode || "",
@@ -91,9 +91,12 @@ export default async function handler(req: any, res: any) {
       external_reference: `checkout-${Date.now()}`
     };
 
-    // For direct bank transfers without credit card tokens:
-    if (!paymentData.token && paymentData.point_of_interaction) {
-      mpPayload.point_of_interaction = paymentData.point_of_interaction;
+    // For point-of-sale or specific bank transfers that don't use tokens
+    if (!paymentData.token) {
+      // Transfer payments (Red Link, DEBIN) in Argentina
+      if (paymentData.point_of_interaction) {
+        mpPayload.point_of_interaction = paymentData.point_of_interaction;
+      }
     }
 
     const response = await fetch(url, {

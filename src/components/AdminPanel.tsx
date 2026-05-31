@@ -40,6 +40,7 @@ interface OrderRowProps {
   confirmDeleteOrderId: string | null;
   setConfirmDeleteOrderId: (id: string | null) => void;
   notify: (msg: string, type?: "success" | "error" | "info") => void;
+  onViewReceipt: (url: string) => void;
 }
 
 function OrderRowComponent({
@@ -48,7 +49,8 @@ function OrderRowComponent({
   formatCurrency,
   confirmDeleteOrderId,
   setConfirmDeleteOrderId,
-  notify
+  notify,
+  onViewReceipt
 }: OrderRowProps) {
   const subtotal = order.items.reduce((acc: number, item: any) => acc + (item.product.basePrice * item.quantity), 0);
   const isTransfer = order.details.paymentMethod === "transfer";
@@ -75,11 +77,21 @@ function OrderRowComponent({
           </div>
         ))}
       </td>
-      <td className="px-5 py-4 space-y-1 text-left align-top">
+      <td className="px-5 py-4 space-y-1.5 text-left align-top">
         <p className="text-sm font-black text-brand-950 font-serif">{formatCurrency(priceToPay)}</p>
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm inline-block ${isTransfer ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-brand-100 border border-brand-200 text-brand-800'}`}>
           {isTransfer ? '15% Off Trsf' : '3 Cuotas Sin Int.'}
         </span>
+        {isTransfer && order.details.receiptImage && (
+          <button
+            type="button"
+            onClick={() => onViewReceipt(order.details.receiptImage)}
+            className="mt-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-bold uppercase tracking-wider rounded-sm cursor-pointer transition-all active:scale-95 w-full select-none shadow-xs"
+          >
+            <Eye className="w-3 h-3 text-white" />
+            <span>Ver Comprobante</span>
+          </button>
+        )}
       </td>
       <td className="px-5 py-4 text-center align-top">
         {confirmDeleteOrderId !== order.id ? (
@@ -147,6 +159,7 @@ export default function AdminPanel({
   // Custom non-blocking interactive states
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState<string | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
   const [description, setDescription] = useState("");
 
   const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
@@ -726,6 +739,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     confirmDeleteOrderId={confirmDeleteOrderId}
                     setConfirmDeleteOrderId={setConfirmDeleteOrderId}
                     notify={notify}
+                    onViewReceipt={setSelectedReceipt}
                   />
                 ))}
               </tbody>
@@ -810,15 +824,81 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           </div>
           <div className="flex items-end">
             <button
-              type="button"
-              onClick={() => {
-                notify("¡Datos Bancarios Guardados! Los compradores verán esta cuenta al pagar con Transferencia.", "success");
-              }}
-              className="w-full bg-brand-900 hover:bg-black text-white text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 h-[38px] flex items-center justify-center shadow-sm select-none"
+               type="button"
+               onClick={() => {
+                 notify("¡Datos Bancarios Guardados! Los compradores verán esta cuenta al pagar con Transferencia.", "success");
+               }}
+               className="w-full bg-brand-900 hover:bg-black text-white text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 h-[38px] flex items-center justify-center shadow-sm select-none"
             >
               Confirmar Datos de Cuenta
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* SECCIÓN CONFIGURACIÓN COBRO MERCADO PAGO */}
+      <div className="bg-white p-6 rounded-2xl border border-brand-200 shadow-xs space-y-4 text-left">
+        <div>
+          <h3 className="font-serif text-lg font-bold text-brand-900 flex items-center gap-2">
+            <span className="text-[#009ee3]">💳 Configuración de Cobro por Mercado Pago</span>
+            <span className="text-[9px] uppercase tracking-wider bg-[#00a6f3] text-white font-sans py-0.5 px-2 rounded-full font-bold">Tarjeta y Débito</span>
+          </h3>
+          <p className="text-xs text-brand-600 font-light mt-1 font-sans">
+            Configurá tu cuenta de Mercado Pago para recibir el dinero de las compras con tarjeta de crédito o débito directamente en tu cuenta de forma 100% real.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-1 font-sans">
+          <div>
+            <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1.5">
+              Email de tu Cuenta Mercado Pago
+            </label>
+            <input
+              type="email"
+              value={bankDetails.mpEmail || ""}
+              onChange={(e) => onBankDetailsChange({ ...bankDetails, mpEmail: e.target.value })}
+              className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-brand-800 text-brand-900"
+              placeholder="tu-email@gmail.com"
+            />
+            <span className="text-[9.5px] text-brand-500 mt-1 block leading-relaxed">Cuenta donde recibirás notificaciones y control de cobro.</span>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1.5">
+              Alias de Cobro MP (Opcional)
+            </label>
+            <input
+              type="text"
+              value={bankDetails.mpAlias || ""}
+              onChange={(e) => onBankDetailsChange({ ...bankDetails, mpAlias: e.target.value })}
+              className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-brand-800 text-brand-900"
+              placeholder="decos.rosario.mp"
+            />
+            <span className="text-[9.5px] text-brand-500 mt-1 block leading-relaxed">Para transferencias "dinero en cuenta" directas.</span>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-brand-700 uppercase tracking-widest mb-1.5">
+              Link de Pago de Mercado Pago (Recomendado)
+            </label>
+            <input
+              type="url"
+              value={bankDetails.mpLink || ""}
+              onChange={(e) => onBankDetailsChange({ ...bankDetails, mpLink: e.target.value })}
+              className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-brand-800 text-brand-900"
+              placeholder="https://mpago.la/..."
+            />
+            <span className="text-[9.5px] text-indigo-700 font-bold mt-1 block leading-relaxed">¡Si ponés tu link, los clientes podrán pagarte de verdad con tarjeta a través del enlace seguro!</span>
+          </div>
+        </div>
+        <div className="flex justify-end pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              notify("¡Configuración de Mercado Pago Guardada! Los pagos se acreditarán en tu cuenta.", "success");
+            }}
+            className="bg-[#009ee3] hover:bg-[#007fba] text-white text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-lg cursor-pointer transition-all active:scale-95 duration-150 h-[38px] flex items-center justify-center shadow-sm select-none"
+          >
+            Confirmar Datos Mercado Pago
+          </button>
         </div>
       </div>
 
@@ -1320,6 +1400,48 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       </div>
 
       {/* Gemini Image Studio modal removed as it is now integrated inline above in the product form files section for better responsiveness and touch-friendly direct use */}
+
+      {/* MODAL PARA VER COMPROBANTE DE PAGO BANCARIO O CAPTURA DE TRANSFERENCIA */}
+      {selectedReceipt && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative max-w-lg w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-brand-200 p-5 space-y-4 text-left animate-in zoom-in-95 duration-100">
+            <div className="flex items-center justify-between border-b border-brand-100 pb-3">
+              <h4 className="font-serif font-black text-brand-900 text-sm flex items-center gap-2">
+                <span>📄 Comprobante Adjunto de la Transferencia</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setSelectedReceipt(null)}
+                className="p-1 px-3 bg-brand-100 font-sans hover:bg-brand-200 rounded-md text-brand-700 hover:text-brand-900 font-black transition-all text-xs cursor-pointer select-none"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="bg-brand-50 rounded-xl overflow-hidden max-h-[60vh] flex items-center justify-center border border-brand-200 relative p-3">
+              <ResolvedImage 
+                src={selectedReceipt} 
+                alt="Comprobante completo" 
+                className="max-h-[55vh] h-auto max-w-full object-contain mx-auto shadow-sm rounded-lg"
+              />
+            </div>
+
+            <p className="text-[10px] text-brand-500 font-sans text-center">
+              Podés cruzar el nombre impreso en la captura con el nombre del cliente en la lista para despachar.
+            </p>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setSelectedReceipt(null)}
+                className="px-5 py-2.5 bg-brand-900 text-white rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors cursor-pointer select-none"
+              >
+                Cerrar Comprobante
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
