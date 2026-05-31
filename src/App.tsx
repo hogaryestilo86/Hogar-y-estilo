@@ -47,13 +47,10 @@ const filterOutDemoProducts = (list: any[]): Product[] => {
     "prod-doudou-conejito"
   ];
   return list.filter((p) => {
-    if (!p) return false;
-    // Keep only actual products explicitly created and configured by the user
-    if (p.isCustom) return true;
+    if (!p || !p.id || !p.title) return false;
+    // Keep of all custom or modified products, reject only old mock template/demo designs
     if (demoIds.includes(p.id)) return false;
-    if (p.id && p.id.startsWith("prod-custom-")) return true;
-    // Reject anything matching legacy catalogs
-    return false;
+    return true;
   });
 };
 
@@ -69,9 +66,34 @@ export default function App() {
         return res.json();
       })
       .then((data) => {
+        // Find if we have a locally stored back-up catalog
+        const saved = localStorage.getItem("store_products_list");
+        let loadedLocal: Product[] = [];
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            loadedLocal = filterOutDemoProducts(parsed);
+          } catch (e) {}
+        }
+
         if (data && Array.isArray(data)) {
           const clean = filterOutDemoProducts(data);
-          const initial = clean.length > 0 ? clean : INITIAL_PRODUCTS;
+          
+          // If the server returns empty products list but we possess products locally,
+          // load the local backup and synchronize them back to the server so they go live immediately!
+          let initial = clean;
+          if (clean.length === 0 && loadedLocal.length > 0) {
+            initial = loadedLocal;
+            console.log("Self-healing: Re-populating Vercel live server with local browser storage cache...");
+            fetch("/api/products", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ products: loadedLocal })
+            }).catch((err) => console.warn("Failed to automatically hot-sync catalog to server:", err));
+          } else if (clean.length === 0 && loadedLocal.length === 0) {
+            initial = INITIAL_PRODUCTS;
+          }
+
           setProducts(initial);
           setHasLoadedInitial(true);
 
@@ -82,36 +104,10 @@ export default function App() {
               console.log("Migrated loaded server products to embedded Base64!");
             }
           });
-        } else if (data && data.fallback) {
-          // No server data yet, check client local storage to auto-migrate user's uploaded products
-          const saved = localStorage.getItem("store_products_list");
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved);
-              const clean = filterOutDemoProducts(parsed);
-              if (clean.length > 0) {
-                // Auto-migrate to server so other users can see them immediately!
-                setProducts(clean);
-                fetch("/api/products", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ products: clean })
-                }).catch((e) => console.warn("Failed to synchronize migrated products to server:", e));
-
-                convertProductsIdbToBase64(clean).then(({ updatedProducts, changed }) => {
-                  if (changed) {
-                    setProducts(updatedProducts);
-                  }
-                });
-              } else {
-                setProducts(INITIAL_PRODUCTS); // Start with preset catalog
-              }
-            } catch (e) {
-              setProducts(INITIAL_PRODUCTS);
-            }
-          } else {
-            setProducts(INITIAL_PRODUCTS); // Preset catalog by default
-          }
+        } else {
+          // No valid response or fallback required, load local backup
+          const initial = loadedLocal.length > 0 ? loadedLocal : INITIAL_PRODUCTS;
+          setProducts(initial);
           setHasLoadedInitial(true);
         }
       })

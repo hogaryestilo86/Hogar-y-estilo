@@ -528,7 +528,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       try {
         data = await response.json();
       } catch (jsonErr) {
-        throw new Error("Si estás usando Vercel o un servidor estático, la ruta /api de Node no está disponible. Para solucionarlo, por favor ingresa tu propia API Key de Gemini en la sección de configuración de abajo para ejecutar la IA directamente en tu navegador.");
+        throw new Error("Para usar la IA desde Vercel sin configurar un backend, ingresá tu propia API Key de Gemini en la cajita de abajo (🔑 Configuración de IA para Vercel) para ejecutarla directo en tu navegador de forma segura.");
       }
 
       if (!response.ok) {
@@ -1436,24 +1436,34 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 </p>
 
                 {/* Vercel Client-Side API Key Input Option */}
-                <div className="bg-brand-50/70 border border-brand-200 rounded-xl p-3.5 text-left space-y-2 mt-2">
+                <div className="bg-brand-50/75 border border-brand-200 rounded-xl p-4 text-left space-y-3 mt-3">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-brand-800 flex items-center gap-1.5 uppercase tracking-wider">
-                      <span>🔑 Configuración de IA para Vercel (Opcional)</span>
+                      <span>🔑 Inteligencia Artificial (Gemini API)</span>
                     </label>
                     <span className={`text-[9.5px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
                       clientApiKey ? "text-green-700 bg-green-50 border-green-200" : "text-brand-500 bg-brand-100 border-brand-200"
                     }`}>
-                      {clientApiKey ? "🔑 Conectado" : "Usar Local"}
+                      {clientApiKey ? "🔑 Conectado" : "Esperando Clave"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-brand-600 font-light leading-relaxed">
-                    Si publicaste tu ecommerce en <strong>Vercel (servidor estático)</strong>, la base de datos de IA del servidor remoto no estará activa de forma directa. Ingresa tu API Key de Gemini aquí abajo para que las consultas se realicen de forma segura e inmediata directamente desde tu navegador:
-                  </p>
+                  
+                  <div className="text-[11px] text-brand-700 space-y-2 leading-relaxed">
+                    <p className="font-semibold text-brand-900">¿Cómo hacer que la IA funcione en vivo en Vercel de forma automática?</p>
+                    <ul className="list-disc list-inside space-y-1 pl-1 text-[10.5px]">
+                      <li>
+                        <strong>Opción 1 (Recomendado / Definitivo):</strong> Entrá a tu panel de Vercel, ve a <strong>Settings &gt; Environment Variables</strong>, agrega una variable llamada <code className="bg-brand-100 px-1 py-0.5 rounded font-mono text-[9px]">GEMINI_API_KEY</code> y pegá tu clave de Google AI Studio. ¡Listo! Funcionará de manera segura y automática para todos los administradores.
+                      </li>
+                      <li>
+                        <strong>Opción 2 (Rápido / Temporal):</strong> Si no configuraste la variable aún, pegá tu clave directamente en el cuadro de abajo. Se guardará de manera segura únicamente en tu navegador web para que puedas seguir optimizando productos de inmediato.
+                      </li>
+                    </ul>
+                  </div>
+
                   <div className="flex gap-2">
                     <input
                       type="password"
-                      placeholder="Pega tu API Key de Gemini en el navegador (ej: AIzaSy...)"
+                      placeholder="Pega tu API Key de Gemini aquí (ej: AIzaSy...)"
                       value={clientApiKey}
                       onChange={(e) => handleClientApiKeyChange(e.target.value)}
                       className="flex-1 bg-white border border-brand-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-brand-800 text-brand-900 font-mono"
@@ -1469,25 +1479,90 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     )}
                   </div>
                   <p className="text-[10px] text-brand-500 leading-snug">
-                    ¿No tienes una llave? Consíguela gratis en segundos con tu cuenta de Google en <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="text-brand-800 font-medium underline hover:text-black">Google AI Studio</a>. También puedes configurarla como variable de entorno <code className="bg-brand-100 px-1 py-0.5 rounded font-mono text-[9px]">VITE_GEMINI_API_KEY</code> en Vercel.
+                    ¿No tenés una API Key? Conseguila 100% gratis en 30 segundos con tu cuenta de Google en <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="text-brand-800 font-medium underline hover:text-black">Google AI Studio</a>.
                   </p>
                 </div>
               </div>
 
               {/* Submit triggers */}
-              <div className="flex justify-end gap-3 pt-3">
+              <div className="flex flex-wrap md:flex-nowrap justify-end gap-3 pt-3">
                 {editingProductId && (
                   <button
                     type="button"
                     onClick={handleCancelEdit}
-                    className="bg-brand-50 hover:bg-brand-100 text-brand-800 border border-brand-200 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                    className="bg-brand-50 hover:bg-brand-100 text-brand-800 border border-brand-200 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-5 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer flex-1 md:flex-none"
                   >
                     Cancelar Edición
                   </button>
                 )}
+                
+                {/* BOTÓN REQUERIDO POR EL USUARIO: Copiar JSON antes de publicar / cargar el producto */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleanTitle = title.trim();
+                    const cleanDesc = description.trim();
+                    if (!cleanTitle && !cleanDesc) {
+                      notify("Por favor, escribe un título o descripción del producto para poder generar su código JSON.", "error");
+                      return;
+                    }
+
+                    const priceNum = parseFloat(basePrice) || 0;
+                    const beforePriceNum = beforePrice ? parseFloat(beforePrice) : undefined;
+                    const featuresArray = featuresText
+                      ? featuresText.split(",").map((f) => f.trim()).filter(Boolean)
+                      : [];
+
+                    const draftProduct: Product = {
+                      id: editingProductId || `prod-custom-${Date.now()}`,
+                      title: cleanTitle || "Borrador de Producto",
+                      basePrice: priceNum,
+                      beforePrice: beforePriceNum,
+                      category: category,
+                      description: cleanDesc,
+                      features: featuresArray,
+                      media: mediaList,
+                      isCustom: true,
+                      featured: featured,
+                      paused: paused,
+                      reviews: [
+                        {
+                          id: `rev-auto-${Date.now()}`,
+                          author: "Curador de Hogar y Estilo",
+                          rating: 5,
+                          comment: "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
+                          date: "Hoy"
+                        }
+                      ]
+                    };
+
+                    try {
+                      // We create a list containing existing products plus this draft (either updated or added)
+                      let listToExport = [...products];
+                      const existsIdx = listToExport.findIndex((p) => p.id === draftProduct.id);
+                      if (existsIdx >= 0) {
+                        listToExport[existsIdx] = draftProduct;
+                      } else {
+                        listToExport = [draftProduct, ...listToExport];
+                      }
+
+                      const jsonStr = JSON.stringify(listToExport, null, 2);
+                      navigator.clipboard.writeText(jsonStr);
+                      notify("¡Código JSON copiado! Incluye el borrador de este formulario y se puede pegar en products.json.", "success");
+                    } catch (err: any) {
+                      notify("No se pudo copiar el JSON automáticamente: " + err.message, "error");
+                    }
+                  }}
+                  className="bg-brand-50 hover:bg-brand-150 text-brand-900 border border-brand-300 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-5 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer flex-1 md:flex-none"
+                  title="Copiar código JSON del producto que estás editando/escribiendo antes de publicarlo oficialmente"
+                >
+                  <Copy className="w-4 h-4 text-brand-800" />
+                  <span>{editingProductId ? "Copiar JSON Modificado" : "Copiar JSON con Borrador"}</span>
+                </button>
+
                 <button
                   type="submit"
-                  className="bg-brand-900 hover:bg-black text-brand-100 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center gap-1.5 shadow-md hover:shadow-lg transition-transform active:scale-95 cursor-pointer"
+                  className="bg-brand-900 hover:bg-black text-brand-100 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-transform active:scale-95 cursor-pointer flex-1 md:flex-none"
                 >
                   <CheckCircle className="w-4 h-4" />
                   <span>{editingProductId ? "Guardar Cambios de Producto" : "Publicar e Incorporar Producto"}</span>
@@ -1666,7 +1741,43 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   type="button"
                   onClick={() => {
                     try {
-                      const jsonStr = JSON.stringify(products, null, 2);
+                      let listToExport = [...products];
+                      
+                      // If products is empty and there's a title in the form, automatically include it as draft!
+                      if (listToExport.length === 0 && title.trim()) {
+                        const priceNum = parseFloat(basePrice) || 0;
+                        const beforePriceNum = beforePrice ? parseFloat(beforePrice) : undefined;
+                        const featuresArray = featuresText
+                          ? featuresText.split(",").map((f) => f.trim()).filter(Boolean)
+                          : [];
+
+                        const draftProduct: Product = {
+                          id: editingProductId || `prod-custom-${Date.now()}`,
+                          title: title.trim(),
+                          basePrice: priceNum,
+                          beforePrice: beforePriceNum,
+                          category: category,
+                          description: description.trim(),
+                          features: featuresArray,
+                          media: mediaList,
+                          isCustom: true,
+                          featured: featured,
+                          paused: paused,
+                          reviews: [
+                            {
+                              id: `rev-auto-${Date.now()}`,
+                              author: "Curador de Hogar y Estilo",
+                              rating: 5,
+                              comment: "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
+                              date: "Hoy"
+                            }
+                          ]
+                        };
+                        listToExport = [draftProduct];
+                        notify("El catálogo estaba vacío pero agregamos el borrador que tienes rellenado en el formulario.", "info");
+                      }
+
+                      const jsonStr = JSON.stringify(listToExport, null, 2);
                       navigator.clipboard.writeText(jsonStr);
                       notify("¡Código JSON del catálogo copiado al portapapeles con éxito! Guárdalo de forma segura.", "success");
                     } catch (e) {
