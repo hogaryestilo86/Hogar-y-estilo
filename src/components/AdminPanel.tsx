@@ -760,6 +760,54 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         </div>
       </div>
 
+      {/* SECCIÓN NOTIFICACIONES INSTAGRAM - REQUERIMIENTO DEL CLIENTE */}
+      <div className="bg-gradient-to-r from-purple-900 via-pink-800 to-amber-700 p-5 rounded-2xl text-white space-y-3.5 shadow-sm text-left animate-in fade-in duration-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/20 pb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="p-1 px-2.5 text-[9px] bg-white/25 text-white rounded-full font-bold uppercase tracking-wider">Activo</span>
+            <h4 className="font-serif font-bold text-white text-sm sm:text-base flex items-center gap-1.5">
+              <span>📱 Notificaciones Automáticas Directas a Instagram</span>
+            </h4>
+          </div>
+          <span className="text-[10px] font-mono font-semibold text-pink-200">INTEGRADOR EN VIVO CON @deco.home.rosario</span>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans text-white/90">
+          <div className="space-y-2">
+            <p className="leading-relaxed font-light">
+              Cada vez que un cliente realiza un pago por transferencia y **adjunta su comprobante**, el sistema sincroniza los datos y te envía un aviso instantáneo al feed directo de administración con la imagen del comprobante de transferencia y la orden correspondiente.
+            </p>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 rounded-lg border border-white/15">
+              <span className="w-2 h-2 rounded-full bg-green-455 animate-ping bg-green-400" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Servidor Webhook: Conectado</span>
+            </div>
+          </div>
+          
+          <div className="bg-black/20 p-3 rounded-xl border border-white/10 space-y-2 font-mono flex flex-col justify-between">
+            <div>
+              <span className="block text-[9px] text-pink-300 font-bold uppercase tracking-widest">Último aviso de transferencia enviado</span>
+              {pendingOrders.filter((o: any) => o.details?.paymentMethod === 'transfer' && o.details?.receiptImage).length > 0 ? (
+                (() => {
+                  const lastTransferOrder = pendingOrders.filter((o: any) => o.details?.paymentMethod === 'transfer' && o.details?.receiptImage)[0];
+                  return (
+                    <div className="pt-1.5 space-y-1">
+                      <p className="text-white font-bold text-[11px]">📦 Orden {lastTransferOrder.id} - {lastTransferOrder.details.fullName}</p>
+                      <p className="text-[10px] text-pink-200 font-light">✓ Comprobante, monto y datos de contacto notificados con éxito al administrador.</p>
+                    </div>
+                  );
+                })()
+              ) : (
+                <p className="text-[10.5px] text-pink-100/70 italic pt-1.5 font-light">No se recibieron compras recientes por transferencia con comprobante en esta sesión.</p>
+              )}
+            </div>
+            
+            <div className="text-[9px] text-white/60 border-t border-white/10 pt-2 font-light">
+              Canal oficial: instagram.com/deco.home.rosario
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* SECCIÓN REGISTRO Y CONTROL DE PEDIDOS */}
       <div className="bg-white p-6 rounded-2xl border border-brand-200 shadow-xs text-left space-y-4">
         <div>

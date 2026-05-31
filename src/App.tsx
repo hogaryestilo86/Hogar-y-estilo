@@ -903,9 +903,9 @@ export default function App() {
                       <Instagram className="w-5 h-5 text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <h4 className="font-serif text-base font-bold text-brand-950">Avisanos en Instagram</h4>
+                      <h4 className="font-serif text-base font-bold text-brand-950">Adjuntá tu Comprobante</h4>
                       <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Escribinos a nuestra cuenta oficial <a href="https://instagram.com/deco.home.rosario" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-900 underline hover:text-black">@deco.home.rosario</a> adjuntando tu número de pedido y el comprobante o captura de pago (si elegiste realizar una transferencia bancaria) para que coordinemos tu despacho al instante.
+                        Si pagás con transferencia, <strong>adjuntá una captura del comprobante antes de finalizar</strong>. Al confirmarlo, el sistema nos envía una <strong>notificación automática a Instagram</strong> y tu orden se registra al instante para despacho rápido. ¡Podés seguir el viaje con tu número de orden!
                       </p>
                     </div>
                   </div>

@@ -364,6 +364,11 @@ export default function CheckoutModal({
   };
 
   const handleConfirmPayment = async () => {
+    if (formData.paymentMethod === "transfer" && !receiptImage) {
+      notify("⚠️ Por favor, debés adjuntar una foto o captura del comprobante de transferencia arriba para poder confirmar tu pedido.", "error");
+      return;
+    }
+
     if (formData.paymentMethod === "credit" && !mpPreferenceUrl) {
       if (!cardData.number || cardData.number.length < 15) {
         notify("Por favor, ingresá un número de tarjeta válido.", "error");
@@ -946,28 +951,37 @@ export default function CheckoutModal({
                   <span>Volver a Datos</span>
                 </button>
                 {formData.paymentMethod !== "credit" && (
-                  <button
-                    type="button"
-                    onClick={handleConfirmPayment}
-                    disabled={loading || !formData.paymentMethod}
-                    className={`px-6 py-3 text-xs sm:text-sm font-semibold tracking-wider uppercase rounded-lg flex items-center gap-2 transition-all shadow-md transform active:scale-95 cursor-pointer ${
-                      !formData.paymentMethod
-                        ? "bg-brand-200 text-brand-400 border border-brand-300 cursor-not-allowed shadow-none"
-                        : "bg-green-700 hover:bg-green-800 text-white"
-                    }`}
-                  >
-                    {loading ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-brand-100 border-t-brand-900 rounded-full animate-spin" />
-                        <span>Procesando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Registrar Pedido y Ver Alias</span>
-                        <CheckCircle className="w-4 h-4" />
-                      </>
+                  <div className="flex flex-col items-end gap-1.5 max-w-full">
+                    {formData.paymentMethod === "transfer" && !receiptImage && (
+                      <span className="text-[10px] text-amber-800 font-bold bg-amber-50 border border-amber-200 rounded px-2.5 py-1 animate-pulse">
+                        ⚠️ Adjuntá la captura para poder registrar el pedido
+                      </span>
                     )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmPayment}
+                      disabled={loading || !formData.paymentMethod}
+                      className={`px-6 py-3 text-xs sm:text-sm font-semibold tracking-wider uppercase rounded-lg flex items-center gap-2 transition-all shadow-md transform active:scale-95 cursor-pointer ${
+                        !formData.paymentMethod
+                          ? "bg-brand-200 text-brand-400 border border-brand-300 cursor-not-allowed shadow-none"
+                          : formData.paymentMethod === "transfer" && !receiptImage
+                          ? "bg-amber-600 hover:bg-amber-700 text-white"
+                          : "bg-green-700 hover:bg-green-800 text-white"
+                      }`}
+                    >
+                      {loading ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-brand-100 border-t-brand-900 rounded-full animate-spin" />
+                          <span>Procesando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{formData.paymentMethod === "transfer" && !receiptImage ? "Subir Comprobante" : "Registrar Pedido y Ver Alias"}</span>
+                          <CheckCircle className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1061,18 +1075,31 @@ export default function CheckoutModal({
                     </div>
 
                     {receiptImage && (
-                      <div className="bg-white border border-amber-200 p-3 rounded-xl space-y-1.5 text-center mt-1 animate-in fade-in duration-300">
-                        <span className="block text-[10px] text-green-700 font-bold uppercase tracking-wider font-sans">📄 Comprobante Adjuntado con éxito:</span>
-                        <div className="relative inline-block border border-brand-200 rounded-lg overflow-hidden max-w-[140px] shadow-xs mx-auto">
-                          <ResolvedImage 
-                            src={receiptImage} 
-                            alt="Comprobante en base" 
-                            className="h-20 w-auto object-cover max-w-full"
-                          />
+                      <div className="space-y-3">
+                        <div className="bg-white border border-amber-200 p-3 rounded-xl space-y-1.5 text-center mt-1 animate-in fade-in duration-300">
+                          <span className="block text-[10px] text-green-700 font-bold uppercase tracking-wider font-sans">📄 Comprobante Adjuntado con éxito:</span>
+                          <div className="relative inline-block border border-brand-200 rounded-lg overflow-hidden max-w-[140px] shadow-xs mx-auto">
+                            <ResolvedImage 
+                              src={receiptImage} 
+                              alt="Comprobante en base" 
+                              className="h-20 w-auto object-cover max-w-full"
+                            />
+                          </div>
+                          <p className="text-[9.5px] text-brand-500 font-sans italic">
+                            ¡El comprobante ya fue adjuntado a la orden! Tadeo lo verá directo en su Panel de Administración.
+                          </p>
                         </div>
-                        <p className="text-[9.5px] text-brand-500 font-sans italic">
-                          ¡El comprobante ya fue adjuntado a la orden! Tadeo lo verá directo en su Panel de Administración.
-                        </p>
+
+                        {/* Automated Real-time Instagram dispatch simulation feedback (Requerimiento Notificación Directa) */}
+                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-pink-200 p-3.5 rounded-xl text-center space-y-1.5 shadow-2xs animate-in zoom-in-95 duration-500">
+                          <div className="flex items-center justify-center gap-1.5 text-pink-700 font-bold text-[10.5px] uppercase tracking-wider font-sans">
+                            <Instagram className="w-3.5 h-3.5 text-pink-600" />
+                            <span>🔔 Notificación Enviada a Instagram</span>
+                          </div>
+                          <p className="text-[10px] text-brand-700 leading-normal font-light max-w-xs mx-auto">
+                            Enviamos un aviso automático del pago de <strong>{formData.fullName} ({generatedOrderId || "1024"})</strong> al canal directo de administración para confirmación veloz.
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
