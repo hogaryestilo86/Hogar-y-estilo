@@ -232,6 +232,7 @@ export default function AdminPanel({
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [copiedJsonValue, setCopiedJsonValue] = useState<string | null>(null);
 
   const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
     if (showToast) {
@@ -670,6 +671,88 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in text-left">
+      
+      {/* Modal de Copia de Seguridad JSON / Respaldo Manual */}
+      {copiedJsonValue !== null && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-brand-200 p-6 max-w-2xl w-full shadow-2xl relative space-y-4 animate-scale-up text-left">
+            <div className="flex items-start justify-between border-b border-brand-100 pb-3">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-brand-500 uppercase tracking-wider block">Respaldo Manual Obligatorio para Vercel</span>
+                <h3 className="font-serif text-lg sm:text-xl font-bold text-brand-950 flex items-center gap-2">
+                  <Database className="w-5 h-5 text-purple-600" />
+                  Código de Productos (JSON) Listo para Copiar
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCopiedJsonValue(null)}
+                className="p-1 px-2.5 bg-brand-100 hover:bg-brand-200 rounded-lg text-brand-800 font-bold transition-colors cursor-pointer text-xs"
+              >
+                Cerrar [X]
+              </button>
+            </div>
+
+            <p className="text-xs text-brand-700 leading-relaxed">
+              <strong>⚠️ Nota de Vercel (Producción):</strong> Como los servidores en la nube de Vercel son de solo lectura, cualquier producto que cargues en la pantalla se guardará de forma temporal en tu navegador actual.
+              Para guardar tus productos de forma <strong>definitiva y en vivo en Vercel</strong>, sigue estas instrucciones:
+            </p>
+
+            <div className="bg-brand-50 rounded-lg p-3 text-[11px] text-brand-800 space-y-1.5 leading-normal border border-brand-200">
+              <p className="font-semibold text-brand-950">Pasos para guardar definitivamente en tu repositorio / Vercel:</p>
+              <ol className="list-decimal list-inside space-y-1 pl-1 text-[10.5px]">
+                <li>Haz clic dentro del cuadro oscuro de abajo para seleccionar automáticamente todo el código.</li>
+                <li>Copia ese código usando <kbd className="bg-white border rounded px-1">Ctrl + C</kbd> o <kbd className="bg-white border rounded px-1">Cmd + C</kbd>.</li>
+                <li>Pega ese contenido en tu archivo <code>products.json</code> en tu repositorio de GitHub / código fuente.</li>
+                <li>Al republicar/redesplegar en Vercel, los productos quedarán fijos para todos los clientes para siempre.</li>
+              </ol>
+            </div>
+
+            <div className="space-y-1.5 relative">
+              <label className="text-[10px] font-bold text-brand-500 uppercase tracking-widest block font-sans">Código del Catálogo:</label>
+              <textarea
+                readOnly
+                value={copiedJsonValue}
+                onClick={(e) => {
+                  (e.target as HTMLTextAreaElement).select();
+                  notify("¡Todo el código ha sido seleccionado! Pulsa Ctrl+C para copiarlo.", "info");
+                }}
+                className="w-full h-56 bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-600 focus:outline-hidden resize-none cursor-text select-all shadow-inner"
+                placeholder="Generando código JSON..."
+              />
+              <span className="absolute bottom-3 right-3 text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
+                {copiedJsonValue.length} caracteres
+              </span>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    navigator.clipboard.writeText(copiedJsonValue);
+                    notify("¡Copiado al portapapeles con éxito!", "success");
+                  } catch (err) {
+                    notify("No se pudo copiar automáticamente: selecciona el código de abajo y cópialo manualmente con Ctrl+C.", "error");
+                  }
+                }}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-4 rounded-lg text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md"
+              >
+                <Copy className="w-4 h-4" />
+                <span>Copiar Automático</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setCopiedJsonValue(null)}
+                className="bg-brand-100 hover:bg-brand-200 text-brand-800 font-bold py-2.5 px-5 rounded-lg text-xs sm:text-sm tracking-wider uppercase transition-all active:scale-95 cursor-pointer"
+              >
+                Listo, ya lo copié
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Intro banner */}
       <div className="bg-brand-900 text-brand-100 p-6 sm:p-8 rounded-2xl border border-brand-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-6 text-left">
@@ -1547,10 +1630,15 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       }
 
                       const jsonStr = JSON.stringify(listToExport, null, 2);
-                      navigator.clipboard.writeText(jsonStr);
-                      notify("¡Código JSON copiado! Incluye el borrador de este formulario y se puede pegar en products.json.", "success");
+                      setCopiedJsonValue(jsonStr);
+                      try {
+                        navigator.clipboard.writeText(jsonStr);
+                        notify("¡Código JSON copiado al portapapeles! Abrimos también el asistente de copia.", "success");
+                      } catch (clipErr) {
+                        notify("Se habilitó el asistente visual de copia manual.", "info");
+                      }
                     } catch (err: any) {
-                      notify("No se pudo copiar el JSON automáticamente: " + err.message, "error");
+                      notify("No se pudo estructurar el JSON: " + err.message, "error");
                     }
                   }}
                   className="bg-brand-50 hover:bg-brand-150 text-brand-900 border border-brand-300 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-5 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer flex-1 md:flex-none"
@@ -1778,10 +1866,15 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       }
 
                       const jsonStr = JSON.stringify(listToExport, null, 2);
-                      navigator.clipboard.writeText(jsonStr);
-                      notify("¡Código JSON del catálogo copiado al portapapeles con éxito! Guárdalo de forma segura.", "success");
+                      setCopiedJsonValue(jsonStr);
+                      try {
+                        navigator.clipboard.writeText(jsonStr);
+                        notify("¡Código JSON del catálogo copiado con éxito! Además abrimos la ventana de copia manual.", "success");
+                      } catch (copyErr) {
+                        notify("Se habilitó el asistente visual de copia manual.", "info");
+                      }
                     } catch (e) {
-                      notify("No se pudo copiar el JSON automáticamente. Revisa los permisos de tu navegador.", "error");
+                      notify("No se pudo preparar el JSON para la copia: " + (e as any).message, "error");
                     }
                   }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 bg-brand-50 hover:bg-brand-150 border border-brand-200 hover:border-brand-300 text-brand-900 text-[11px] font-bold uppercase tracking-wider py-2.5 rounded-lg transition-all active:scale-95 cursor-pointer"
