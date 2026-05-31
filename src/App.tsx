@@ -1094,6 +1094,7 @@ export default function App() {
             onAddProduct={handleAddCustomProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
+            onSetProducts={setProducts}
             adminEmail={adminEmail}
             onAdminEmailChange={handleAdminEmailChange}
             adminPhone={adminPhone}

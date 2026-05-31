@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
-import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil } from "lucide-react";
+import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache, getMedia } from "../indexedDbMedia";
 
 interface AdminPanelProps {
@@ -14,6 +14,7 @@ interface AdminPanelProps {
   onAddProduct: (product: Product) => void;
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
+  onSetProducts?: (list: Product[]) => void;
   adminEmail: string;
   onAdminEmailChange: (email: string) => void;
   adminPhone?: string;
@@ -202,6 +203,7 @@ export default function AdminPanel({
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
+  onSetProducts,
   adminEmail,
   onAdminEmailChange,
   adminPhone = "5493416555555",
@@ -225,6 +227,8 @@ export default function AdminPanel({
   
   // Custom non-blocking interactive states
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmWipe, setConfirmWipe] = useState(false);
+  const [importJsonInput, setImportJsonInput] = useState("");
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
   const [description, setDescription] = useState("");
@@ -1505,124 +1509,295 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             </p>
 
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              {products.map((item) => {
-                const listPrice = item.basePrice;
-                const transferPrice = Math.round(listPrice * 0.85);
+              {products.length === 0 ? (
+                <div className="text-center py-10 bg-brand-50/20 border border-brand-200 border-dashed rounded-xl p-4">
+                  <span className="text-2xl">📦</span>
+                  <p className="text-xs text-brand-800 font-bold mt-2">No hay productos cargados</p>
+                  <p className="text-[10px] text-brand-500 mt-0.5">Usa el panel de la izquierda para agregar o importar tu inventario desde cero.</p>
+                </div>
+              ) : (
+                products.map((item) => {
+                  const listPrice = item.basePrice;
+                  const transferPrice = Math.round(listPrice * 0.85);
 
-                return (
-                  <div 
-                    key={item.id}
-                    className={`flex rounded-lg p-2.5 border items-center justify-between transition-all ${
-                      editingProductId === item.id 
-                        ? "bg-brand-50 border-brand-800 ring-1 ring-brand-800" 
-                        : item.paused
-                        ? "bg-neutral-50 border-neutral-300 opacity-60 grayscale-[40%]"
-                        : "bg-brand-50/50 border-brand-200 hover:border-brand-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {item.media && item.media[0]?.type === "video" ? (
-                        <ResolvedVideo
-                          src={item.media[0]?.url}
-                          className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
-                          muted
-                          playsInline
-                        />
-                      ) : (
-                        <ResolvedImage
-                          src={(item.media && item.media[0]?.url) || getCategoryPlaceholder(item.category)}
-                          alt={item.title}
-                          className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <div className="text-left">
-                        <h5 className={`text-xs font-serif font-bold text-brand-900 line-clamp-1 ${item.paused ? "line-through text-brand-500" : ""}`}>{item.title}</h5>
-                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                          <p className="text-[10px] text-brand-500 uppercase tracking-wide">{item.category}</p>
-                          {item.paused && (
-                            <span className="text-[8px] font-sans font-bold bg-amber-100 text-amber-800 border border-amber-200 px-1 rounded uppercase tracking-wide">
-                              ⏸️ Pausado
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] font-bold text-brand-800">{formatCurrency(listPrice)}</span>
-                          <span className="text-[9px] bg-green-50 border border-green-200 text-green-700 px-1 rounded">15% OFF transf.</span>
+                  return (
+                    <div 
+                      key={item.id}
+                      className={`flex rounded-lg p-2.5 border items-center justify-between transition-all ${
+                        editingProductId === item.id 
+                          ? "bg-brand-50 border-brand-800 ring-1 ring-brand-800" 
+                          : item.paused
+                          ? "bg-neutral-50 border-neutral-300 opacity-60 grayscale-[40%]"
+                          : "bg-brand-50/50 border-brand-200 hover:border-brand-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {item.media && item.media[0]?.type === "video" ? (
+                          <ResolvedVideo
+                            src={item.media[0]?.url}
+                            className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <ResolvedImage
+                            src={(item.media && item.media[0]?.url) || getCategoryPlaceholder(item.category)}
+                            alt={item.title}
+                            className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
+                            referrerPolicy="no-referrer"
+                          />
+                        )}
+                        <div className="text-left">
+                          <h5 className={`text-xs font-serif font-bold text-brand-900 line-clamp-1 ${item.paused ? "line-through text-brand-500" : ""}`}>{item.title}</h5>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <p className="text-[10px] text-brand-500 uppercase tracking-wide">{item.category}</p>
+                            {item.paused && (
+                              <span className="text-[8px] font-sans font-bold bg-amber-100 text-amber-800 border border-amber-200 px-1 rounded uppercase tracking-wide">
+                                ⏸️ Pausado
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] font-bold text-brand-800">{formatCurrency(listPrice)}</span>
+                            <span className="text-[9px] bg-green-50 border border-green-200 text-green-700 px-1 rounded">15% OFF transf.</span>
+                          </div>
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* Toggle Pause button (Pausar sin eliminar) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updatedProduct = {
+                              ...item,
+                              paused: !item.paused
+                            };
+                            onUpdateProduct(updatedProduct);
+                            notify(
+                              `El producto "${item.title}" ahora está ${!item.paused ? "PAUSADO (Oculto en tienda)" : "ACTIVO (Visible de nuevo)"}.`,
+                              "info"
+                            );
+                          }}
+                          className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                            item.paused 
+                              ? "text-amber-700 bg-amber-100 border border-amber-300 hover:bg-amber-200" 
+                              : "text-brand-400 hover:text-brand-900 hover:bg-brand-200/50"
+                          }`}
+                          title={item.paused ? "Re-activar venta (Hacer visible)" : "Pausar venta (Ocultar)"}
+                        >
+                          {item.paused ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                        {/* Modify Product button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingProductId(item.id);
+                            setTitle(item.title);
+                            setBasePrice(item.basePrice.toString());
+                            setBeforePrice(item.beforePrice ? item.beforePrice.toString() : "");
+                            setCategory(item.category || "Cocina");
+                            setDescription(item.description);
+                            setFeaturesText(item.features ? item.features.join(", ") : "");
+                            setMediaList(item.media || []);
+                            setFeatured(!!item.featured);
+                            setPaused(!!item.paused);
+                            
+                            // Smooth scroll to form in touch screens or desktops
+                            const formEl = document.getElementById("admin-creation-form-panel");
+                            if (formEl) {
+                              formEl.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                          }}
+                          className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                            editingProductId === item.id 
+                              ? "text-brand-900 bg-brand-200" 
+                              : "text-brand-400 hover:text-brand-900 hover:bg-brand-200/50"
+                          }`}
+                          title="Modificar producto"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+
+                        {/* Delete actions for all products */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingProductId === item.id) {
+                              handleCancelEdit();
+                            }
+                            onDeleteProduct(item.id);
+                          }}
+                          className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                          title="Borrar de la tienda"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      {/* Toggle Pause button (Pausar sin eliminar) */}
-                      <button
-                        onClick={() => {
-                          const updatedProduct = {
-                            ...item,
-                            paused: !item.paused
-                          };
-                          onUpdateProduct(updatedProduct);
-                          notify(
-                            `El producto "${item.title}" ahora está ${!item.paused ? "PAUSADO (Oculto en tienda)" : "ACTIVO (Visible de nuevo)"}.`,
-                            "info"
-                          );
-                        }}
-                        className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                          item.paused 
-                            ? "text-amber-700 bg-amber-100 border border-amber-300 hover:bg-amber-200" 
-                            : "text-brand-400 hover:text-brand-900 hover:bg-brand-200/50"
-                        }`}
-                        title={item.paused ? "Re-activar venta (Hacer visible)" : "Pausar venta (Ocultar)"}
-                      >
-                        {item.paused ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                      {/* Modify Product button */}
-                      <button
-                        onClick={() => {
-                          setEditingProductId(item.id);
-                          setTitle(item.title);
-                          setBasePrice(item.basePrice.toString());
-                          setBeforePrice(item.beforePrice ? item.beforePrice.toString() : "");
-                          setCategory(item.category || "Cocina");
-                          setDescription(item.description);
-                          setFeaturesText(item.features ? item.features.join(", ") : "");
-                          setMediaList(item.media || []);
-                          setFeatured(!!item.featured);
-                          setPaused(!!item.paused);
-                          
-                          // Smooth scroll to form in touch screens or desktops
-                          const formEl = document.getElementById("admin-creation-form-panel");
-                          if (formEl) {
-                            formEl.scrollIntoView({ behavior: "smooth", block: "start" });
-                          }
-                        }}
-                        className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                          editingProductId === item.id 
-                            ? "text-brand-900 bg-brand-200" 
-                            : "text-brand-400 hover:text-brand-900 hover:bg-brand-200/50"
-                        }`}
-                        title="Modificar producto"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+          {/* CONTROL DE RESPAldo Y SINCRONIZACIÓN EN LA NUBE */}
+          <div className="bg-white rounded-2xl border border-brand-200 p-5 shadow-sm space-y-4 text-left">
+            <h4 className="font-serif font-bold text-brand-900 text-base pb-2 border-b border-brand-100 flex items-center gap-2">
+              <Database className="w-4.5 h-4.5 text-purple-600" />
+              Sincronización y Respaldo Inteligente (Vercel)
+            </h4>
+            <p className="text-xs text-brand-600 font-light leading-relaxed">
+              Vercel utiliza sistemas sin servidor de solo lectura. Para asegurarte de que los productos se queden guardados de forma permanente para todos los clientes (en vivo):
+            </p>
+            <div className="bg-purple-50 rounded-xl p-3 border border-purple-100 text-[11px] text-purple-900 leading-relaxed space-y-2">
+              <p className="font-semibold">⚡ Saca copias de tu catálogo cuando quieras:</p>
+              <ul className="list-disc list-inside space-y-1 text-purple-800">
+                <li>Agrega, edita o quita productos desde esta pantalla administrada.</li>
+                <li>Presiona <strong>"Copiar Código JSON"</strong> y pégalo en el archivo <code>products.json</code> de tu código fuente o repositorio de GitHub/Vercel.</li>
+                <li>Si alguna vez se borran los productos por cambios en la nube, simplemente pega ese código de respaldo aquí abajo y presiona <strong>"Importar e Iniciar Sincronización"</strong> para que vuelva a estar vivo al instante.</li>
+              </ul>
+            </div>
 
-                      {/* Delete actions for all products */}
+            {/* Acciones Rápidas */}
+            <div className="space-y-3 pt-1">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      const jsonStr = JSON.stringify(products, null, 2);
+                      navigator.clipboard.writeText(jsonStr);
+                      notify("¡Código JSON del catálogo copiado al portapapeles con éxito! Guárdalo de forma segura.", "success");
+                    } catch (e) {
+                      notify("No se pudo copiar el JSON automáticamente. Revisa los permisos de tu navegador.", "error");
+                    }
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 bg-brand-50 hover:bg-brand-150 border border-brand-200 hover:border-brand-300 text-brand-900 text-[11px] font-bold uppercase tracking-wider py-2.5 rounded-lg transition-all active:scale-95 cursor-pointer"
+                  title="Copiar lista de productos en formato JSON para copias de seguridad rápidas"
+                >
+                  <Copy className="w-3.5 h-3.5 text-brand-800" />
+                  <span>Copiar Código JSON</span>
+                </button>
+                
+                {/* WIPE Catalog button */}
+                {!confirmWipe ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmWipe(true)}
+                    className="inline-flex items-center gap-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-[11px] font-bold uppercase tracking-wider px-3.5 py-2.5 rounded-lg transition-all active:scale-95 cursor-pointer"
+                    title="Eliminar absolutamente todo para empezar desde cero"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                    <span>Borrar Todo</span>
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-1.5 bg-red-50 border border-red-200 rounded-lg p-2.5 w-full animate-in slide-in-from-top-2 duration-200">
+                    <p className="text-[10px] text-red-900 font-extrabold leading-tight">¿Estás 100% seguro de vaciar el catálogo completo de la tienda? Esta acción es irreversible.</p>
+                    <div className="flex gap-2 mt-1">
                       <button
+                        type="button"
                         onClick={() => {
-                          if (editingProductId === item.id) {
-                            handleCancelEdit();
+                          if (onSetProducts) {
+                            onSetProducts([]);
+                            localStorage.removeItem("store_products_list");
+                            notify("Catálogo vaciado localmente con éxito.", "success");
+                            // Send empty payload to server to wipe also products.json on the server!
+                            fetch("/api/products", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ products: [] })
+                            })
+                            .then((r) => r.json())
+                            .then(() => {
+                              notify("Sincronizado catálogo en blanco en el servidor de producción.", "success");
+                            })
+                            .catch((err) => {
+                              console.warn("Server side wipe warning: ", err);
+                            });
+                          } else {
+                            notify("Sincronizador no disponible temporalmente en esta sesión.", "error");
                           }
-                          onDeleteProduct(item.id);
+                          setConfirmWipe(false);
                         }}
-                        className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                        title="Borrar de la tienda"
+                        className="bg-red-600 hover:bg-red-700 text-white font-extrabold text-[9px] uppercase tracking-wide py-1.5 rounded-md cursor-pointer transition-all flex-1"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        Vaciar Ahora
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmWipe(false)}
+                        className="bg-white border border-brand-200 hover:bg-brand-50 text-brand-800 font-extrabold text-[9px] uppercase tracking-wide py-1.5 rounded-md cursor-pointer transition-all flex-1"
+                      >
+                        Conservar todo
                       </button>
                     </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
+
+              {/* Import Catalog Panel */}
+              <div className="border-t border-brand-100 pt-3 space-y-2">
+                <label className="block text-[10px] font-bold text-brand-800 uppercase tracking-widest">
+                  📥 Importar / Restaurar Copia de Seguridad
+                </label>
+                <textarea
+                  value={importJsonInput}
+                  onChange={(e) => setImportJsonInput(e.target.value)}
+                  placeholder='Pega aquí tu lista copiada en formato JSON, por ejemplo: [ { "id": "...", "title": "..." }, ... ]'
+                  className="w-full h-16 text-[10px] p-2 bg-brand-50/50 hover:bg-brand-50 border border-brand-200 focus:border-brand-800 rounded-lg focus:ring-1 focus:ring-brand-100 transition-all font-mono outline-hidden leading-snug"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!importJsonInput.trim()) {
+                      notify("Por favor, pega un código JSON válido primero.", "error");
+                      return;
+                    }
+                    try {
+                      let parsed = JSON.parse(importJsonInput.trim());
+                      if (!Array.isArray(parsed)) {
+                        notify("El formato debe ser una lista de productos válida (Empieza con '[' y termina con ']').", "error");
+                        return;
+                      }
+                      
+                      // Inject ids if missing with clean values
+                      parsed = parsed.map((p: any) => ({
+                        ...p,
+                        id: p.id || `prod-custom-${Date.now()}-${Math.floor(Math.random() * 1000000)}`
+                      }));
+
+                      if (onSetProducts) {
+                        onSetProducts(parsed);
+                        notify(`¡Exito! Catálogo de ${parsed.length} productos importados y restablecidos.`, "success");
+                        setImportJsonInput("");
+                        
+                        // Push immediately to the server so it updates live on Vercel
+                        fetch("/api/products", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ products: parsed })
+                        })
+                        .then((r) => r.json())
+                        .then(() => {
+                          notify("Sincronizado en vivo con el servidor de producción.", "success");
+                        })
+                        .catch((err) => {
+                          console.warn("Failed to push imported list to server:", err);
+                        });
+                      } else {
+                        notify("El sincronizador no está disponible en este momento.", "error");
+                      }
+                    } catch (err: any) {
+                      notify(`El código JSON ingresado contiene errores de formato: ${err.message}`, "error");
+                    }
+                  }}
+                  className="w-full bg-brand-950 hover:bg-brand-900 text-brand-100 font-bold text-[10.5px] tracking-wider uppercase py-2 border border-black/10 rounded-lg flex items-center justify-center gap-1 shadow-sm hover:shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  <Database className="w-3.5 h-3.5 text-brand-100" />
+                  <span>Importar e Iniciar Sincronización</span>
+                </button>
+              </div>
             </div>
           </div>
 
