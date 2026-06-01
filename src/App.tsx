@@ -15,6 +15,8 @@ import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
 import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB } from "./indexedDbMedia";
+import { collection, getDocs, setDoc, doc, deleteDoc } from "firebase/firestore";
+import { db } from "./firebase";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
 // Helper to resolve image urls, stripping the local server proxy prefix if run in static hosts (Vercel, GitHub Pages)
@@ -58,11 +60,37 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
 
-  // Fetch products from backend server on mount (shares catalog for all users)
-  // Fetch products from backend server on mount (shares catalog for all users)
+  // Fetch products from backend server or Cloud Firestore on mount
   useEffect(() => {
     async function loadCatalog() {
-      // 1. Get local backups
+      // 1. Fetch from Firestore first (highest priority, permanent, cloud-safe, works on Vercel)
+      try {
+        console.log("Loading catalog directly from cloud Firestore...");
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const firestoreProducts: Product[] = [];
+        querySnapshot.forEach((docSnap) => {
+          firestoreProducts.push(docSnap.data() as Product);
+        });
+
+        if (firestoreProducts.length > 0) {
+          const clean = filterOutDemoProducts(firestoreProducts);
+          setProducts(clean);
+          setHasLoadedInitial(true);
+          console.log(`Loaded ${clean.length} products directly from Firestore!`);
+          
+          convertProductsIdbToBase64(clean).then(({ updatedProducts, changed }) => {
+            if (changed) {
+              setProducts(updatedProducts);
+              console.log("Migrated loaded cloud products to embedded Base64!");
+            }
+          });
+          return; // Succeeded! Skip redundant offline/local routines
+        }
+      } catch (fbErr) {
+        console.warn("Could not connect directly to Firebase Cloud Firestore, falling back:", fbErr);
+      }
+
+      // 2. Get local backups if offline or Firebase un-provisioned
       let loadedLocal: Product[] = [];
       try {
         // Try IndexedDB first (no 5MB size limit)
@@ -85,7 +113,7 @@ export default function App() {
         }
       }
 
-      // 2. Fetch from remote server on Vercel or local Dev
+      // 3. Fetch from remote server on Vercel or local Dev
       try {
         const res = await fetch("/api/products");
         if (!res.ok) throw new Error("Server response error: " + res.status);
@@ -142,7 +170,7 @@ export default function App() {
     loadCatalog();
   }, []);
 
-  // Sync state to local storage, IndexedDB and remote server whenever modified
+  // Sync state to local storage, IndexedDB, Firebase Firestore and fallback server whenever modified
   useEffect(() => {
     if (!hasLoadedInitial) return;
 
@@ -156,7 +184,36 @@ export default function App() {
       console.warn("No se pudo persistir la lista de productos en localStorage (es posible que exceda la cuota por las imágenes base64, pero se guardó con éxito en IndexedDB):", e);
     }
 
-    // 3. Persist to Express/Vercel server
+    // 3. Persist directly to Firebase Cloud Firestore (Direct client-side sync, works on Vercel out-of-the-box!)
+    async function syncToCloudFirestore() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const existingIds = new Set<string>();
+        querySnapshot.forEach((docSnap) => {
+          existingIds.add(docSnap.id);
+        });
+
+        // Insert / Update each active product
+        for (const product of products) {
+          if (product && product.id) {
+            await setDoc(doc(db, "products", product.id), product);
+            existingIds.delete(product.id);
+          }
+        }
+
+        // Clean up from firestore if any item was deleted
+        for (const remainingId of existingIds) {
+          await deleteDoc(doc(db, "products", remainingId));
+        }
+
+        console.log(`[Firestore Direct] Synchronized ${products.length} products to Cloud Database successfully!`);
+      } catch (fbSyncErr) {
+        console.warn("Failed to synchronize directly to Firebase Firestore:", fbSyncErr);
+      }
+    }
+    syncToCloudFirestore();
+
+    // 4. Persist to Express/Vercel server (fallback fallback)
     fetch("/api/products", {
       method: "POST",
       headers: {

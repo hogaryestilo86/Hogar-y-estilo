@@ -4,6 +4,25 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import nodemailer from "nodemailer";
 import fs from "fs";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
+
+let db: any = null;
+
+try {
+  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(firebaseConfigPath)) {
+    const configContent = fs.readFileSync(firebaseConfigPath, "utf-8");
+    const firebaseConfig = JSON.parse(configContent);
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    console.log("🔥 [Hhogar y Estilo Server] Firebase initialized successfully on backend server-side!");
+  } else {
+    console.warn("firebase-applet-config.json not found, using local file-system catalog fallback.");
+  }
+} catch (err: any) {
+  console.error("Failed to initialize Firebase on server-side:", err);
+}
 
 async function startServer() {
   const app = express();
@@ -144,6 +163,24 @@ Descripción básica / Notas del producto: "${description || ""}"`;
   // API Endpoint: Get Shared/Synchronized Products
   app.get("/api/products", async (req, res) => {
     try {
+      // 1. Primary: Try to read from Firebase Cloud Firestore if initialized on the server
+      if (db) {
+        try {
+          const querySnapshot = await getDocs(collection(db, "products"));
+          const firestoreProducts: any[] = [];
+          querySnapshot.forEach((docSnap) => {
+            firestoreProducts.push(docSnap.data());
+          });
+          if (firestoreProducts.length > 0) {
+            console.log(`[Server Proxy] Loaded ${firestoreProducts.length} products successfully from Firestore.`);
+            return res.json(firestoreProducts);
+          }
+        } catch (dbErr: any) {
+          console.error("[Server Proxy] Error reading products from Firestore, falling back to local file-system:", dbErr.message);
+        }
+      }
+
+      // 2. Secondary: Fallback to reading products.json file-system backup.
       if (fs.existsSync(PRODUCTS_FILE)) {
         const fileContent = await fs.promises.readFile(PRODUCTS_FILE, "utf-8");
         if (!fileContent || fileContent.trim() === "") {
@@ -162,7 +199,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       // Return a special fallback flag if the file doesn't exist yet
       return res.json({ fallback: true });
     } catch (err: any) {
-      console.error("Error reading products.json:", err);
+      console.error("Error reading products:", err);
       return res.json([]);
     }
   });
@@ -175,10 +212,42 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         return res.status(400).json({ error: "Datos de catálogo inválidos." });
       }
       
+      // A. Write backup in products.json file
       await fs.promises.writeFile(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
-      return res.json({ success: true, count: products.length });
+
+      // B. Write to Firestore to sync backend state
+      if (db) {
+        try {
+          const querySnapshot = await getDocs(collection(db, "products"));
+          const existingIds = new Set<string>();
+          querySnapshot.forEach((docSnap) => {
+            existingIds.add(docSnap.id);
+          });
+
+          // Upload/Set core documents
+          for (const product of products) {
+            if (product && product.id) {
+              await setDoc(doc(db, "products", product.id), product);
+              existingIds.delete(product.id);
+            }
+          }
+
+          // Delete any obsolete documents
+          for (const remainingId of existingIds) {
+            await deleteDoc(doc(db, "products", remainingId));
+          }
+
+          console.log(`[Server Proxy] Successfully synchronized ${products.length} products with Cloud Firestore.`);
+          return res.json({ success: true, count: products.length, sync: "cloud_firestore" });
+        } catch (dbErr: any) {
+          console.error("[Server Proxy] Error writing products to Firestore:", dbErr.message);
+          return res.json({ success: true, count: products.length, sync: "local_file_only", warning: dbErr.message });
+        }
+      }
+
+      return res.json({ success: true, count: products.length, sync: "local_file_only" });
     } catch (err: any) {
-      console.error("Error writing products.json:", err);
+      console.error("Error writing products:", err);
       return res.status(500).json({ error: "No se pudo guardar el catálogo en el servidor.", message: err.message });
     }
   });

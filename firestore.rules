@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Products Catalog Collection Rule Block
+    match /products/{productId} {
+      // Anyone can load the catalog of products (highly performant and public)
+      allow read: if true;
+      
+      // Admin writes from the frontend app panel (using strict schema validation for safety)
+      allow write: if request.resource == null 
+        // For deletions, request.resource is null
+        || (
+          request.resource.data.id is string
+          && request.resource.data.id.size() <= 128
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 200
+          && request.resource.data.basePrice is number
+          && request.resource.data.category is string
+          && request.resource.data.category.size() <= 100
+        );
+    }
+  }
+}
