@@ -307,49 +307,49 @@ export default function AdminPanel({
         reader.readAsDataURL(blob);
       });
 
-      // 1. Obtener SHA del archivo existente
-      let sha: string | undefined = undefined;
-      let shaFetched = false;
+      // 1. Obtener SHA del archivo existente con método avanzado de no-caché (Cache-Busting exhaustivo)
+      const getFreshestSha = async (): Promise<{ sha: string | undefined; error?: string }> => {
+        const cleanRepo = repoToUse.replace(/\s+/g, "");
 
-      // Intento A: API estándar de Contenidos
-      try {
-        const fileUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}?ref=${branchToUse}`;
-        const getResponse = await fetch(fileUrl, {
-          headers: {
-            "Accept": "application/vnd.github.v3+json",
-            "Authorization": `token ${tokenToUse}`
-          }
-        });
-
-        if (getResponse.ok) {
-          const fileData = await getResponse.json();
-          sha = fileData.sha;
-          shaFetched = true;
-          console.log("SHA recuperado exitosamente usando API de Contenidos:", sha);
-        } else if (getResponse.status === 401) {
-          throw new Error("CREDENTIALS_INVALID_TOKEN");
-        } else if (getResponse.status === 404) {
-          // El archivo no existe aún, se creará uno nuevo
-          shaFetched = true;
-          console.log("El archivo no existe en GitHub. Se creará por primera vez.");
-        } else if (getResponse.status === 403) {
-          throw new Error("CREDENTIALS_FORBIDDEN_OR_SCOPE");
-        }
-      } catch (err: any) {
-        if (err.message === "CREDENTIALS_INVALID_TOKEN" || err.message === "CREDENTIALS_FORBIDDEN_OR_SCOPE") {
-          throw err;
-        }
-        console.warn("La API de contenidos falló o el archivo es mayor a 1MB. Intentando recuperar SHA vía Trees API...");
-      }
-
-      // Intento B: Si la API de contenidos no nos dio el SHA (común si el archivo es grande o hay bloqueos), usamos Trees API
-      if (!shaFetched) {
+        // Intento A: API estándar de Contenidos (Máximo 1MB)
         try {
-          const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${branchToUse}?recursive=1`;
-          const treeResponse = await fetch(treeUrl, {
+          const fileUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}?ref=${branchToUse}&_t=${Date.now()}`;
+          const getResponse = await fetch(fileUrl, {
+            cache: "no-store",
             headers: {
               "Accept": "application/vnd.github.v3+json",
-              "Authorization": `token ${tokenToUse}`
+              "Authorization": `token ${tokenToUse}`,
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              "Pragma": "no-cache"
+            }
+          });
+
+          if (getResponse.ok) {
+            const fileData = await getResponse.json();
+            if (fileData && fileData.sha) {
+              console.log("SHA fresco recuperado usando API de Contenidos:", fileData.sha);
+              return { sha: fileData.sha };
+            }
+          } else if (getResponse.status === 401) {
+            return { sha: undefined, error: "CREDENTIALS_INVALID_TOKEN" };
+          } else if (getResponse.status === 404) {
+            console.log("El archivo no existe todavía en GitHub. Retornando SHA undefined para creación.");
+            return { sha: undefined };
+          }
+        } catch (e) {
+          console.warn("Error secundario en API de Contenidos al buscar SHA, reintentando por Árbol de Git:", e);
+        }
+
+        // Intento B: API de Árboles de Git (Trees API - Robusta y soporta archivos de cualquier tamaño)
+        try {
+          const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${branchToUse}?recursive=1&_t=${Date.now()}`;
+          const treeResponse = await fetch(treeUrl, {
+            cache: "no-store",
+            headers: {
+              "Accept": "application/vnd.github.v3+json",
+              "Authorization": `token ${tokenToUse}`,
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              "Pragma": "no-cache"
             }
           });
 
@@ -361,45 +361,83 @@ export default function AdminPanel({
                 item.path.toLowerCase().replace(/^\/+/, "") === targetPath
               );
               if (match) {
-                sha = match.sha;
-                console.log("SHA recuperado exitosamente vía Trees API:", sha);
+                console.log("SHA fresco recuperado usando API de Árboles:", match.sha);
+                return { sha: match.sha };
               }
-              shaFetched = true;
             }
           } else if (treeResponse.status === 401) {
-            throw new Error("CREDENTIALS_INVALID_TOKEN");
+            return { sha: undefined, error: "CREDENTIALS_INVALID_TOKEN" };
           } else if (treeResponse.status === 404) {
-            throw new Error("REPOSITORY_OR_BRANCH_NOT_FOUND");
-          } else if (treeResponse.status === 403) {
-            throw new Error("CREDENTIALS_FORBIDDEN_OR_SCOPE");
+            return { sha: undefined, error: "REPOSITORY_OR_BRANCH_NOT_FOUND" };
           }
-        } catch (treeErr: any) {
-          if (treeErr.message && treeErr.message.startsWith("CREDENTIALS") || treeErr.message === "REPOSITORY_OR_BRANCH_NOT_FOUND") {
-            throw treeErr;
-          }
-          console.error("Fallo definitivo recuperando el SHA del archivo:", treeErr);
+        } catch (e) {
+          console.error("Fallo general recuperando SHA del ábrol de Git:", e);
         }
+
+        return { sha: undefined };
+      };
+
+      const initialFetch = await getFreshestSha();
+      if (initialFetch.error) {
+        throw new Error(initialFetch.error);
       }
+      let sha = initialFetch.sha;
 
       // 2. Realizar la subida directa del archivo usando la API de contenidos (Nativamente soporta hasta 100MB)
       notify("Cargando catálogo en el servidor seguro de GitHub...", "info");
-      const putUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}`;
-      const putBody = {
-        message: "Actualizar productos.json desde el Panel de Administración Hogar & Estilo 🛍️",
-        content: base64Content,
-        branch: branchToUse,
-        ...(sha ? { sha } : {})
+      
+      const doPutFile = async (shaToUse: string | undefined) => {
+        const putUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}`;
+        const putBody = {
+          message: "Actualizar productos.json desde el Panel de Administración Hogar & Estilo 🛍️",
+          content: base64Content,
+          branch: branchToUse,
+          ...(shaToUse ? { sha: shaToUse } : {})
+        };
+
+        return await fetch(putUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `token ${tokenToUse}`
+          },
+          body: JSON.stringify(putBody)
+        });
       };
 
-      const putResponse = await fetch(putUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/vnd.github.v3+json",
-          "Authorization": `token ${tokenToUse}`
-        },
-        body: JSON.stringify(putBody)
-      });
+      let putResponse = await doPutFile(sha);
+
+      // Comprobar si hay un conflicto de versión (status 409 o un mensaje de error por desajuste de SHA)
+      let isConflict = putResponse.status === 409;
+      if (!putResponse.ok && !isConflict) {
+        try {
+          const clonedRes = putResponse.clone();
+          const errJson = await clonedRes.json();
+          const errMsg = errJson.message || "";
+          if (errMsg.includes("does not match") || errMsg.includes("conflict")) {
+            isConflict = true;
+          }
+        } catch (_) {}
+      }
+
+      // Mecanismo automático de auto-recuperación si hay desajuste de SHA
+      if (isConflict) {
+        console.warn("Desajuste de versión de GitHub detectado (409/Conflict o SHA mismatch). Re-sincronizando versión en vivo...");
+        notify("Detectados cambios recientes en la nube. Sincronizando catálogo de forma segura...", "info");
+        
+        // Esperamos 500 milisegundos para que la caché de GitHub se asiente
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        
+        const freshFetch = await getFreshestSha();
+        if (freshFetch.error) {
+          throw new Error(freshFetch.error);
+        }
+        sha = freshFetch.sha;
+        console.log("Reintentando acción con SHA fresco de seguridad:", sha);
+        
+        putResponse = await doPutFile(sha);
+      }
 
       if (!putResponse.ok) {
         const errJson = await putResponse.json().catch(() => ({}));
@@ -407,7 +445,7 @@ export default function AdminPanel({
         
         if (putResponse.status === 401) {
           throw new Error("CREDENTIALS_INVALID_TOKEN");
-        } else if (putResponse.status === 403 || putResponse.status === 422) {
+        } else if (putResponse.status === 403 || putResponse.status === 422 || putResponse.status === 409) {
           if (errMsg.includes("large") || errMsg.includes("limit") || errMsg.includes("process")) {
             throw new Error("FILE_SIZE_LIMIT_EXCEEDED");
           }
