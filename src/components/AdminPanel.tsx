@@ -782,10 +782,10 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           <div className="bg-white rounded-2xl border border-brand-200 p-6 max-w-2xl w-full shadow-2xl relative space-y-4 animate-scale-up text-left">
             <div className="flex items-start justify-between border-b border-brand-100 pb-3">
               <div className="space-y-1">
-                <span className="text-[10px] font-bold text-brand-500 uppercase tracking-wider block">Respaldo Manual Obligatorio para Vercel</span>
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">¡Conectado a Firebase Cloud Database!</span>
                 <h3 className="font-serif text-lg sm:text-xl font-bold text-brand-950 flex items-center gap-2">
                   <Database className="w-5 h-5 text-purple-600" />
-                  Código de Productos (JSON) Listo para Copiar
+                  Código de Productos (JSON) Listo
                 </h3>
               </div>
               <button
@@ -798,17 +798,16 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             </div>
 
             <p className="text-xs text-brand-700 leading-relaxed">
-              <strong>⚠️ Nota de Vercel (Producción):</strong> Como los servidores en la nube de Vercel son de solo lectura, cualquier producto que cargues en la pantalla se guardará de forma temporal en tu navegador actual.
-              Para guardar tus productos de forma <strong>definitiva y en vivo en Vercel</strong>, sigue estas instrucciones:
+              <strong>🚀 ¡Sincronización en la Nube Activada!</strong> Configuramos exitosamente tu base de datos <strong>Firebase Firestore</strong> en vivo. Esto significa que cuando cargas un producto se sincroniza de forma segura en internet y no se borrará al salir. 
+              Si de todos modos deseas guardar tu catálogo en el código fuente de tu repositorio en GitHub/Vercel (para que quede como respaldo base), puedes descargar el archivo o copiar el código de abajo:
             </p>
 
             <div className="bg-brand-50 rounded-lg p-3 text-[11px] text-brand-800 space-y-1.5 leading-normal border border-brand-200">
-              <p className="font-semibold text-brand-950">Pasos para guardar definitivamente en tu repositorio / Vercel:</p>
+              <p className="font-semibold text-brand-950">Pasos por si deseas actualizar tu repositorio de GitHub / Vercel:</p>
               <ol className="list-decimal list-inside space-y-1 pl-1 text-[10.5px]">
                 <li>Haz clic dentro del cuadro oscuro de abajo para seleccionar automáticamente todo el código.</li>
-                <li>Copia ese código usando <kbd className="bg-white border rounded px-1">Ctrl + C</kbd> o <kbd className="bg-white border rounded px-1">Cmd + C</kbd>.</li>
-                <li>Pega ese contenido en tu archivo <code>products.json</code> en tu repositorio de GitHub / código fuente.</li>
-                <li>Al republicar/redesplegar en Vercel, los productos quedarán fijos para todos los clientes para siempre.</li>
+                <li>Si el botón "Copiar Automático" da error por restricciones del iframe de tu navegador, pulsa <kbd className="bg-white border rounded px-1">Ctrl + C</kbd> o <kbd className="bg-white border rounded px-1">Cmd + C</kbd> en tu teclado, o simplemente haz clic en <strong>"Descargar products.json"</strong>.</li>
+                <li>Sube o pega ese contenido en tu archivo <code>products.json</code> en tu repositorio de GitHub.</li>
               </ol>
             </div>
 
@@ -819,7 +818,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 value={copiedJsonValue}
                 onClick={(e) => {
                   (e.target as HTMLTextAreaElement).select();
-                  notify("¡Todo el código ha sido seleccionado! Pulsa Ctrl+C para copiarlo.", "info");
+                  notify("¡Todo el código ha sido seleccionado! Pulsa Ctrl+C en tu teclado para copiarlo.", "info");
                 }}
                 className="w-full h-56 bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-600 focus:outline-hidden resize-none cursor-text select-all shadow-inner"
                 placeholder="Generando código JSON..."
@@ -837,7 +836,6 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     await navigator.clipboard.writeText(copiedJsonValue);
                     notify("✨ ¡Código JSON copiado al portapapeles con éxito!", "success");
                   } catch (err) {
-                    // Fallback using older method or alerting
                     try {
                       const aux = document.createElement("textarea");
                       aux.value = copiedJsonValue;
@@ -845,9 +843,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       aux.select();
                       document.execCommand("copy");
                       document.body.removeChild(aux);
-                      notify("✨ ¡Copiado con método alternativo de respaldo!", "success");
+                      notify("✨ ¡Código copiado con portapapeles alternativo de respaldo!", "success");
                     } catch (e2) {
-                      notify("No se pudo copiar de forma automática. Por favor selecciona el código del cuadro de texto de arriba y cópialo manualmente.", "error");
+                      notify("El navegador bloqueó la copia automática debido al Iframe. Por favor pulsa Ctrl+C o descarga el archivo.", "error");
                     }
                   }
                 }}
@@ -1724,55 +1722,59 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   onClick={async () => {
                     const cleanTitle = title.trim();
                     const cleanDesc = description.trim();
-                    if (!cleanTitle && !cleanDesc) {
-                      notify("Por favor, escribe un título o descripción del producto para poder generar su código JSON.", "error");
-                      return;
-                    }
+                    
+                    let listToExport = [...products];
 
-                    const priceNum = parseFloat(basePrice) || 0;
-                    const beforePriceNum = beforePrice ? parseFloat(beforePrice) : undefined;
-                    const featuresArray = featuresText
-                      ? featuresText.split(",").map((f) => f.trim()).filter(Boolean)
-                      : [];
+                    // If they are building or editing a product, include this draft in the export
+                    if (cleanTitle || cleanDesc) {
+                      const priceNum = parseFloat(basePrice) || 0;
+                      const beforePriceNum = beforePrice ? parseFloat(beforePrice) : undefined;
+                      const featuresArray = featuresText
+                        ? featuresText.split(",").map((f) => f.trim()).filter(Boolean)
+                        : [];
 
-                    const draftProduct: Product = {
-                      id: editingProductId || `prod-custom-${Date.now()}`,
-                      title: cleanTitle || "Borrador de Producto",
-                      basePrice: priceNum,
-                      beforePrice: beforePriceNum,
-                      category: category,
-                      description: cleanDesc,
-                      features: featuresArray,
-                      media: mediaList,
-                      isCustom: true,
-                      featured: featured,
-                      paused: paused,
-                      reviews: [
-                        {
-                          id: `rev-auto-${Date.now()}`,
-                          author: "Curador de Hogar y Estilo",
-                          rating: 5,
-                          comment: "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-                          date: "Hoy"
-                        }
-                      ]
-                    };
+                      const draftProduct: Product = {
+                        id: editingProductId || `prod-custom-${Date.now()}`,
+                        title: cleanTitle || "Borrador de Producto",
+                        basePrice: priceNum,
+                        beforePrice: beforePriceNum,
+                        category: category,
+                        description: cleanDesc,
+                        features: featuresArray,
+                        media: mediaList,
+                        isCustom: true,
+                        featured: featured,
+                        paused: paused,
+                        reviews: [
+                          {
+                            id: `rev-auto-${Date.now()}`,
+                            author: "Curador de Hogar y Estilo",
+                            rating: 5,
+                            comment: "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
+                            date: "Hoy"
+                          }
+                        ]
+                      };
 
-                    try {
-                      // We create a list containing existing products plus this draft (either updated or added)
-                      let listToExport = [...products];
                       const existsIdx = listToExport.findIndex((p) => p.id === draftProduct.id);
                       if (existsIdx >= 0) {
                         listToExport[existsIdx] = draftProduct;
                       } else {
                         listToExport = [draftProduct, ...listToExport];
                       }
+                    }
 
+                    try {
                       const jsonStr = JSON.stringify(listToExport, null, 2);
                       setCopiedJsonValue(jsonStr);
                       try {
                         await navigator.clipboard.writeText(jsonStr);
-                        notify("¡Código JSON copiado al portapapeles! Abrimos también el asistente de copia.", "success");
+                        notify(
+                          cleanTitle 
+                            ? "¡Código JSON del borrador copiado al portapapeles con éxito!" 
+                            : "¡Código JSON del catálogo actual copiado con éxito!", 
+                          "success"
+                        );
                       } catch (clipErr) {
                         try {
                           const aux = document.createElement("textarea");
@@ -1781,20 +1783,91 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                           aux.select();
                           document.execCommand("copy");
                           document.body.removeChild(aux);
-                          notify("¡Código JSON copiado al portapapeles con método alternativo! Asistente disponible.", "success");
+                          notify("¡Código JSON copiado al portapapeles con método alternativo!", "success");
                         } catch (e2) {
-                          notify("Se habilitó el asistente visual de copia manual.", "info");
+                          notify("Se abrió la ventana para copiar el código manualmente.", "info");
                         }
                       }
                     } catch (err: any) {
                       notify("No se pudo estructurar el JSON: " + err.message, "error");
                     }
                   }}
-                  className="bg-brand-50 hover:bg-brand-150 text-brand-900 border border-brand-300 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-5 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer flex-1 md:flex-none"
-                  title="Copiar código JSON del producto que estás editando/escribiendo antes de publicarlo oficialmente"
+                  className="bg-brand-50 hover:bg-brand-150 text-brand-900 border border-brand-300 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-4 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer flex-1 md:flex-none"
+                  title="Copiar código JSON del catálogo completo (incluyendo tu borrador actual si lo has rellenado)"
                 >
                   <Copy className="w-4 h-4 text-brand-800" />
-                  <span>{editingProductId ? "Copiar JSON Modificado" : "Copiar JSON con Borrador"}</span>
+                  <span>{editingProductId ? "Copiar JSON Modificado" : (title.trim() ? "Copiar JSON con Borrador" : "Copiar Catálogo JSON")}</span>
+                </button>
+
+                {/* NUEVO BOTÓN REQUERIDO PARA EVITAR ERRORES DE PORTAPAPELES: Descarga Directa del archivo JSON compatible con Vercel/GitHub */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleanTitle = title.trim();
+                    const cleanDesc = description.trim();
+                    
+                    let listToExport = [...products];
+
+                    // If form has details, inject draft product to output file
+                    if (cleanTitle || cleanDesc) {
+                      const priceNum = parseFloat(basePrice) || 0;
+                      const beforePriceNum = beforePrice ? parseFloat(beforePrice) : undefined;
+                      const featuresArray = featuresText
+                        ? featuresText.split(",").map((f) => f.trim()).filter(Boolean)
+                        : [];
+
+                      const draftProduct: Product = {
+                        id: editingProductId || `prod-custom-${Date.now()}`,
+                        title: cleanTitle || "Borrador de Producto",
+                        basePrice: priceNum,
+                        beforePrice: beforePriceNum,
+                        category: category,
+                        description: cleanDesc,
+                        features: featuresArray,
+                        media: mediaList,
+                        isCustom: true,
+                        featured: featured,
+                        paused: paused,
+                        reviews: [
+                          {
+                            id: `rev-auto-${Date.now()}`,
+                            author: "Curador de Hogar y Estilo",
+                            rating: 5,
+                            comment: "Nuevo ingreso seleccionado por el departamento de curación.",
+                            date: "Hoy"
+                          }
+                        ]
+                      };
+
+                      const existsIdx = listToExport.findIndex((p) => p.id === draftProduct.id);
+                      if (existsIdx >= 0) {
+                        listToExport[existsIdx] = draftProduct;
+                      } else {
+                        listToExport = [draftProduct, ...listToExport];
+                      }
+                    }
+
+                    try {
+                      const jsonStr = JSON.stringify(listToExport, null, 2);
+                      const blob = new Blob([jsonStr], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "products.json";
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      notify("✨ ¡Archivo products.json descargado! Guárdalo o súbelo directo a tu GitHub.", "success");
+                    } catch (err: any) {
+                      notify("No se pudo descargar el archivo: " + err.message, "error");
+                    }
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-4 rounded-lg flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer flex-1 md:flex-none shadow-md"
+                  title="Descargar directamente el archivo products.json listo para subir a tu repositorio en GitHub"
+                >
+                  <Download className="w-4 h-4 text-white" />
+                  <span>Descargar products.json</span>
                 </button>
 
                 <button
