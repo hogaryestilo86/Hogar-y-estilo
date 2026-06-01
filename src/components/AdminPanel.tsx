@@ -7,7 +7,7 @@ import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
 import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings } from "lucide-react";
-import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache, getMedia } from "../indexedDbMedia";
+import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64 } from "../indexedDbMedia";
 
 interface AdminPanelProps {
   products: Product[];
@@ -280,7 +280,19 @@ export default function AdminPanel({
       localStorage.setItem("github_sync_branch", branchToUse);
       localStorage.setItem("github_sync_path", pathToUse);
 
-      const jsonStr = JSON.stringify(dataToSave, null, 2);
+      notify("Optimizando imágenes para asegurar una sincronización ultrarrápida...", "info");
+      const compressedCatalog = await compressAllProductsBase64(dataToSave);
+      
+      // Update local state if needed so that it matches
+      try {
+        if (onSetProducts) {
+          onSetProducts(compressedCatalog);
+        }
+      } catch (e) {
+        console.warn("Could not update local state with compressed list:", e);
+      }
+
+      const jsonStr = JSON.stringify(compressedCatalog, null, 2);
 
       // Convert content to safe UTF-8 base64 encoding using a non-blocking fast and safe FileReader/Blob native method
       const base64Content = await new Promise<string>((resolve, reject) => {
