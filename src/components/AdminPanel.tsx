@@ -282,26 +282,72 @@ export default function AdminPanel({
 
       const jsonStr = JSON.stringify(dataToSave, null, 2);
 
-      // Query GitHub API for existing file metadata to obtain SHA hash
-      const fileUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}?ref=${branchToUse}`;
-      const getResponse = await fetch(fileUrl, {
-        headers: {
-          "Accept": "application/vnd.github.v3+json",
-          "Authorization": `token ${tokenToUse}`
-        }
-      });
-
+      // Query GitHub API for existing file metadata with automatic Trees API fallback for large files (>1MB)
       let sha: string | undefined = undefined;
-      if (getResponse.ok) {
-        const fileData = await getResponse.json();
-        sha = fileData.sha;
-      } else if (getResponse.status === 401) {
-        throw new Error("Token de GitHub inválido. Por favor, revísalo.");
-      } else if (getResponse.status === 404) {
-        // Safe: File might not exist yet, we will create it!
-        console.log("File not found, creating a new file on repository...");
-      } else {
-        throw new Error(`Error de comunicación con GitHub (Código: ${getResponse.status})`);
+      try {
+        const fileUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}?ref=${branchToUse}`;
+        const getResponse = await fetch(fileUrl, {
+          headers: {
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `token ${tokenToUse}`
+          }
+        });
+
+        if (getResponse.ok) {
+          const fileData = await getResponse.json();
+          sha = fileData.sha;
+        } else if (getResponse.status === 401) {
+          throw new Error("Token de GitHub inválido. Por favor, revísalo o genera uno válido.");
+        } else if (getResponse.status === 404) {
+          console.log("products.json no existe aún en GitHub, se creará nuevo.");
+        } else {
+          // Trigger fallback for other statuses (like 403 / large file sizes)
+          console.warn(`Query contents returned status ${getResponse.status}. Intentando recuperarlo desde Trees API...`);
+          throw new Error("size_limit_or_status_issue");
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes("Token de GitHub")) {
+          throw err;
+        }
+
+        // Fallback: Query the Git Trees API which recursively returns file SHAs of files size up to 100MB+ without loading actual code content
+        try {
+          const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${branchToUse}?recursive=1`;
+          const treeResponse = await fetch(treeUrl, {
+            headers: {
+              "Accept": "application/vnd.github.v3+json",
+              "Authorization": `token ${tokenToUse}`
+            }
+          });
+
+          if (treeResponse.ok) {
+            const treeData = await treeResponse.json();
+            if (treeData && Array.isArray(treeData.tree)) {
+              const targetPath = pathToUse.toLowerCase().replace(/^\/+/, "");
+              const match = treeData.tree.find((item: any) => 
+                item.path.toLowerCase().replace(/^\/+/, "") === targetPath
+              );
+              if (match) {
+                sha = match.sha;
+                console.log("¡Éxito! SHA obtenido de forma segura desde la API de Git Trees (evitando límites de tamaño):", sha);
+              }
+            }
+          } else if (treeResponse.status === 401) {
+            throw new Error("Token de GitHub inválido. Por favor, revísalo o genera uno válido.");
+          } else {
+            console.error(`Git Trees API fallida con status: ${treeResponse.status}`);
+          }
+        } catch (treeErr: any) {
+          console.error("Fallo de recuperación en Trees API:", treeErr);
+          if (treeErr.message && treeErr.message.includes("Token de GitHub")) {
+            throw treeErr;
+          }
+        }
+
+        // If after both we still don't have SHA, and it's not a clear error, we assume it's new, otherwise notify user
+        if (!sha) {
+          console.log("No se pudo hallar archivo previo ni siquiera en Trees API, asumiendo creación nueva u omitiendo SHA...");
+        }
       }
 
       // Convert content to safe UTF-8 base64 encoding using a non-blocking fast and safe FileReader/Blob native method
