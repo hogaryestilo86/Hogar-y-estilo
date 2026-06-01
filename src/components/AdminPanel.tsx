@@ -304,14 +304,18 @@ export default function AdminPanel({
         throw new Error(`Error de comunicación con GitHub (Código: ${getResponse.status})`);
       }
 
-      // Convert content to safe UTF-8 base64 encoding
-      const encoder = new TextEncoder();
-      const bytes = encoder.encode(jsonStr);
-      let binary = "";
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64Content = btoa(binary);
+      // Convert content to safe UTF-8 base64 encoding using a non-blocking fast and safe FileReader/Blob native method
+      const base64Content = await new Promise<string>((resolve, reject) => {
+        const blob = new Blob([jsonStr], { type: "text/plain;charset=utf-8" });
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.split(",")[1];
+          resolve(base64);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
 
       const putUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}`;
       const putBody = {
