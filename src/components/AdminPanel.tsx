@@ -282,74 +282,6 @@ export default function AdminPanel({
 
       const jsonStr = JSON.stringify(dataToSave, null, 2);
 
-      // Query GitHub API for existing file metadata with automatic Trees API fallback for large files (>1MB)
-      let sha: string | undefined = undefined;
-      try {
-        const fileUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}?ref=${branchToUse}`;
-        const getResponse = await fetch(fileUrl, {
-          headers: {
-            "Accept": "application/vnd.github.v3+json",
-            "Authorization": `token ${tokenToUse}`
-          }
-        });
-
-        if (getResponse.ok) {
-          const fileData = await getResponse.json();
-          sha = fileData.sha;
-        } else if (getResponse.status === 401) {
-          throw new Error("Token de GitHub inválido. Por favor, revísalo o genera uno válido.");
-        } else if (getResponse.status === 404) {
-          console.log("products.json no existe aún en GitHub, se creará nuevo.");
-        } else {
-          // Trigger fallback for other statuses (like 403 / large file sizes)
-          console.warn(`Query contents returned status ${getResponse.status}. Intentando recuperarlo desde Trees API...`);
-          throw new Error("size_limit_or_status_issue");
-        }
-      } catch (err: any) {
-        if (err.message && err.message.includes("Token de GitHub")) {
-          throw err;
-        }
-
-        // Fallback: Query the Git Trees API which recursively returns file SHAs of files size up to 100MB+ without loading actual code content
-        try {
-          const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${branchToUse}?recursive=1`;
-          const treeResponse = await fetch(treeUrl, {
-            headers: {
-              "Accept": "application/vnd.github.v3+json",
-              "Authorization": `token ${tokenToUse}`
-            }
-          });
-
-          if (treeResponse.ok) {
-            const treeData = await treeResponse.json();
-            if (treeData && Array.isArray(treeData.tree)) {
-              const targetPath = pathToUse.toLowerCase().replace(/^\/+/, "");
-              const match = treeData.tree.find((item: any) => 
-                item.path.toLowerCase().replace(/^\/+/, "") === targetPath
-              );
-              if (match) {
-                sha = match.sha;
-                console.log("¡Éxito! SHA obtenido de forma segura desde la API de Git Trees (evitando límites de tamaño):", sha);
-              }
-            }
-          } else if (treeResponse.status === 401) {
-            throw new Error("Token de GitHub inválido. Por favor, revísalo o genera uno válido.");
-          } else {
-            console.error(`Git Trees API fallida con status: ${treeResponse.status}`);
-          }
-        } catch (treeErr: any) {
-          console.error("Fallo de recuperación en Trees API:", treeErr);
-          if (treeErr.message && treeErr.message.includes("Token de GitHub")) {
-            throw treeErr;
-          }
-        }
-
-        // If after both we still don't have SHA, and it's not a clear error, we assume it's new, otherwise notify user
-        if (!sha) {
-          console.log("No se pudo hallar archivo previo ni siquiera en Trees API, asumiendo creación nueva u omitiendo SHA...");
-        }
-      }
-
       // Convert content to safe UTF-8 base64 encoding using a non-blocking fast and safe FileReader/Blob native method
       const base64Content = await new Promise<string>((resolve, reject) => {
         const blob = new Blob([jsonStr], { type: "text/plain;charset=utf-8" });
@@ -363,27 +295,211 @@ export default function AdminPanel({
         reader.readAsDataURL(blob);
       });
 
-      const putUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}`;
-      const putBody = {
-        message: "Actualizar productos.json desde el Panel de Administración Hogar & Estilo 🛍️",
-        content: base64Content,
-        branch: branchToUse,
-        ...(sha ? { sha } : {})
+      // Internal function to perform Low-level Git Database API commit (supports up to 100MB per file natively)
+      const syncWithGitDatabaseApi = async () => {
+        // A. Get parent commit reference SHA
+        let refUrl = `https://api.github.com/repos/${cleanRepo}/git/ref/heads/${branchToUse}`;
+        let refResponse = await fetch(refUrl, {
+          headers: {
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `token ${tokenToUse}`
+          }
+        });
+        if (!refResponse.ok) {
+          refUrl = `https://api.github.com/repos/${cleanRepo}/git/refs/heads/${branchToUse}`;
+          refResponse = await fetch(refUrl, {
+            headers: {
+              "Accept": "application/vnd.github.v3+json",
+              "Authorization": `token ${tokenToUse}`
+            }
+          });
+        }
+        if (!refResponse.ok) {
+          throw new Error(`No se pudo obtener la referencia de la rama o el repositorio de GitHub no tiene commits previos.`);
+        }
+        const refData = await refResponse.json();
+        const parentCommitSha = refData.object?.sha || (Array.isArray(refData) ? refData[0]?.object?.sha : null);
+        if (!parentCommitSha) {
+          throw new Error("No se pudo hallar el SHA del commit padre en la rama de tu repositorio.");
+        }
+
+        // B. Create file Blob
+        const blobResponse = await fetch(`https://api.github.com/repos/${cleanRepo}/git/blobs`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `token ${tokenToUse}`
+          },
+          body: JSON.stringify({
+            content: base64Content,
+            encoding: "base64"
+          })
+        });
+        if (!blobResponse.ok) {
+          const er = await blobResponse.json().catch(() => ({}));
+          throw new Error(er.message || `No se pudo crear el blob Git en tu cuenta (Código: ${blobResponse.status})`);
+        }
+        const blobData = await blobResponse.json();
+        const newBlobSha = blobData.sha;
+
+        // C. Create Tree
+        const treeResponse = await fetch(`https://api.github.com/repos/${cleanRepo}/git/trees`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `token ${tokenToUse}`
+          },
+          body: JSON.stringify({
+            base_tree: parentCommitSha,
+            tree: [
+              {
+                path: pathToUse,
+                mode: "100644",
+                type: "blob",
+                sha: newBlobSha
+              }
+            ]
+          })
+        });
+        if (!treeResponse.ok) {
+          const er = await treeResponse.json().catch(() => ({}));
+          throw new Error(er.message || `No se pudo crear el árbol Git (Código: ${treeResponse.status})`);
+        }
+        const treeData = await treeResponse.json();
+        const newTreeSha = treeData.sha;
+
+        // D. Create Commit
+        const commitResponse = await fetch(`https://api.github.com/repos/${cleanRepo}/git/commits`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `token ${tokenToUse}`
+          },
+          body: JSON.stringify({
+            message: "Actualizar productos.json - Sincronización inteligente y segura para archivos grandes 💎📦",
+            tree: newTreeSha,
+            parents: [parentCommitSha]
+          })
+        });
+        if (!commitResponse.ok) {
+          const er = await commitResponse.json().catch(() => ({}));
+          throw new Error(er.message || `No se pudo crear el commit de confirmación (Código: ${commitResponse.status})`);
+        }
+        const commitData = await commitResponse.json();
+        const newCommitSha = commitData.sha;
+
+        // E. Update reference to point to new commit
+        const updateRefUrl = `https://api.github.com/repos/${cleanRepo}/git/refs/heads/${branchToUse}`;
+        const updateRefResponse = await fetch(updateRefUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `token ${tokenToUse}`
+          },
+          body: JSON.stringify({
+            sha: newCommitSha,
+            force: true
+          })
+        });
+        if (!updateRefResponse.ok) {
+          const er = await updateRefResponse.json().catch(() => ({}));
+          throw new Error(er.message || `No se pudo actualizar el puntero de la rama (Código: ${updateRefResponse.status})`);
+        }
       };
 
-      const putResponse = await fetch(putUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/vnd.github.v3+json",
-          "Authorization": `token ${tokenToUse}`
-        },
-        body: JSON.stringify(putBody)
-      });
+      // Proactively detect larger files (>500KB) and run high-performance low-level API directly to save requests and guarantee immediate success!
+      if (jsonStr.length > 500000) {
+        console.log("Catálogo grande detectado. Usando API Git Database directamente.");
+        notify("Detectadas fotos de alta resolución. Usando canal de subida Git de alta densidad...", "info");
+        await syncWithGitDatabaseApi();
+      } else {
+        // Try the standard high-level Contents API first for simple file updates
+        let sha: string | undefined = undefined;
+        try {
+          const fileUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}?ref=${branchToUse}`;
+          const getResponse = await fetch(fileUrl, {
+            headers: {
+              "Accept": "application/vnd.github.v3+json",
+              "Authorization": `token ${tokenToUse}`
+            }
+          });
 
-      if (!putResponse.ok) {
-        const errJson = await putResponse.json().catch(() => ({}));
-        throw new Error(errJson.message || `No se pudo guardar el archivo (Código: ${putResponse.status})`);
+          if (getResponse.ok) {
+            const fileData = await getResponse.json();
+            sha = fileData.sha;
+          } else if (getResponse.status === 401) {
+            throw new Error("Token de GitHub inválido. Por favor, revísalo o genera uno válido.");
+          } else if (getResponse.status === 404) {
+            console.log("File not found, creating a new file...");
+          } else {
+            // Trigger Git database fallback for other statuses
+            throw new Error("size_limit_or_status_issue");
+          }
+        } catch (err: any) {
+          if (err.message && err.message.includes("Token de GitHub")) {
+            throw err;
+          }
+          // Fallback SHA retrieval via Git Trees API
+          try {
+            const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${branchToUse}?recursive=1`;
+            const treeResponse = await fetch(treeUrl, {
+              headers: {
+                "Accept": "application/vnd.github.v3+json",
+                "Authorization": `token ${tokenToUse}`
+              }
+            });
+
+            if (treeResponse.ok) {
+              const treeData = await treeResponse.json();
+              if (treeData && Array.isArray(treeData.tree)) {
+                const targetPath = pathToUse.toLowerCase().replace(/^\/+/, "");
+                const match = treeData.tree.find((item: any) => 
+                  item.path.toLowerCase().replace(/^\/+/, "") === targetPath
+                );
+                if (match) {
+                  sha = match.sha;
+                }
+              }
+            }
+          } catch (treeErr) {
+            console.error("Git Trees API SHA recovery failed:", treeErr);
+          }
+        }
+
+        const putUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}`;
+        const putBody = {
+          message: "Actualizar productos.json desde el Panel de Administración Hogar & Estilo 🛍️",
+          content: base64Content,
+          branch: branchToUse,
+          ...(sha ? { sha } : {})
+        };
+
+        const putResponse = await fetch(putUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github.v3+json",
+            "Authorization": `token ${tokenToUse}`
+          },
+          body: JSON.stringify(putBody)
+        });
+
+        if (!putResponse.ok) {
+          const errJson = await putResponse.json().catch(() => ({}));
+          const errMsg = errJson.message || "";
+          
+          if (errMsg.includes("large") || errMsg.includes("limit") || errMsg.includes("size") || putResponse.status === 403 || putResponse.status === 400) {
+            console.warn("Contents PUT API errored out due to file size. Falling back seamlessly to Git Database API...");
+            notify("El archivo es demasiado grande para la API estándar. Activando módulo automático de carga masiva...", "info");
+            await syncWithGitDatabaseApi();
+          } else {
+            throw new Error(errMsg || `No se pudo guardar el archivo (Código: ${putResponse.status})`);
+          }
+        }
       }
 
       notify("✨ ¡ÉXITO! Catálogo de productos guardado directamente en tu repositorio de GitHub.", "success");
