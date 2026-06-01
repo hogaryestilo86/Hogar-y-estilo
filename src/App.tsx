@@ -16,7 +16,7 @@ import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
 import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB } from "./indexedDbMedia";
 import { collection, getDocs, setDoc, doc, deleteDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, cleanObjectForFirestore } from "./firebase";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
 // Helper to resolve image urls, stripping the local server proxy prefix if run in static hosts (Vercel, GitHub Pages)
@@ -196,7 +196,8 @@ export default function App() {
         // Insert / Update each active product
         for (const product of products) {
           if (product && product.id) {
-            await setDoc(doc(db, "products", product.id), product);
+            const cleanedProduct = cleanObjectForFirestore(product);
+            await setDoc(doc(db, "products", product.id), cleanedProduct);
             existingIds.delete(product.id);
           }
         }

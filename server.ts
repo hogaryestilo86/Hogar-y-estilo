@@ -24,6 +24,26 @@ try {
   console.error("Failed to initialize Firebase on server-side:", err);
 }
 
+function cleanObjectForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(cleanObjectForFirestore);
+  }
+  if (typeof obj === "object") {
+    const clean: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const val = obj[key];
+        if (val !== undefined) {
+          clean[key] = cleanObjectForFirestore(val);
+        }
+      }
+    }
+    return clean;
+  }
+  return obj;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -227,7 +247,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           // Upload/Set core documents
           for (const product of products) {
             if (product && product.id) {
-              await setDoc(doc(db, "products", product.id), product);
+              const cleanedProduct = cleanObjectForFirestore(product);
+              await setDoc(doc(db, "products", product.id), cleanedProduct);
               existingIds.delete(product.id);
             }
           }

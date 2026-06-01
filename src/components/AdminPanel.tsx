@@ -813,16 +813,20 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
             <div className="space-y-1.5 relative">
               <label className="text-[10px] font-bold text-brand-500 uppercase tracking-widest block font-sans">Código del Catálogo:</label>
-              <textarea
-                readOnly
-                value={copiedJsonValue}
-                onClick={(e) => {
-                  (e.target as HTMLTextAreaElement).select();
-                  notify("¡Todo el código ha sido seleccionado! Pulsa Ctrl+C en tu teclado para copiarlo.", "info");
-                }}
-                className="w-full h-56 bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-600 focus:outline-hidden resize-none cursor-text select-all shadow-inner"
-                placeholder="Generando código JSON..."
-              />
+              {(() => {
+                const isTooLarge = copiedJsonValue.length > 5000;
+                const previewText = isTooLarge
+                  ? copiedJsonValue.substring(0, 3000) + "\n\n... [¡CÓDIGO TRUNCADO PARA EVITAR LENTITUD EN TU DISPOSITIVO! El catálogo completo es muy grande debido a las fotos. El archivo tiene " + copiedJsonValue.length + " caracteres. Por favor, usa los botones de abajo 'Copiar Automático' o 'Descargar products.json' para obtener el archivo original completo sin ningún corte] ..."
+                  : copiedJsonValue;
+                return (
+                  <textarea
+                    readOnly
+                    value={previewText}
+                    className="w-full h-56 bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-600 focus:outline-hidden resize-none cursor-text shadow-inner"
+                    placeholder="Generando código JSON..."
+                  />
+                );
+              })()}
               <span className="absolute bottom-3 right-3 text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
                 {copiedJsonValue.length} caracteres
               </span>
