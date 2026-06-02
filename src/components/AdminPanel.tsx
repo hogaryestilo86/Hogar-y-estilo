@@ -240,7 +240,7 @@ export default function AdminPanel({
   const [githubBranch, setGithubBranch] = useState(() => localStorage.getItem("github_sync_branch") || "main");
   const [githubPath, setGithubPath] = useState(() => localStorage.getItem("github_sync_path") || "products.json");
   const [isSyncingGithub, setIsSyncingGithub] = useState(false);
-  const [showGithubSettings, setShowGithubSettings] = useState(false);
+  const [showGithubSettings, setShowGithubSettings] = useState(true);
   const [lastSyncTime, setLastSyncTime] = useState(() => localStorage.getItem("github_last_sync_time") || "");
 
   const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
@@ -776,8 +776,8 @@ export default function AdminPanel({
         continue;
       }
 
-      if (isVideo && fileSizeInMB > 3) {
-        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera el límite de 3MB para videos incrustados. Para una carga ultrarrápida de tu tienda y evitar límites en GitHub, sube videos más largos a YouTube o Google Drive e ingresa su URL pública aquí abajo.`, "error");
+      if (isVideo && fileSizeInMB > 25) {
+        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera el límite de 25MB de carga. Por favor, reduce la resolución o peso de tu video, o súbelo a YouTube/Drive y pega el enlace abajo para que tu sitio cargue al instante.`, "error");
         continue;
       }
 
@@ -1813,7 +1813,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       Haz clic para examinar archivos locales
                     </p>
                     <p className="text-[10.5px] text-brand-500 font-light mt-1">
-                      Formatos: PNG, JPG, WebP (máx 12MB, auto-comprimido) • Video: MP4, WebM (máx 3MB)
+                      Formatos: PNG, JPG, WebP (máx 12MB, auto-comprimido) • Video: MP4, WebM (Soporta hasta 25MB gracias a tu canal DB GitHub 💎)
                     </p>
                   </div>
                 </div>
@@ -2446,6 +2446,22 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 </div>
               )}
 
+              {/* HINT BANNER ABOVE THE SYNC BUTTON */}
+              {(!githubToken.trim() || !githubRepo.trim()) && (
+                <div className="bg-amber-50/90 border border-amber-200 text-amber-900 rounded-xl p-3.5 text-xs leading-relaxed space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <p className="font-extrabold text-[11px] uppercase tracking-wide text-amber-800 flex items-center gap-1.5">
+                    <span className="flex h-2 w-2 rounded-full bg-amber-500"></span>
+                    💡 CONFIGURA ARRIBA PARA ACTIVAR LA COMPATIBILIDAD CON GITHUB:
+                  </p>
+                  <p className="font-light text-[11px]">
+                    Para que los cambios de tu catálogo se guarden de forma permanente y gratuita en tu web de Vercel/GitHub, completa los campos de arriba con tu <strong>Repositorio</strong> (Usuario/Contenedor) y tu <strong>Token de Acceso de GitHub</strong>.
+                  </p>
+                  <p className="font-semibold text-[10.5px] text-amber-950">
+                    Al escribir ambos datos arriba, el botón morado de abajo se liberará listo para guardar todo en la nube en vivo al instante con 1-Clic.
+                  </p>
+                </div>
+              )}
+
               <button
                 type="button"
                 disabled={isSyncingGithub}
@@ -2453,7 +2469,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 className={`w-full py-3 px-4 rounded-xl font-bold uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-md text-white border border-black/10 transition-colors ${
                   isSyncingGithub 
                     ? "bg-purple-400 cursor-not-allowed" 
-                    : "bg-purple-600 hover:bg-purple-700 active:bg-purple-800"
+                    : (!githubToken.trim() || !githubRepo.trim())
+                      ? "bg-purple-600 hover:bg-purple-700 active:bg-purple-800 opacity-80"
+                      : "bg-purple-700 hover:bg-purple-800 active:bg-purple-900"
                 }`}
               >
                 {isSyncingGithub ? (
@@ -2464,7 +2482,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 ) : (
                   <>
                     <Github className="w-3.5 h-3.5 text-white animate-pulse" />
-                    <span>Sincronizar Catálogo en GitHub</span>
+                    <span>{!githubToken.trim() || !githubRepo.trim() ? "Configurar y Sincronizar en GitHub" : "Sincronizar Catálogo en GitHub"}</span>
                   </>
                 )}
               </button>

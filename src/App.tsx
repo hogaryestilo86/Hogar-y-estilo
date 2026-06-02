@@ -15,7 +15,7 @@ import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
 import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB } from "./indexedDbMedia";
-import { collection, getDocs, setDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
+import { collection, getDocs, setDoc, doc, deleteDoc, getDoc, onSnapshot } from "firebase/firestore";
 import { db, cleanObjectForFirestore } from "./firebase";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
@@ -432,6 +432,8 @@ export default function App() {
     };
   });
 
+  const lastCloudMetricsRef = React.useRef<any>(null);
+
   // Safe side effects persistence sync
   useEffect(() => {
     try {
@@ -442,7 +444,18 @@ export default function App() {
 
     // Also sync storeMetrics with Firebase Cloud Firestore
     async function syncMetricsToCloud() {
+      if (
+        lastCloudMetricsRef.current &&
+        lastCloudMetricsRef.current.viewsCount === storeMetrics.viewsCount &&
+        lastCloudMetricsRef.current.abandonedCartCount === storeMetrics.abandonedCartCount &&
+        lastCloudMetricsRef.current.purchasesCount === storeMetrics.purchasesCount &&
+        lastCloudMetricsRef.current.pendingDispatchesCount === storeMetrics.pendingDispatchesCount
+      ) {
+        // Skip writing back to the cloud because this was already identical to the last read cloud state!
+        return;
+      }
       try {
+        lastCloudMetricsRef.current = storeMetrics;
         await setDoc(doc(db, "analytics", "global"), storeMetrics, { merge: true });
         console.log("[Firestore Analytics] Global metrics synchronized in real time:", storeMetrics);
       } catch (fbErr) {
@@ -451,6 +464,38 @@ export default function App() {
     }
     syncMetricsToCloud();
   }, [storeMetrics]);
+
+  // Real-time Firestore subscription to update metrics instantly
+  useEffect(() => {
+    const analyticsRef = doc(db, "analytics", "global");
+    const unsubscribe = onSnapshot(analyticsRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const incoming = {
+          viewsCount: Number(data.viewsCount || 0),
+          abandonedCartCount: Number(data.abandonedCartCount || 0),
+          purchasesCount: Number(data.purchasesCount || 0),
+          pendingDispatchesCount: Number(data.pendingDispatchesCount || 0),
+        };
+
+        const isDifferent =
+          !lastCloudMetricsRef.current ||
+          lastCloudMetricsRef.current.viewsCount !== incoming.viewsCount ||
+          lastCloudMetricsRef.current.abandonedCartCount !== incoming.abandonedCartCount ||
+          lastCloudMetricsRef.current.purchasesCount !== incoming.purchasesCount ||
+          lastCloudMetricsRef.current.pendingDispatchesCount !== incoming.pendingDispatchesCount;
+
+        if (isDifferent) {
+          lastCloudMetricsRef.current = incoming;
+          setStoreMetrics(incoming);
+        }
+      }
+    }, (err) => {
+      console.warn("Silent failure subscribing to real-time firestore analytics:", err);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     try {
@@ -500,12 +545,14 @@ export default function App() {
           }, { merge: true });
         }
 
-        setStoreMetrics({
+        const initialMetrics = {
           viewsCount: views,
           abandonedCartCount: abandoned,
           purchasesCount: purchases,
           pendingDispatchesCount: pendingDispatches,
-        });
+        };
+        lastCloudMetricsRef.current = initialMetrics;
+        setStoreMetrics(initialMetrics);
       } catch (e) {
         console.warn("Error fetching / updating global analytics from Firestore:", e);
         // Fallback to local increment if Firestore query fails
