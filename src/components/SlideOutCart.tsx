@@ -189,6 +189,7 @@ export default function SlideOutCart({
                       ) : (
                         <ResolvedImage
                           src={mediaUrl}
+                          backupUrl={activeMedia?.backupUrl}
                           alt={product.title}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover"

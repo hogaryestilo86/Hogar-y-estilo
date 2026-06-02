@@ -8,6 +8,9 @@ import { OrderDetails, CartItem, BankDetails } from "../types";
 import { X, CreditCard, Landmark, CheckCircle, ArrowRight, ClipboardCheck, ArrowLeft, ShieldAlert, DollarSign, HelpCircle, Copy, Instagram, Upload, Image } from "lucide-react";
 import { storeMedia, ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
+// Cache public key config to speed up payment brick loading and optimize conversions
+let cachedMpPublicConfig: { publicKey: string; isReal: boolean } | null = null;
+
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -54,6 +57,7 @@ export default function CheckoutModal({
 
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [receiptImage, setReceiptImage] = useState<string>("");
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,8 +69,20 @@ export default function CheckoutModal({
       return;
     }
 
+    if (receiptPreviewUrl) {
+      try {
+        URL.revokeObjectURL(receiptPreviewUrl);
+      } catch (_) {}
+    }
+
+    // 1. Create and set an instant local preview URL (0ms latency!)
+    const objectUrl = URL.createObjectURL(file);
+    setReceiptPreviewUrl(objectUrl);
+    setReceiptImage(objectUrl);
+
     setUploadingReceipt(true);
     try {
+      // 2. Compress and save to IndexedDB asynchronously in background
       const idbUrl = await storeMedia(file);
       setReceiptImage(idbUrl);
       setFormData(prev => ({ ...prev, receiptImage: idbUrl }));
@@ -150,9 +166,9 @@ export default function CheckoutModal({
 
       const initializeBrick = async () => {
         try {
-          // 1. Dynamic script load
+          // 1. Dynamic script load (foolproof global check to prevent duplicate script tags)
           await new Promise<void>((resolve, reject) => {
-            if (window.hasOwnProperty("MercadoPago")) {
+            if (typeof (window as any).MercadoPago !== "undefined") {
               resolve();
               return;
             }
@@ -166,12 +182,22 @@ export default function CheckoutModal({
 
           if (!active) return;
 
-          // 2. Fetch config
-          const configRes = await fetch("/api/mercadopago/config");
-          if (!configRes.ok) {
-            throw new Error("No se pudo obtener la clave pública de configuración.");
+          // 2. Fetch config (cached at module level to eliminate API roundtrip latency!)
+          let publicKey = "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849";
+          let isReal = false;
+
+          if (cachedMpPublicConfig) {
+            publicKey = cachedMpPublicConfig.publicKey;
+            isReal = cachedMpPublicConfig.isReal;
+          } else {
+            const configRes = await fetch("/api/mercadopago/config");
+            if (configRes.ok) {
+              const data = await configRes.json();
+              publicKey = data.publicKey;
+              isReal = data.hasPrivateToken;
+              cachedMpPublicConfig = { publicKey, isReal };
+            }
           }
-          const { publicKey, hasPrivateToken: isReal } = await configRes.json();
           setHasPrivateToken(isReal);
           setMpIsSimulator(!isReal);
 
@@ -604,6 +630,7 @@ export default function CheckoutModal({
                             ) : (
                               <ResolvedImage
                                 src={mediaUrl}
+                                backupUrl={activeMedia?.backupUrl}
                                 alt={product.title}
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"

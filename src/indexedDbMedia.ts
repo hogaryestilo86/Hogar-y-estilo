@@ -395,53 +395,50 @@ export async function resolveIdbUrl(url: string | undefined): Promise<string> {
  * Incorporates backupUrl to enable offline fallback and zero-broken-image delivery.
  */
 export function useResolvedUrl(url: string | undefined, backupUrl?: string): string {
-  const [resolved, setResolved] = useState<string>(() => {
+  const isIdbUrl = url ? url.startsWith("idb://") : false;
+  const idbKey = isIdbUrl && url ? url.replace("idb://", "") : "";
+  
+  const getInstantResolved = () => {
     if (!url) return backupUrl || "";
-    if (url.startsWith("idb://")) {
-      const key = url.replace("idb://", "");
-      if (globalResolvedCache[key]) {
-        return globalResolvedCache[key];
+    if (!isIdbUrl) {
+      if ((url.startsWith("/uploads/") || url.startsWith("uploads/")) && backupUrl) {
+        return backupUrl;
       }
-      if (inMemoryFallbackCache[key]) {
-        return inMemoryFallbackCache[key];
-      }
-      return backupUrl || ""; // loading placeholder
+      return url;
     }
-    
-    // Quick fallback when running in static deployments (Vercel) where local files in /uploads/
-    // aren't physically present on the server until GitHub sync re-deploys them
-    if ((url.startsWith("/uploads/") || url.startsWith("uploads/")) && backupUrl) {
-      return backupUrl;
+    if (idbKey && globalResolvedCache[idbKey]) {
+      return globalResolvedCache[idbKey];
     }
-    return url;
-  });
+    if (idbKey && inMemoryFallbackCache[idbKey]) {
+      return inMemoryFallbackCache[idbKey];
+    }
+    return backupUrl || "";
+  };
+
+  const instantValue = getInstantResolved();
+  const [resolved, setResolved] = useState<string>(instantValue);
 
   useEffect(() => {
-    if (!url) {
-      setResolved(backupUrl || "");
-      return;
-    }
+    setResolved(getInstantResolved());
+  }, [url, backupUrl]);
 
-    if (!url.startsWith("idb://")) {
-      if ((url.startsWith("/uploads/") || url.startsWith("uploads/")) && backupUrl) {
-        setResolved(backupUrl);
-      } else {
-        setResolved(url);
-      }
-      return;
-    }
+  useEffect(() => {
+    if (!isIdbUrl || !idbKey) return;
+    if (globalResolvedCache[idbKey] || inMemoryFallbackCache[idbKey]) return;
 
     let active = true;
-    resolveIdbUrl(url).then((res) => {
-      if (active) {
-        setResolved(res || backupUrl || "");
+    getMedia(idbKey).then((blob) => {
+      if (active && blob) {
+        const blobUrl = URL.createObjectURL(blob);
+        globalResolvedCache[idbKey] = blobUrl;
+        setResolved(blobUrl);
       }
     });
 
     return () => {
       active = false;
     };
-  }, [url, backupUrl]);
+  }, [url]);
 
   return resolved;
 }
