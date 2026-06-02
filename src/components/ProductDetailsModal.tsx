@@ -94,24 +94,23 @@ export default function ProductDetailsModal({
       maximumFractionDigits: 0,
     }).format(val);
   };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-brand-900/60 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-brand-950/75 backdrop-blur-md">
       {/* Modal Container */}
-      <div className="bg-brand-50 w-full max-w-4xl rounded-2xl border border-brand-200 overflow-hidden shadow-2xl relative my-8 flex flex-col md:flex-row max-h-[90vh]">
+      <div className="bg-[#ded7c4] w-full max-w-4xl rounded-2xl border border-[#c4bba3] overflow-hidden shadow-2xl relative my-8 flex flex-col md:flex-row max-h-[90vh]">
         
         {/* Close Button Pin and Like Button */}
         <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
           <button
             onClick={() => setLiked(!liked)}
-            className="p-2 rounded-full bg-white/80 hover:bg-white text-rose-500 shadow-sm border border-brand-200 cursor-pointer"
+            className="p-2 rounded-full bg-[#fcfbfa]/90 hover:bg-white text-rose-600 shadow-sm border border-[#c4bba3] cursor-pointer"
             aria-label="Guardar en favoritos"
           >
-            <Heart className={`w-4 h-4 ${liked ? "fill-rose-500" : ""}`} />
+            <Heart className={`w-4 h-4 ${liked ? "fill-rose-600" : ""}`} />
           </button>
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-white/80 hover:bg-white text-brand-700 hover:text-brand-900 shadow-sm border border-brand-200 cursor-pointer"
+            className="p-2 rounded-full bg-[#fcfbfa]/90 hover:bg-white text-brand-950 hover:text-black shadow-sm border border-[#c4bba3] cursor-pointer"
             aria-label="Cerrar detalles"
           >
             <X className="w-4 h-4" />
@@ -119,8 +118,8 @@ export default function ProductDetailsModal({
         </div>
 
         {/* Left Side: Media gallery & player */}
-        <div className="w-full md:w-1/2 bg-white flex flex-col justify-between border-r border-brand-200 p-4 sm:p-6 overflow-y-auto max-h-[40vh] md:max-h-full">
-          <div className="relative w-full aspect-square rounded-xl bg-brand-100 overflow-hidden border border-brand-200 flex items-center justify-center">
+        <div className="w-full md:w-1/2 bg-[#eedfc9]/40 flex flex-col justify-between border-r border-[#c4bba3] p-4 sm:p-6 overflow-y-auto max-h-[40vh] md:max-h-full">
+          <div className="relative w-full aspect-square rounded-xl bg-brand-950 overflow-hidden border border-[#c4bba3] flex items-center justify-center">
             {activeMediaList[activeMediaIndex]?.type === "video" ? (
               <div className="relative w-full h-full flex items-center justify-center bg-black">
                 <ResolvedVideo
@@ -144,7 +143,7 @@ export default function ProductDetailsModal({
                   className="absolute bottom-16 right-4 z-40 bg-brand-900/90 hover:bg-black text-white p-2.5 rounded-full shadow-lg border border-brand-800 transition-all active:scale-95 flex items-center justify-center cursor-pointer hover:scale-105"
                   title={isMuted ? "Activar sonido" : "Silenciar video"}
                 >
-                  {isMuted ? <VolumeX className="w-5 h-5 text-red-100" /> : <Volume2 className="w-5 h-5 text-white animate-pulse" />}
+                  {isMuted ? <VolumeX className="w-5 h-5 text-red-105" /> : <Volume2 className="w-5 h-5 text-white animate-pulse" />}
                 </button>
               </div>
             ) : (
@@ -159,8 +158,9 @@ export default function ProductDetailsModal({
             )}
 
             {product.basePrice >= 50000 && (
-              <span className="absolute top-3 left-3 bg-green-700 text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1 rounded-full shadow-sm">
-                Envío Totalmente Gratis
+              <span className="absolute top-4 left-4 bg-gradient-to-r from-emerald-600 via-emerald-700 to-green-650 text-white text-[11px] font-black tracking-widest uppercase px-3.5 py-1.5 rounded-xl shadow-lg border border-emerald-400/40 flex items-center gap-1.5 backdrop-blur-xs animate-pulse">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+                🚚 ENVÍO TOTALMENTE GRATIS
               </span>
             )}
           </div>
@@ -173,13 +173,13 @@ export default function ProductDetailsModal({
                   key={idx}
                   onClick={() => setActiveMediaIndex(idx)}
                   className={`relative w-16 sm:w-20 aspect-square rounded-lg overflow-hidden border-2 cursor-pointer transition-all shrink-0 ${
-                    idx === activeMediaIndex ? "border-brand-900 scale-105" : "border-brand-200 hover:border-brand-400"
+                    idx === activeMediaIndex ? "border-brand-950 scale-105" : "border-[#c4bba3] hover:border-brand-950"
                   }`}
                 >
                   {item.type === "video" ? (
                     <div className="w-full h-full bg-black flex items-center justify-center relative">
-                      <span className="absolute inset-0 bg-brand-900/30 group-hover:bg-brand-900/10 transition-colors" />
-                      <span className="text-white text-xs font-bold leading-none">VÍDEO</span>
+                      <span className="absolute inset-0 bg-brand-950/40 transition-colors" />
+                      <span className="text-white text-xs font-black leading-none">VÍDEO</span>
                     </div>
                   ) : (
                     <ResolvedImage
@@ -201,34 +201,34 @@ export default function ProductDetailsModal({
           <div className="space-y-4">
             {/* Category header */}
             <div className="flex items-center gap-2">
-              <span className="text-[10px] tracking-widest text-brand-500 uppercase font-bold">
+              <span className="text-[10px] tracking-widest text-brand-800 bg-[#ccbfab] px-2.5 py-0.5 rounded-md uppercase font-extrabold">
                 {product.category}
               </span>
-              <div className="h-1 w-1 bg-brand-300 rounded-full" />
-              <div className="flex items-center gap-0.5">
+              <div className="h-1.5 w-1.5 bg-[#bfae98] rounded-full" />
+              <div className="flex items-center gap-0.5 bg-[#ccbfab] px-2 py-0.5 rounded-md border border-[#bfae98]">
                 <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                <span className="text-xs font-medium text-brand-800">{averageRating} ({reviewsList.length})</span>
+                <span className="text-xs font-black text-brand-950">{averageRating} ({reviewsList.length})</span>
               </div>
             </div>
 
             {/* Title */}
-            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-brand-900 leading-tight">
+            <h2 className="font-serif text-2xl sm:text-3xl font-black text-brand-950 leading-tight">
               {product.title}
             </h2>
 
             {/* Description */}
-            <p className="text-sm text-brand-700 font-light leading-relaxed">
+            <p className="text-sm text-brand-900 font-normal leading-relaxed">
               {product.description}
             </p>
 
             {/* Key list features */}
             {product.features && product.features.length > 0 && (
               <div className="space-y-2 mt-2">
-                <h4 className="font-bold text-brand-900 text-xs uppercase tracking-wider">Características Premium:</h4>
+                <h4 className="font-black text-brand-950 text-xs uppercase tracking-wider">Características Premium:</h4>
                 <ul className="space-y-1.5">
                   {product.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-xs text-brand-700">
-                      <Check className="w-4 h-4 text-green-700 shrink-0 mt-0.5" />
+                    <li key={idx} className="flex items-start gap-2 text-xs text-brand-900 font-bold">
+                      <Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5 stroke-[2.5]" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -237,55 +237,67 @@ export default function ProductDetailsModal({
             )}
 
             {/* Micro-billing options automatic calculation */}
-            <div className="border-t border-b border-brand-200 py-4 my-2.5 space-y-2.5">
-              <div className="flex justify-between items-baseline">
-                <span className="text-xs text-brand-600 font-light">Monto de Lista:</span>
-                <span className="text-2xl sm:text-3xl font-extrabold text-brand-900 font-serif">
-                  {formatCurrency(listPrice)}
-                </span>
+            <div className="border-t border-b border-[#c4bba3] py-4 my-2.5 space-y-2.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-brand-900 font-bold uppercase tracking-wider">Monto de Lista:</span>
+                <div className="flex flex-col items-end">
+                  {product.beforePrice && product.beforePrice > listPrice && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs line-through text-red-650 font-black leading-none">
+                        {formatCurrency(product.beforePrice)}
+                      </span>
+                      <span className="bg-gradient-to-r from-red-600 to-amber-600 text-white text-[9.5px] font-black px-1.5 py-0.5 rounded shadow-xs">
+                        {Math.round(((product.beforePrice - listPrice) / product.beforePrice) * 100)}% OFF
+                      </span>
+                    </div>
+                  )}
+                  <span className="text-2xl sm:text-3xl font-black text-brand-950 font-serif leading-none mt-1">
+                    {formatCurrency(listPrice)}
+                  </span>
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                <div className="bg-brand-100 p-2.5 rounded-lg border border-brand-200 text-xs">
-                  <span className="text-brand-500 block text-[10px] uppercase font-semibold">En 3 Pagos sin interés</span>
-                  <strong className="text-brand-900 font-serif text-sm">3 cuotas de {formatCurrency(installmentPrice)}</strong>
+                <div className="bg-[#ccbfab]/60 p-2.5 rounded-lg border border-[#c4bba3] text-xs">
+                  <span className="text-[#3a352c] block text-[10px] uppercase font-bold">En 3 Pagos sin interés</span>
+                  <strong className="text-brand-950 font-serif text-sm">3 cuotas de {formatCurrency(installmentPrice)}</strong>
                 </div>
-                <div className="bg-green-50 border border-green-200 p-2.5 rounded-lg text-xs">
-                  <span className="text-green-700 block text-[10px] uppercase font-semibold">15% Bonificado por Transferencia</span>
-                  <strong className="text-green-800 font-serif text-sm">{formatCurrency(transferPrice)}</strong>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg text-xs">
+                  <span className="text-emerald-800 block text-[10px] uppercase font-black">15% Bonificado por Transferencia</span>
+                  <strong className="text-brand-950 font-serif text-sm">{formatCurrency(transferPrice)}</strong>
                 </div>
               </div>
             </div>
 
-            {/* Delivery guarantee & support banner */}
-            <div className="bg-[#FAF8F5] p-3.5 rounded-xl border border-brand-200 space-y-3.5 text-xs text-brand-600 leading-relaxed shadow-3xs">
+            {/* Delivery guarantee & support banner - Highly readable and reassuring */}
+            <div className="bg-[#f2ead7] p-3.5 rounded-xl border border-[#c4bba3] space-y-3.5 text-xs text-brand-950 leading-relaxed shadow-3xs">
               <div className="flex items-start gap-2.5">
                 <Truck className="w-5 h-5 text-brand-800 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-brand-900 flex items-center gap-1">
+                  <p className="font-extrabold text-brand-950 flex items-center gap-1.5">
                     <span>Envíos Gratis a Todo el País</span>
-                    <span className="text-[9px] uppercase font-bold text-green-700 bg-green-50 border border-green-200 py-0.5 px-2.5 rounded-full font-sans">Bonificado desde $50.000</span>
+                    <span className="text-[9px] uppercase font-black text-emerald-800 bg-emerald-500/20 border border-emerald-500/30 py-0.5 px-2.5 rounded-full font-sans animate-pulse">🚚 Bonificado desde $50.000</span>
                   </p>
-                  <p className="font-light text-[11px] text-brand-700">Embalaje reforzado de alta seguridad. Despachamos gratis superando los $50.000 (Entrega en 2 a 5 días hábiles).</p>
+                  <p className="font-medium text-[11px] text-brand-900">Embalaje de máxima seguridad. ¡Despachamos gratis en el día superando los $50.000! (Entrega rápida de 2 a 5 días hábiles).</p>
                 </div>
               </div>
-              <div className="h-px bg-brand-200/80 my-0.5" />
+              <div className="h-px bg-[#c4bba3]/60 my-0.5" />
               <div className="flex items-start gap-2.5">
-                <ShieldCheck className="w-5 h-5 text-[#00a6f3] shrink-0 mt-0.5" />
+                <ShieldCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-[#00a6f3] flex items-center gap-1 font-mono text-[11px] tracking-wide uppercase">
-                    🤝 Compra Protegida por Mercado Pago
+                  <p className="font-extrabold text-[#111827] flex items-center gap-1.5 font-sans text-[11.5px] tracking-wide uppercase">
+                    🛡️ Compra Protegida por Mercado Pago
                   </p>
-                  <p className="font-light text-brand-600 text-[11px]">Tu dinero está 100% seguro. Si el producto no llega tal como lo soñabas, te devolvemos el total de tu importe de inmediato.</p>
+                  <p className="font-medium text-brand-900 text-[11px]">Tu dinero está 150% resguardado de forma oficial. Si tu entrega no llega impecable, te reintegramos el total de forma inmediata.</p>
                 </div>
               </div>
             </div>
 
             {/* Volvemos Renovados Message instead of Reviews */}
-            <div className="pt-5 border-t border-brand-200 text-center space-y-2">
-              <span className="inline-block bg-brand-800 text-brand-50 text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full">
+            <div className="pt-5 border-t border-[#c4bba3] text-center space-y-2">
+              <span className="inline-block bg-[#1e1c18] text-[#fcfbfa] text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full">
                 ✨ Volvemos Renovados
               </span>
-              <p className="text-xs text-brand-700 font-light leading-relaxed px-2">
+              <p className="text-xs text-brand-950 font-bold leading-relaxed px-2">
                 Estamos regresando renovados con colecciones exclusivas para tu hogar. Pronto habilitaremos nuevamente nuestro canal de opiniones de la comunidad. ¡Gracias por confiar en nosotros!
               </p>
             </div>
@@ -293,17 +305,16 @@ export default function ProductDetailsModal({
           </div>
 
           {/* Quick CTA bottom button */}
-          <div className="pt-6 mt-4 border-t border-brand-200">
+          <div className="pt-6 mt-4 border-t border-[#c4bba3]">
             <button
               onClick={() => onAddToCart(product)}
-              className="w-full bg-brand-900 hover:bg-black text-brand-50 font-semibold text-xs sm:text-sm tracking-wider uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-transform transform active:scale-95 cursor-pointer shadow-md"
+              className="w-full bg-[#1e1c18] hover:bg-black text-[#fcfbfa] font-black text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-transform transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
             >
-              <ShoppingCart className="w-4.5 h-4.5" />
+              <ShoppingCart className="w-4.5 h-4.5 text-amber-300" />
               <span>Agregar al Carrito • {formatCurrency(listPrice)}</span>
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );

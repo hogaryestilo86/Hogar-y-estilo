@@ -586,4 +586,23 @@ export async function loadProductsFromIndexedDB(): Promise<Product[] | null> {
   }
 }
 
+/**
+ * Warms up the global media cache by pre-resolving all idb:// URLs for a list of products.
+ * This runs in the background and resolves everything so that useResolvedUrl is 100% synchronous and instant when mounting.
+ */
+export function preloadProductMedia(products: Product[]): void {
+  if (!products || !Array.isArray(products)) return;
+  products.forEach((product) => {
+    if (product.media && Array.isArray(product.media)) {
+      product.media.forEach((m) => {
+        if (m.url && m.url.startsWith("idb://")) {
+          // Resolve in background to populate globalResolvedCache
+          resolveIdbUrl(m.url).catch(() => {});
+        }
+      });
+    }
+  });
+}
+
+
 

@@ -14,7 +14,7 @@ import AdminPanel from "./components/AdminPanel";
 import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
-import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB } from "./indexedDbMedia";
+import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB, preloadProductMedia } from "./indexedDbMedia";
 import { collection, getDocs, setDoc, doc, deleteDoc, getDoc, onSnapshot, disableNetwork } from "firebase/firestore";
 import { db, cleanObjectForFirestore } from "./firebase";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
@@ -110,6 +110,13 @@ export default function App() {
       window.location.replace(targetUrl);
     }
   }, []);
+
+  // Background media preloader to ensure zero-latency video/image visual styling is ready on mount!
+  useEffect(() => {
+    if (products && products.length > 0) {
+      preloadProductMedia(products);
+    }
+  }, [products]);
 
   // Fetch products from backend server or Cloud Firestore on mount with high-performance instant-local rendering
   useEffect(() => {
