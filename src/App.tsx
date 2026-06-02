@@ -241,88 +241,106 @@ export default function App() {
   useEffect(() => {
     if (!hasLoadedInitial) return;
 
-    // 1. Persist to IndexedDB (virtually unlimited size)
-    saveProductsToIndexedDB(products);
+    let active = true;
 
-    // 2. Persist to LocalStorage (5MB limit fallback)
-    try {
-      localStorage.setItem("store_products_list", JSON.stringify(products));
-    } catch (e) {
-      console.warn("No se pudo persistir la lista de productos en localStorage (es posible que exceda la cuota por las imágenes base64, pero se guardó con éxito en IndexedDB):", e);
-    }
+    async function syncCatalog() {
+      // 1. Proactively convert any local idb:// URLs in products to Base64 dataURL
+      // This is crucial so that Firestore and the backup server receive proper standard images.
+      const { updatedProducts, changed } = await convertProductsIdbToBase64(products);
+      if (!active) return;
 
-    // 3. Persist directly to Firebase Cloud Firestore (Direct client-side sync, works on Vercel out-of-the-box!)
-    async function syncToCloudFirestore() {
-      if (isFirestoreQuotaExceeded) {
-        return;
+      if (changed) {
+        console.log("[Sync Loop] Detected unconverted idb:// media. Migrating to Base64 before cloud sync.");
+        setProducts(updatedProducts);
+        return; // The state change will re-trigger this useEffect.
       }
+
+      // 2. Persist to IndexedDB (virtually unlimited size)
+      saveProductsToIndexedDB(products);
+
+      // 3. Persist to LocalStorage (5MB limit fallback)
       try {
-        const querySnapshot = await getDocs(collection(db, "products"));
-        const existingIds = new Set<string>();
-        querySnapshot.forEach((docSnap) => {
-          existingIds.add(docSnap.id);
-        });
-
-        // Insert / Update each active product
-        for (const product of products) {
-          if (product && product.id) {
-            const cleanedProduct = cleanObjectForFirestore(product);
-            await setDoc(doc(db, "products", product.id), cleanedProduct);
-            existingIds.delete(product.id);
-          }
-        }
-
-        // Clean up from firestore if any item was deleted
-        for (const remainingId of existingIds) {
-          await deleteDoc(doc(db, "products", remainingId));
-        }
-
-        console.log(`[Firestore Direct] Synchronized ${products.length} products to Cloud Database successfully!`);
-      } catch (fbSyncErr) {
-        handleFirestoreError(fbSyncErr, "syncToCloudFirestore");
+        localStorage.setItem("store_products_list", JSON.stringify(products));
+      } catch (e) {
+        console.warn("No se pudo persistir la lista de productos en localStorage (es posible que exceda la cuota por las imágenes base64, pero se guardó con éxito en IndexedDB):", e);
       }
-    }
-    syncToCloudFirestore();
 
-    // 4. Persist to Express/Vercel server (fallback fallback)
-    fetch("/api/products", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ products })
-    })
-    .then((r) => r.json())
-    .then((res) => {
-      console.log("Portafolio sincronizado en el servidor:", res);
+      // 4. Persist directly to Firebase Cloud Firestore (Direct client-side sync, works on Vercel out-of-the-box!)
+      if (!isFirestoreQuotaExceeded) {
+        try {
+          const querySnapshot = await getDocs(collection(db, "products"));
+          const existingIds = new Set<string>();
+          querySnapshot.forEach((docSnap) => {
+            existingIds.add(docSnap.id);
+          });
 
-      // OPTIMIZATION: If the server successfully extracted large base64 media into static persistent server files,
-      // update our frontend React state to use these URLs instead of holding the giant raw base64 string in memory.
-      if (res.success && res.products && Array.isArray(res.products)) {
-        let hasChanges = false;
-        const currentUrls = products.flatMap(p => (p.media || []).map(m => m.url));
-        const newUrls = res.products.flatMap((p: any) => (p.media || []).map((m: any) => m.url));
-
-        if (currentUrls.length === newUrls.length) {
-          for (let i = 0; i < currentUrls.length; i++) {
-            if (currentUrls[i] !== newUrls[i]) {
-              hasChanges = true;
-              break;
+          // Insert / Update each active product
+          for (const product of products) {
+            if (product && product.id) {
+              const cleanedProduct = cleanObjectForFirestore(product);
+              await setDoc(doc(db, "products", product.id), cleanedProduct);
+              existingIds.delete(product.id);
             }
           }
-        } else {
-          hasChanges = true;
-        }
 
-        if (hasChanges) {
-          console.log("[Media Extractor] Updating reactive state with converted server static assets:", res.products);
-          setProducts(res.products);
+          // Clean up from firestore if any item was deleted
+          for (const remainingId of existingIds) {
+            await deleteDoc(doc(db, "products", remainingId));
+          }
+
+          console.log(`[Firestore Direct] Synchronized ${products.length} products to Cloud Database successfully!`);
+        } catch (fbSyncErr) {
+          handleFirestoreError(fbSyncErr, "syncToCloudFirestore");
         }
       }
-    })
-    .catch((err) => {
-      console.warn("Error enviando cambios al servidor de catálogos:", err);
-    });
+
+      // 5. Persist to Express/Vercel server
+      try {
+        const response = await fetch("/api/products", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ products })
+        });
+        const res = await response.json();
+        if (!active) return;
+
+        console.log("Portafolio sincronizado en el servidor:", res);
+
+        // OPTIMIZATION: If the server successfully extracted large base64 media into static persistent server files,
+        // update our frontend React state to use these URLs instead of holding the giant raw base64 string in memory.
+        if (res.success && res.products && Array.isArray(res.products)) {
+          let hasChanges = false;
+          const currentUrls = products.flatMap(p => (p.media || []).map(m => m.url));
+          const newUrls = res.products.flatMap((p: any) => (p.media || []).map((m: any) => m.url));
+
+          if (currentUrls.length === newUrls.length) {
+            for (let i = 0; i < currentUrls.length; i++) {
+              if (currentUrls[i] !== newUrls[i]) {
+                hasChanges = true;
+                break;
+              }
+            }
+          } else {
+            hasChanges = true;
+          }
+
+          if (hasChanges) {
+            console.log("[Media Extractor] Updating reactive state with converted server static assets:", res.products);
+            setProducts(res.products);
+          }
+        }
+      } catch (err) {
+        console.warn("Error enviando cambios al servidor de catálogos:", err);
+      }
+    }
+
+    syncCatalog();
+
+    return () => {
+      active = false;
+    };
   }, [products, hasLoadedInitial]);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);

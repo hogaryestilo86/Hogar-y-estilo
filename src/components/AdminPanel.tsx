@@ -343,6 +343,49 @@ export default function AdminPanel({
             } catch (err) {
               console.warn("Error interpretando data URL:", err);
             }
+          } else if (mediaItem.url.startsWith("idb://")) {
+            // Referencia a un archivo en IndexedDB local. ¡Lo subimos directamente a GitHub!
+            const key = mediaItem.url.replace("idb://", "");
+            const ext = mediaItem.type === "video" ? "mp4" : "jpg";
+            const filenameToUpload = key.includes(".") ? key : `${key}.${ext}`;
+            filenameToUse = filenameToUpload;
+
+            const gitCheckUrl = `https://api.github.com/repos/${cleanRepo}/contents/public/uploads/${filenameToUpload}?ref=${branchToUse}`;
+            try {
+              const checkRes = await fetch(gitCheckUrl, {
+                headers: {
+                  "Authorization": `token ${tokenToUse}`
+                }
+              });
+              
+              if (checkRes.status === 404) {
+                notify(`Subiendo foto o video local a tu GitHub: ${filenameToUpload}...`, "info");
+                const blob = await getMedia(key);
+                if (blob) {
+                  const reader = new FileReader();
+                  const base64Promise = new Promise<string>((resolve, reject) => {
+                    reader.onloadend = () => {
+                      if (reader.result && typeof reader.result === "string") {
+                        const resBase64 = reader.result.split(",")[1];
+                        resolve(resBase64);
+                      } else {
+                        reject(new Error("Fallo al leer media local"));
+                      }
+                    };
+                    reader.onerror = reject;
+                  });
+                  reader.readAsDataURL(blob);
+                  
+                  base64ToUpload = await base64Promise;
+                }
+              } else if (checkRes.ok) {
+                console.log(`El archivo local ${filenameToUpload} ya está registrado en GitHub. Omitiendo.`);
+                mediaItem.backupUrl = mediaItem.url;
+                mediaItem.url = `/uploads/${filenameToUpload}`;
+              }
+            } catch (gitCheckErr) {
+              console.warn(`Error al verificar/subir el archivo local ${filenameToUpload}:`, gitCheckErr);
+            }
           } else if (mediaItem.url.startsWith("/uploads/") || mediaItem.url.startsWith("uploads/")) {
             // Referencia a un archivo en el servidor local. ¡Veamos si ya existe en GitHub!
             const filename = mediaItem.url.split("/").pop();
@@ -364,8 +407,12 @@ export default function AdminPanel({
                     const reader = new FileReader();
                     const base64Promise = new Promise<string>((resolve, reject) => {
                       reader.onloadend = () => {
-                        const resBase64 = (reader.result as string).split(",")[1];
-                        resolve(resBase64);
+                        if (reader.result && typeof reader.result === "string") {
+                          const resBase64 = reader.result.split(",")[1];
+                          resolve(resBase64);
+                        } else {
+                          reject(new Error("Error leyendo blob del servidor"));
+                        }
                       };
                       reader.onerror = reject;
                     });
