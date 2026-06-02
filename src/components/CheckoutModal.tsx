@@ -44,6 +44,40 @@ export default function CheckoutModal({
       contentRef.current.scrollTop = 0;
     }
   }, [step, isOpen]);
+
+  // Early Optimization: Pre-load Mercado Pago SDK script & fetch config to eliminate card payment select latency!
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (typeof (window as any).MercadoPago === "undefined" && !document.getElementById("mp-sdk-script")) {
+      const script = document.createElement("script");
+      script.id = "mp-sdk-script";
+      script.src = "https://sdk.mercadopago.com/js/v2";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+
+    if (!cachedMpPublicConfig) {
+      fetch("/api/mercadopago/config")
+        .then((res) => {
+          if (res.ok) return res.json();
+          throw new Error();
+        })
+        .then((data) => {
+          cachedMpPublicConfig = {
+            publicKey: data.publicKey,
+            isReal: data.hasPrivateToken,
+          };
+        })
+        .catch(() => {
+          // Fallback to demo public key to guarantee zero latency loading
+          cachedMpPublicConfig = {
+            publicKey: "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849",
+            isReal: false,
+          };
+        });
+    }
+  }, [isOpen]);
   const [formData, setFormData] = useState<OrderDetails>({
     fullName: "",
     email: "",
@@ -621,6 +655,7 @@ export default function CheckoutModal({
                             {isVideoMedia ? (
                               <ResolvedVideo
                                 src={mediaUrl}
+                                backupUrl={activeMedia?.backupUrl}
                                 className="w-full h-full object-cover"
                                 muted
                                 playsInline
@@ -779,6 +814,103 @@ export default function CheckoutModal({
                       {formatCurrency(installmentAmount)}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Dynamic Purchase Summary in payment step so user can see media and totals perfectly while selecting payment method */}
+              <div className="bg-brand-100 p-4 rounded-xl border border-brand-200 mt-2 space-y-3">
+                <h4 className="font-serif font-bold text-brand-900 text-sm border-b border-brand-200/60 pb-1.5 flex items-center justify-between">
+                  <span>Productos Elegidos</span>
+                  <span className="text-[10px] uppercase font-sans text-brand-500 font-normal">Resumen de Pago</span>
+                </h4>
+                
+                <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                  {cartItems.map((item) => {
+                    const product = item.product;
+                    const activeMedia = product.media && product.media.length > 0 ? product.media[0] : null;
+                    const isVideoMedia = activeMedia?.type === "video";
+                    const mediaUrl = activeMedia?.url || getCategoryPlaceholder(product.category);
+
+                    return (
+                      <div key={product.id} className="flex items-center justify-between bg-white/70 p-2 rounded-lg border border-brand-200/50 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded border border-brand-200 overflow-hidden shrink-0 bg-brand-50 flex items-center justify-center">
+                            {isVideoMedia ? (
+                              <ResolvedVideo
+                                src={mediaUrl}
+                                backupUrl={activeMedia?.backupUrl}
+                                className="w-full h-full object-cover"
+                                muted
+                                playsInline
+                                autoPlay
+                                loop
+                              />
+                            ) : (
+                              <ResolvedImage
+                                src={mediaUrl}
+                                backupUrl={activeMedia?.backupUrl}
+                                alt={product.title}
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-brand-900 line-clamp-1 pr-1 font-serif">
+                              {product.title}
+                            </p>
+                            <p className="text-[10px] text-brand-500 font-light">
+                              Cant: {item.quantity} • {product.category || "General"}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-brand-900 font-mono">
+                          {formatCurrency(product.basePrice * item.quantity)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-1.5 text-xs text-brand-700 border-t border-brand-200/60 pt-2 bg-brand-100/50">
+                  <div className="flex justify-between">
+                    <span>Subtotal de productos:</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Envío:</span>
+                    <span className={shipping === 0 ? "text-green-700 font-bold" : ""}>
+                      {shipping === 0 ? "¡ENVÍO GRATIS!" : formatCurrency(shipping)}
+                    </span>
+                  </div>
+                  {formData.paymentMethod === "transfer" ? (
+                    <>
+                      <div className="flex justify-between text-[#065F46] font-semibold bg-[#ECFDF5] p-1 px-2 rounded border border-[#A7F3D0] text-[11px] animate-in slide-in-from-top-1 duration-200">
+                        <span>Descuento por Transferencia (15% OFF):</span>
+                        <span>-{formatCurrency(Math.round(subtotal * 0.15))}</span>
+                      </div>
+                      <div className="border-t border-brand-250 pt-2 flex justify-between font-bold text-sm text-[#065F46] bg-[#ECFDF5]/50 px-2 rounded">
+                        <span>Total Neto a transferir:</span>
+                        <span>{formatCurrency(transferTotal)}</span>
+                      </div>
+                    </>
+                  ) : formData.paymentMethod === "credit" ? (
+                    <>
+                      <div className="flex justify-between text-blue-700 font-semibold bg-blue-50 p-1 px-2 rounded border border-blue-200/45 text-[11px] animate-in slide-in-from-top-1 duration-200">
+                        <span>Financiación:</span>
+                        <span>3 cuotas fijas de {formatCurrency(installmentAmount)}</span>
+                      </div>
+                      <div className="border-t border-brand-200 pt-2 flex justify-between font-bold text-sm text-brand-900">
+                        <span>Total de productos + Envío:</span>
+                        <span>{formatCurrency(finalListTotal)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="border-t border-brand-200 pt-2 flex justify-between font-bold text-sm text-brand-900">
+                      <span>Total estimado:</span>
+                      <span>{formatCurrency(finalListTotal)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

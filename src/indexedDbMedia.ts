@@ -519,6 +519,8 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
     return React.createElement("video", {
       ref,
       src: resolved,
+      preload: "auto",
+      poster: backupUrl || undefined,
       ...props
     });
   }
