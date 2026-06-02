@@ -297,11 +297,15 @@ export default function ProductDetailsModal({
               <div className="flex items-start gap-2.5">
                 <Truck className="w-5 h-5 text-brand-800 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-extrabold text-brand-950 flex items-center gap-1.5">
-                    <span>Envíos Gratis a Todo el País</span>
-                    <span className="text-[9px] uppercase font-black text-emerald-800 bg-emerald-500/20 border border-emerald-500/30 py-0.5 px-2.5 rounded-full font-sans animate-pulse">🚚 Bonificado desde $50.000</span>
-                  </p>
-                  <p className="font-medium text-[11px] text-brand-900">Embalaje de máxima seguridad. ¡Despachamos gratis en el día superando los $50.000! (Entrega rápida de 2 a 5 días hábiles).</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <p className="font-extrabold text-brand-950">
+                      Envíos Gratis a Todo el País
+                    </p>
+                    <span className="text-[10px] uppercase font-black text-white bg-red-600 border border-red-500 py-1 px-3 rounded-full font-sans animate-pulse shadow-sm flex items-center gap-1">
+                      🚚 Conseguí envío gratis en compras de $50.000 en adelante
+                    </span>
+                  </div>
+                  <p className="font-medium text-[11px] text-brand-900 mt-2">Embalaje de máxima seguridad. ¡Despachamos gratis en el día superando los $50.000! (Entrega rápida de 2 a 5 días hábiles).</p>
                 </div>
               </div>
               <div className="h-px bg-[#c4bba3]/60 my-0.5" />
@@ -311,7 +315,7 @@ export default function ProductDetailsModal({
                   <p className="font-extrabold text-[#111827] flex items-center gap-1.5 font-sans text-[11.5px] tracking-wide uppercase">
                     🛡️ Compra Protegida por Mercado Pago
                   </p>
-                  <p className="font-medium text-brand-900 text-[11px]">Tu dinero está 150% resguardado de forma oficial. Si tu entrega no llega impecable, te reintegramos el total de forma inmediata.</p>
+                  <p className="font-medium text-brand-900 text-[11px]">Tu dinero está 100% resguardado de forma oficial. Si tu entrega no llega impecable, te reintegramos el total de forma inmediata.</p>
                 </div>
               </div>
             </div>
@@ -332,9 +336,9 @@ export default function ProductDetailsModal({
           <div className="pt-6 mt-4 border-t border-[#c4bba3]">
             <button
               onClick={() => onAddToCart(product)}
-              className="w-full bg-[#1e1c18] hover:bg-black text-[#fcfbfa] font-black text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-transform transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
+              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-transform transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
             >
-              <ShoppingCart className="w-4.5 h-4.5 text-amber-300" />
+              <ShoppingCart className="w-4.5 h-4.5 text-white" />
               <span>Agregar al Carrito • {formatCurrency(listPrice)}</span>
             </button>
           </div>

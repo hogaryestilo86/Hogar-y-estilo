@@ -290,7 +290,7 @@ export default function ProductCard({
               e.stopPropagation();
               onBuyNow(product);
             }}
-            className="w-full bg-[#1e1c18] hover:bg-black text-white font-bold text-xs sm:text-sm tracking-widest uppercase py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
+            className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs sm:text-sm tracking-widest uppercase py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
           >
             <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
             <span>Comprar ahora</span>
@@ -303,9 +303,9 @@ export default function ProductCard({
               e.stopPropagation();
               onAddToCart(product);
             }}
-            className="w-full bg-[#fcfbfa] hover:bg-white text-brand-950 border border-[#bfae98] font-black text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs hover:shadow-sm"
+            className="w-full bg-[#fdf2f5] hover:bg-[#fce7ec] text-pink-700 border border-pink-300 font-black text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs hover:shadow-sm"
           >
-            <ShoppingCart className="w-3.5 h-3.5 text-brand-700" />
+            <ShoppingCart className="w-3.5 h-3.5 text-pink-600" />
             <span>Agregar al carrito</span>
           </button>
         </div>
