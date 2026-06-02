@@ -1715,7 +1715,7 @@ export default function App() {
                 e.preventDefault();
                 const form = e.currentTarget;
                 const password = (form.elements.namedItem("admin-passcode") as HTMLInputElement).value;
-                if (password.toLowerCase() === "admin" || password === "1234") {
+                if (password.toLowerCase() === "admin" || password === "1809") {
                   setIsAdminAuthenticated(true);
                   setShowAdminLoginModal(false);
                   setActiveTab("admin");
