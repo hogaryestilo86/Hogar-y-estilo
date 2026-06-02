@@ -99,10 +99,10 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
           return (
             <div
               key={idx}
-              className="snap-start shrink-0 w-[290px] sm:w-[360px] bg-white rounded-2xl border border-brand-200 overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 flex flex-col group text-left border-b-4 border-b-brand-900"
+              className="snap-start shrink-0 w-[290px] sm:w-[360px] bg-[#f2efe9] rounded-2xl border border-[#d6d0bf] overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 flex flex-col group text-left border-b-4 border-b-[#c4beaf] text-brand-900"
             >
               {/* Card Image/Video Container */}
-              <div className="relative h-[220px] overflow-hidden bg-brand-50 flex items-center justify-center">
+              <div className="relative h-[220px] overflow-hidden bg-[#e8e4d9] flex items-center justify-center border-b border-[#d6d0bf]">
                 {isVideo ? (
                   <ResolvedVideo
                     src={resolvedUrl}
@@ -126,7 +126,7 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
                     referrerPolicy="no-referrer"
                   />
                 )}
-                <span className="absolute top-3 left-3 bg-brand-900/90 text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md shadow-sm">
+                <span className="absolute top-3 left-3 bg-[#292620] text-white text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md shadow-sm border border-[#1f1d18]">
                   Destacado
                 </span>
               </div>
@@ -134,18 +134,18 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
               {/* Card Content info */}
               <div className="p-5 flex-grow flex flex-col justify-between space-y-3">
                 <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase tracking-wider font-extrabold text-brand-500 block">
+                  <span className="text-[10px] uppercase tracking-wider font-extrabold text-[#7c725f] block">
                     Selección del Mes
                   </span>
                   <h3 className="font-serif font-bold text-brand-900 text-base sm:text-lg leading-tight group-hover:text-brand-700 transition-colors">
                     {item.title}
                   </h3>
-                  <p className="text-xs text-brand-600 font-light leading-relaxed line-clamp-3">
+                  <p className="text-xs text-[#5f5749] font-light leading-relaxed line-clamp-3">
                     {item.desc}
                   </p>
                 </div>
 
-                <div className="pt-3 border-t border-brand-100 flex items-center justify-between">
+                <div className="pt-3 border-t border-[#d6d0bf] flex items-center justify-between">
                   <span className="text-[10px] font-mono text-brand-400">
                     Hogar & Cocina
                   </span>
@@ -160,7 +160,7 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
                         el.scrollIntoView({ behavior: "smooth" });
                       }
                     }}
-                    className="text-[11px] font-bold uppercase tracking-wider text-brand-900 hover:text-brand-700 transition-colors flex items-center gap-1.5 group cursor-pointer border-none bg-transparent"
+                    className="text-[11px] font-bold uppercase tracking-wider text-[#292620] hover:text-[#7c725f] transition-colors flex items-center gap-1.5 group cursor-pointer border-none bg-transparent"
                   >
                     <span>Ver catálogo</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />

@@ -101,6 +101,21 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
 
+  // Automatic client redirect to public production domain
+  useEffect(() => {
+    const isPreview = window.location.hostname.includes("run.app") || 
+                      window.location.hostname.includes("aistudio") || 
+                      window.location.hostname.includes("google.com");
+    const isAdminRoute = window.location.hash.includes("admin") || 
+                         window.location.search.includes("admin") ||
+                         localStorage.getItem("admin_authenticated") === "true";
+                         
+    if (isPreview && !isAdminRoute) {
+      console.log("Redirecting client from preview environment to production: https://hogar-y-estilo.vercel.app");
+      window.location.replace("https://hogar-y-estilo.vercel.app");
+    }
+  }, []);
+
   // Fetch products from backend server or Cloud Firestore on mount
   useEffect(() => {
     async function loadCatalog() {
