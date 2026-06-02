@@ -57,6 +57,13 @@ const filterOutDemoProducts = (list: any[]): Product[] => {
 };
 
 let isFirestoreQuotaExceeded = false;
+try {
+  const quotaFlag = localStorage.getItem("firestore_quota_exceeded_date");
+  if (quotaFlag === new Date().toDateString()) {
+    isFirestoreQuotaExceeded = true;
+    console.log("[Firestore Resiliency] Firestore is globally registered as quota-exhausted for today. Bypassing client direct connections.");
+  }
+} catch (_) {}
 
 function handleFirestoreError(error: any, context: string) {
   console.warn(`[Firestore Resiliency] Error in ${context}:`, error);
@@ -74,6 +81,9 @@ function handleFirestoreError(error: any, context: string) {
     if (!isFirestoreQuotaExceeded) {
       isFirestoreQuotaExceeded = true;
       console.error("🔥 [Firestore Resiliency Alert] Firestore Free Daily Quota Exceeded! Switching client database channel to Local Offline Storage + Express Server fallback modes seamlessly.");
+      try {
+        localStorage.setItem("firestore_quota_exceeded_date", new Date().toDateString());
+      } catch (_) {}
       try {
         disableNetwork(db).then(() => {
           console.log("[Firestore Resiliency] Firebase Firestore network disabled successfully to prevent repetitive socket polling and retry overhead.");
@@ -94,112 +104,134 @@ export default function App() {
   // Fetch products from backend server or Cloud Firestore on mount
   useEffect(() => {
     async function loadCatalog() {
-      // 1. Fetch from Firestore first (highest priority, permanent, cloud-safe, works on Vercel)
-      if (!isFirestoreQuotaExceeded) {
-        try {
-          console.log("Loading catalog directly from cloud Firestore...");
-          const querySnapshot = await getDocs(collection(db, "products"));
-          const firestoreProducts: Product[] = [];
-          querySnapshot.forEach((docSnap) => {
-            firestoreProducts.push(docSnap.data() as Product);
-          });
-
-          if (firestoreProducts.length > 0) {
-            const clean = filterOutDemoProducts(firestoreProducts);
-            setProducts(clean);
-            setHasLoadedInitial(true);
-            console.log(`Loaded ${clean.length} products directly from Firestore!`);
-            
-            convertProductsIdbToBase64(clean).then(({ updatedProducts, changed }) => {
-              if (changed) {
-                setProducts(updatedProducts);
-                console.log("Migrated loaded cloud products to embedded Base64!");
-              }
-            });
-            return; // Succeeded! Skip redundant offline/local routines
-          }
-        } catch (fbErr) {
-          handleFirestoreError(fbErr, "loadCatalog");
-        }
-      } else {
-        console.log("[loadCatalog] Firestore is marked as exhausted. Skipping direct cloud getDocs, using local + proxy server databases.");
-      }
-
-      // 2. Get local backups if offline or Firebase un-provisioned
+      console.log("[Catalog Loader] Initializing consolidated catalog startup loader...");
+      
+      // 1. First, load whatever we have in local browser storage (IndexedDB & LocalStorage)
       let loadedLocal: Product[] = [];
       try {
-        // Try IndexedDB first (no 5MB size limit)
         const idbProducts = await loadProductsFromIndexedDB();
         if (idbProducts && Array.isArray(idbProducts)) {
           loadedLocal = filterOutDemoProducts(idbProducts);
         }
       } catch (err) {
-        console.warn("Error reading from IndexedDB on startup:", err);
+        console.warn("Read error from IndexedDB on startup:", err);
       }
-
-      // If empty, try localStorage as secondary fallback
+      
       if (loadedLocal.length === 0) {
         const saved = localStorage.getItem("store_products_list");
         if (saved) {
           try {
-            const parsed = JSON.parse(saved);
-            loadedLocal = filterOutDemoProducts(parsed);
-          } catch (e) {}
+            loadedLocal = filterOutDemoProducts(JSON.parse(saved));
+          } catch (_) {}
+        }
+      }
+      console.log(`[Catalog Loader] Local browser storage holds ${loadedLocal.length} products.`);
+
+      // 2. Try to fetch from cloud sources (Firestore and Express backup server)
+      let loadedCloud: Product[] = [];
+      const cloudMap = new Map<string, Product>();
+      
+      // A. Try direct Firestore
+      if (!isFirestoreQuotaExceeded) {
+        try {
+          console.log("[Catalog Loader] Fetching from Cloud Firestore...");
+          const querySnapshot = await getDocs(collection(db, "products"));
+          querySnapshot.forEach((docSnap) => {
+            const p = docSnap.data() as Product;
+            if (p && p.id) {
+              cloudMap.set(p.id, p);
+            }
+          });
+          console.log(`[Catalog Loader] Cloud Firestore returned ${cloudMap.size} products.`);
+        } catch (fbErr) {
+          handleFirestoreError(fbErr, "loadCatalog");
         }
       }
 
-      // 3. Fetch from remote server on Vercel or local Dev
+      // B. Always try fallback Express/Vercel server API to read merged products on disk (especially if Firestore write failed)
       try {
+        console.log("[Catalog Loader] Fetching from fallback server API...");
         const res = await fetch("/api/products");
-        if (!res.ok) throw new Error("Server response error: " + res.status);
-        const data = await res.json();
-
-        if (data && Array.isArray(data)) {
-          const clean = filterOutDemoProducts(data);
-          
-          let initial = clean;
-          if (clean.length === 0 && loadedLocal.length > 0) {
-            initial = loadedLocal;
-            console.log("Self-healing: Re-populating Vercel live server with local browser storage cache...");
-            fetch("/api/products", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ products: loadedLocal })
-            }).catch((err) => console.warn("Failed to automatically hot-sync catalog to server:", err));
-          } else if (clean.length === 0 && loadedLocal.length === 0) {
-            initial = INITIAL_PRODUCTS;
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data)) {
+            data.forEach((p: Product) => {
+              if (p && p.id) {
+                cloudMap.set(p.id, p);
+              }
+            });
+            console.log(`[Catalog Loader] Consolidated Cloud + Server API total products: ${cloudMap.size}`);
           }
-
-          setProducts(initial);
-          setHasLoadedInitial(true);
-
-          // Auto-migrate legacy idb:// media to highly portable base64 data URLs
-          convertProductsIdbToBase64(initial).then(({ updatedProducts, changed }) => {
-            if (changed) {
-              setProducts(updatedProducts);
-              console.log("Migrated loaded server products to embedded Base64!");
-            }
-          });
-        } else {
-          // No valid array returned or fallback required
-          const initial = loadedLocal.length > 0 ? loadedLocal : INITIAL_PRODUCTS;
-          setProducts(initial);
-          setHasLoadedInitial(true);
         }
       } catch (err) {
-        console.warn("Could not sync shared catalog from server, using local fallback:", err);
-        const initial = loadedLocal.length > 0 ? loadedLocal : INITIAL_PRODUCTS;
-        setProducts(initial);
-        setHasLoadedInitial(true);
-        
-        if (loadedLocal.length > 0) {
-          convertProductsIdbToBase64(loadedLocal).then(({ updatedProducts, changed }) => {
-            if (changed) {
-              setProducts(updatedProducts);
-            }
-          });
-        }
+        console.warn("[Catalog Loader] Backup server fetch failed:", err);
       }
+
+      loadedCloud = filterOutDemoProducts(Array.from(cloudMap.values()));
+
+      // 3. Smart Merge conflict resolution (Combining local products with cloud products)
+      let initial = INITIAL_PRODUCTS;
+      
+      if (loadedLocal.length > 0 || loadedCloud.length > 0) {
+        // Resolve conflicts using our robust merger
+        const mergedMap = new Map<string, Product>();
+
+        // Start with cloud/server products
+        loadedCloud.forEach((p) => {
+          if (p && p.id) mergedMap.set(p.id, p);
+        });
+
+        // Override or append with local browser products (local edits are authoritative or represent unsynced updates)
+        loadedLocal.forEach((p) => {
+          if (p && p.id) {
+            mergedMap.set(p.id, p);
+          }
+        });
+
+        const mergedList = Array.from(mergedMap.values());
+        
+        // Load explicitly deleted custom product IDs to avoid re-populating items the user recently deleted
+        let deletedCustomIds = new Set<string>();
+        try {
+          const deletedStr = localStorage.getItem("deleted_custom_product_ids");
+          if (deletedStr) {
+            deletedCustomIds = new Set(JSON.parse(deletedStr));
+          }
+        } catch (_) {}
+
+        const finalMerged = mergedList.filter((p) => {
+          if (p.isCustom && deletedCustomIds.has(p.id)) {
+            return false; // Filter out explicitly deleted custom product
+          }
+          return true;
+        });
+
+        initial = finalMerged.length > 0 ? finalMerged : INITIAL_PRODUCTS;
+      }
+
+      console.log(`[Catalog Loader] Completed catalog consolidation. Final active count: ${initial.length} products.`);
+      
+      setProducts(initial);
+      setHasLoadedInitial(true);
+
+      // 4. Auto-heal: If the server catalog or cloud was empty but we had local items,
+      // upload our local consolidated state back to the server so it's backed up.
+      if (loadedCloud.length === 0 && loadedLocal.length > 0) {
+        console.log("[Catalog Loader] Self-healing: Re-populating out-of-sync backend server with local catalog...");
+        fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ products: initial })
+        }).catch((err) => console.warn("[Catalog Loader] Failed to automatically sync catalog to server:", err));
+      }
+
+      // 5. Run Base64 converter to make sure media structures are up-to-date
+      convertProductsIdbToBase64(initial).then(({ updatedProducts, changed }) => {
+        if (changed) {
+          setProducts(updatedProducts);
+          console.log("[Catalog Loader] Migrated loaded catalog images to full Base64!");
+        }
+      });
     }
 
     loadCatalog();
@@ -835,6 +867,14 @@ export default function App() {
 
   const handleAddCustomProduct = (newProduct: Product) => {
     setProducts((prev) => [newProduct, ...prev]);
+    try {
+      const deletedStr = localStorage.getItem("deleted_custom_product_ids");
+      if (deletedStr) {
+        const deletedIds = JSON.parse(deletedStr);
+        const filtered = deletedIds.filter((id: string) => id !== newProduct.id);
+        localStorage.setItem("deleted_custom_product_ids", JSON.stringify(filtered));
+      }
+    } catch (_) {}
   };
 
   const handleUpdateProduct = (updatedProduct: Product) => {
@@ -845,6 +885,16 @@ export default function App() {
 
   const handleDeleteProduct = (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
+    try {
+      const deletedStr = localStorage.getItem("deleted_custom_product_ids") || "[]";
+      const deletedIds = JSON.parse(deletedStr);
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        localStorage.setItem("deleted_custom_product_ids", JSON.stringify(deletedIds));
+      }
+    } catch (e) {
+      console.warn("No se pudo guardar la lista de eliminados:", e);
+    }
   };
 
   const handleOrderComplete = (orderDetails: any, itemsInCart: any[], generatedOrderId?: string) => {

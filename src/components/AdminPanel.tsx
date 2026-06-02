@@ -429,7 +429,21 @@ export default function AdminPanel({
         console.warn("No se pudo actualizar el estado local con la lista comprimida:", e);
       }
 
-      const jsonStr = JSON.stringify(compressedCatalog, null, 2);
+      // Strip massive backupUrl base64 fields from the JSON catalog pushed to GitHub.
+      // Since individual static images are uploaded separately under public/uploads/ and compiled during Vercel builds,
+      // having backupUrls inside products.json is redundant and balloons the file size, causing 422 Payload Too Large errors.
+      const githubCatalog = JSON.parse(JSON.stringify(compressedCatalog));
+      githubCatalog.forEach((prod: any) => {
+        if (prod && prod.media && Array.isArray(prod.media)) {
+          prod.media.forEach((item: any) => {
+            if (item) {
+              delete item.backupUrl;
+            }
+          });
+        }
+      });
+
+      const jsonStr = JSON.stringify(githubCatalog, null, 2);
 
       // Convertir contenido a base64 de manera segura
       const base64Content = await new Promise<string>((resolve, reject) => {

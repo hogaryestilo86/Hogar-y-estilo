@@ -241,40 +241,71 @@ Descripción básica / Notas del producto: "${description || ""}"`;
   // API Endpoint: Get Shared/Synchronized Products
   app.get("/api/products", async (req, res) => {
     try {
+      let firestoreProducts: any[] = [];
+      let dbReadSuccess = false;
+
       // 1. Primary: Try to read from Firebase Cloud Firestore if initialized on the server
       if (db) {
         try {
           const querySnapshot = await getDocs(collection(db, "products"));
-          const firestoreProducts: any[] = [];
           querySnapshot.forEach((docSnap) => {
             firestoreProducts.push(docSnap.data());
           });
-          if (firestoreProducts.length > 0) {
-            console.log(`[Server Proxy] Loaded ${firestoreProducts.length} products successfully from Firestore.`);
-            return res.json(firestoreProducts);
-          }
+          dbReadSuccess = true;
+          console.log(`[Server Proxy] Loaded ${firestoreProducts.length} products successfully from Firestore.`);
         } catch (dbErr: any) {
           console.error("[Server Proxy] Error reading products from Firestore, falling back to local file-system:", dbErr.message);
         }
       }
 
-      // 2. Secondary: Fallback to reading products.json file-system backup.
+      // 2. Secondary: Read products.json file-system backup.
+      let localProducts: any[] = [];
       if (fs.existsSync(PRODUCTS_FILE)) {
-        const fileContent = await fs.promises.readFile(PRODUCTS_FILE, "utf-8");
-        if (!fileContent || fileContent.trim() === "") {
-          return res.json([]);
-        }
         try {
-          const parsed = JSON.parse(fileContent);
-          if (Array.isArray(parsed)) {
-            return res.json(parsed);
+          const fileContent = await fs.promises.readFile(PRODUCTS_FILE, "utf-8");
+          if (fileContent && fileContent.trim() !== "") {
+            const parsed = JSON.parse(fileContent);
+            if (Array.isArray(parsed)) {
+              localProducts = parsed;
+            }
           }
         } catch (jsonErr) {
-          console.warn("products.json contains invalid JSON, returning empty list:", jsonErr);
-          return res.json([]);
+          console.warn("products.json contains invalid JSON:", jsonErr);
         }
       }
-      // Return a special fallback flag if the file doesn't exist yet
+
+      // 3. Smart Merge: If Firestore succeeded, merge it with products.json on the server so we NEVER lose custom products!
+      // This is extremely critical because if Firestore is write-exhausted (quota exceeded), new products
+      // are successfully written to products.json but fail to save to Firestore. Placing them in the returned list
+      // prevents data loss and restores consistency perfectly!
+      if (dbReadSuccess) {
+        const mergedMap = new Map<string, any>();
+
+        // Start with Firestore products
+        firestoreProducts.forEach((p) => {
+          if (p && p.id) {
+            mergedMap.set(p.id, p);
+          }
+        });
+
+        // Add or overwrite with products.json (local file is authoritative for custom products in dev mode)
+        localProducts.forEach((p) => {
+          if (p && p.id) {
+            // Keep the custom product if it's stored in the file system
+            mergedMap.set(p.id, p);
+          }
+        });
+
+        const mergedList = Array.from(mergedMap.values());
+        return res.json(mergedList);
+      }
+
+      // If Firestore read wasn't successful, return the local file-system list
+      if (localProducts.length > 0) {
+        return res.json(localProducts);
+      }
+
+      // Return a special fallback flag if nothing exists yet
       return res.json({ fallback: true });
     } catch (err: any) {
       console.error("Error reading products:", err);
