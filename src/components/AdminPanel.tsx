@@ -148,14 +148,30 @@ function OrderRowComponent({
           {isTransfer ? '15% Off Trsf' : '3 Cuotas Sin Int.'}
         </span>
         {isTransfer && order.details.receiptImage && (
-          <button
-            type="button"
-            onClick={() => onViewReceipt(order.details.receiptImage)}
-            className="mt-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-bold uppercase tracking-wider rounded-sm cursor-pointer transition-all active:scale-95 w-full select-none shadow-xs"
-          >
-            <Eye className="w-3 h-3 text-white" />
-            <span>Ver Comprobante</span>
-          </button>
+          <div className="space-y-1.5 mt-2.5">
+            <div 
+              onClick={() => onViewReceipt(order.details.receiptImage)}
+              className="relative w-24 h-24 bg-brand-50 border border-brand-200 rounded-lg overflow-hidden cursor-pointer hover:border-emerald-500 transition-all group shadow-2xs block"
+              title="Toca la foto para ampliar el comprobante"
+            >
+              <ResolvedImage 
+                src={order.details.receiptImage} 
+                alt="Comprobante miniatura" 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+              />
+              <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="text-[9px] text-white font-extrabold uppercase bg-emerald-600 hover:bg-emerald-700 px-2 py-0.5 rounded-sm shadow-sm">🔍 Ampliar</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onViewReceipt(order.details.receiptImage)}
+              className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-bold uppercase tracking-wider rounded-md cursor-pointer transition-all active:scale-95 w-full select-none shadow-xs"
+            >
+              <Eye className="w-3 h-3 text-white" />
+              <span>Ver Comprobante</span>
+            </button>
+          </div>
         )}
       </td>
       <td className="px-5 py-4 text-center align-top">
@@ -776,8 +792,8 @@ export default function AdminPanel({
         continue;
       }
 
-      if (isVideo && fileSizeInMB > 25) {
-        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera el límite de 25MB de carga. Por favor, reduce la resolución o peso de tu video, o súbelo a YouTube/Drive y pega el enlace abajo para que tu sitio cargue al instante.`, "error");
+      if (isVideo && fileSizeInMB > 100) {
+        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera el límite de 100MB de carga. Por favor, reduce la resolución o peso de tu video, o súbelo a YouTube/Drive y pega el enlace abajo para que tu sitio cargue al instante.`, "error");
         continue;
       }
 
@@ -1328,19 +1344,44 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           
           <div className="bg-black/20 p-3 rounded-xl border border-white/10 space-y-2 font-mono flex flex-col justify-between">
             <div>
-              <span className="block text-[9px] text-pink-300 font-bold uppercase tracking-widest">Último aviso de transferencia enviado</span>
+              <span className="block text-[9px] text-pink-300 font-bold uppercase tracking-widest text-left">Último aviso de transferencia enviado</span>
               {pendingOrders.filter((o: any) => o.details?.paymentMethod === 'transfer' && o.details?.receiptImage).length > 0 ? (
                 (() => {
                   const lastTransferOrder = pendingOrders.filter((o: any) => o.details?.paymentMethod === 'transfer' && o.details?.receiptImage)[0];
                   return (
-                    <div className="pt-1.5 space-y-1">
-                      <p className="text-white font-bold text-[11px]">📦 Orden {lastTransferOrder.id} - {lastTransferOrder.details.fullName}</p>
-                      <p className="text-[10px] text-pink-200 font-light">✓ Comprobante, monto y datos de contacto notificados con éxito al administrador.</p>
+                    <div className="pt-1.5 flex gap-2.5 items-start text-left">
+                      {lastTransferOrder.details.receiptImage && (
+                        <div 
+                          onClick={() => setSelectedReceipt(lastTransferOrder.details.receiptImage)}
+                          className="relative w-12 h-12 bg-black/30 border border-white/20 rounded-md overflow-hidden cursor-pointer hover:border-pink-300 transition-all group shrink-0"
+                          title="Toca la foto para ampliar"
+                        >
+                          <ResolvedImage 
+                            src={lastTransferOrder.details.receiptImage} 
+                            alt="Miniatura comprobante" 
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span className="text-[8px] text-zinc-100 font-extrabold uppercase">Ver</span>
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="text-white font-bold text-[11px] truncate">📦 {lastTransferOrder.details.fullName} ({lastTransferOrder.id})</p>
+                        <p className="text-[9.5px] text-pink-200 font-light">Monto: {formatCurrency(Math.round(lastTransferOrder.items.reduce((acc: number, item: any) => acc + (item.product.basePrice * item.quantity), 0) * 0.85))}</p>
+                        <button 
+                          type="button" 
+                          onClick={() => setSelectedReceipt(lastTransferOrder.details.receiptImage)}
+                          className="text-[9.5px] text-pink-300 hover:text-white font-bold underline font-sans text-left mt-0.5 block cursor-pointer"
+                        >
+                          Ampliar comprobante
+                        </button>
+                      </div>
                     </div>
                   );
                 })()
               ) : (
-                <p className="text-[10.5px] text-pink-100/70 italic pt-1.5 font-light">No se recibieron compras recientes por transferencia con comprobante en esta sesión.</p>
+                <p className="text-[10.5px] text-pink-100/70 italic pt-1.5 font-light text-left">No se recibieron compras recientes por transferencia con comprobante en esta sesión.</p>
               )}
             </div>
             
@@ -1813,7 +1854,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       Haz clic para examinar archivos locales
                     </p>
                     <p className="text-[10.5px] text-brand-500 font-light mt-1">
-                      Formatos: PNG, JPG, WebP (máx 12MB, auto-comprimido) • Video: MP4, WebM (Soporta hasta 25MB gracias a tu canal DB GitHub 💎)
+                      Formatos: PNG, JPG, WebP (máx 12MB, auto-comprimido) • Video: MP4, WebM (Soporta hasta 100MB gracias a tu canal DB GitHub 💎)
                     </p>
                   </div>
                 </div>

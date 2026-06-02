@@ -52,6 +52,13 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Ensure uploads directory exists and is served statically
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir));
+
   // Middleware for parsing JSON requests
   app.use(express.json({ limit: "150mb" }));
   app.use(express.urlencoded({ limit: "150mb", extended: true }));
@@ -245,11 +252,63 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       if (!products || !Array.isArray(products)) {
         return res.status(400).json({ error: "Datos de catálogo inválidos." });
       }
-      
-      // A. Write backup in products.json file
-      await fs.promises.writeFile(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
 
-      // B. Write to Firestore to sync backend state
+      // Ensure uploads directory exists and is registered
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Automatically convert any embedded base64 items (heavy images or videos) with proper extensions
+      const processedProducts = products.map((product) => {
+        if (!product || !product.media || !Array.isArray(product.media)) return product;
+
+        const updatedMedia = product.media.map((mediaItem) => {
+          if (mediaItem && mediaItem.url && mediaItem.url.startsWith("data:")) {
+            try {
+              const regex = /^data:([a-zA-Z0-9-]+\/[a-zA-Z0-9-+.#]+);base64,(.+)$/;
+              const matches = mediaItem.url.match(regex);
+              if (matches) {
+                const mimeType = matches[1];
+                const base64Data = matches[2];
+
+                // Map standard MIME types to file extensions
+                let ext = "bin";
+                if (mimeType.includes("video/mp4")) ext = "mp4";
+                else if (mimeType.includes("video/webm")) ext = "webm";
+                else if (mimeType.includes("video/quicktime")) ext = "mov";
+                else if (mimeType.includes("image/jpeg") || mimeType.includes("image/jpg")) ext = "jpg";
+                else if (mimeType.includes("image/png")) ext = "png";
+                else if (mimeType.includes("image/webp")) ext = "webp";
+                else if (mimeType.includes("image/gif")) ext = "gif";
+                else {
+                  const parts = mimeType.split("/");
+                  if (parts[1]) ext = parts[1].split("+")[0];
+                }
+
+                const filename = `media_${Date.now()}_${Math.floor(Math.random() * 100000)}.${ext}`;
+                const filepath = path.join(uploadsDir, filename);
+
+                // Write binary payload directly to physical disk
+                fs.writeFileSync(filepath, Buffer.from(base64Data, "base64"));
+                console.log(`[Media Extractor] Successfully saved heavy base64 media to: /uploads/${filename} (${mimeType})`);
+
+                return { ...mediaItem, url: `/uploads/${filename}` };
+              }
+            } catch (err) {
+              console.error("[Media Extractor] Error saving base64 to server file-system:", err);
+            }
+          }
+          return mediaItem;
+        });
+
+        return { ...product, media: updatedMedia };
+      });
+      
+      // A. Write backup in products.json file using base64-extracted clean urls
+      await fs.promises.writeFile(PRODUCTS_FILE, JSON.stringify(processedProducts, null, 2), "utf-8");
+
+      // B. Write to Firestore to sync backend state (now extremely lightweight and compliant with the 1MB limit!)
       if (db) {
         try {
           const querySnapshot = await getDocs(collection(db, "products"));
@@ -259,7 +318,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           });
 
           // Upload/Set core documents
-          for (const product of products) {
+          for (const product of processedProducts) {
             if (product && product.id) {
               const cleanedProduct = cleanObjectForFirestore(product);
               await setDoc(doc(db, "products", product.id), cleanedProduct);
@@ -272,15 +331,15 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             await deleteDoc(doc(db, "products", remainingId));
           }
 
-          console.log(`[Server Proxy] Successfully synchronized ${products.length} products with Cloud Firestore.`);
-          return res.json({ success: true, count: products.length, sync: "cloud_firestore" });
+          console.log(`[Server Proxy] Successfully synchronized ${processedProducts.length} lightweight products with Cloud Firestore.`);
+          return res.json({ success: true, count: processedProducts.length, sync: "cloud_firestore", products: processedProducts });
         } catch (dbErr: any) {
           console.error("[Server Proxy] Error writing products to Firestore:", dbErr.message);
-          return res.json({ success: true, count: products.length, sync: "local_file_only", warning: dbErr.message });
+          return res.json({ success: true, count: processedProducts.length, sync: "local_file_only", products: processedProducts, warning: dbErr.message });
         }
       }
 
-      return res.json({ success: true, count: products.length, sync: "local_file_only" });
+      return res.json({ success: true, count: processedProducts.length, sync: "local_file_only", products: processedProducts });
     } catch (err: any) {
       console.error("Error writing products:", err);
       return res.status(500).json({ error: "No se pudo guardar el catálogo en el servidor.", message: err.message });

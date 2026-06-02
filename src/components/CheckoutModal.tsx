@@ -1041,8 +1041,8 @@ export default function CheckoutModal({
                   </div>
 
                   <div className="border-t border-brand-250 pt-3 space-y-3">
-                    <p className="text-xs sm:text-sm text-brand-950 font-semibold leading-relaxed font-sans">
-                      📲 <strong>¡Aviso Importante!</strong> Para confirmar la compra y coordinar el despacho rápido de tus productos, por favor envianos una captura o foto del comprobante de pago a nuestro Instagram.
+                    <p className="text-xs sm:text-sm text-[#065F46] bg-[#ECFDF5] p-3 rounded-xl font-semibold leading-relaxed font-sans border border-[#A7F3D0]">
+                      ✨ <strong>Comprobante Recibido:</strong> Tu comprobante ya fue adjuntado a la orden y enviado a administración. No necesitas enviarlo manualmente. ¡Prepararemos tu despacho de inmediato! 🚚
                     </p>
 
                     <a
@@ -1050,13 +1050,12 @@ export default function CheckoutModal({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => {
-                        navigator.clipboard.writeText(directMessageText);
-                        notify("¡Mensaje de aviso copiado! Pegalo al chatear en Instagram.", "success");
+                        notify("¡Gracias por seguirnos en Instagram!", "success");
                       }}
-                      className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:brightness-110 text-white py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] active:scale-95 text-center cursor-pointer font-sans shadow-md"
+                      className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:brightness-110 text-white py-3 px-4 rounded-xl font-bold text-xs sm:text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] active:scale-95 text-center cursor-pointer font-sans shadow-md"
                     >
                       <Instagram className="w-4.5 h-4.5 text-white" />
-                      <span>Avisar Compra por Instagram</span>
+                      <span>Seguinos en Instagram</span>
                     </a>
                   </div>
                 </div>
@@ -1070,7 +1069,7 @@ export default function CheckoutModal({
                         Estado: Reserva Confirmada - Pago Pendiente
                       </div>
                       <p className="text-[11px] text-brand-700 leading-relaxed font-light">
-                        Tu pedido está reservado por 24 horas. Realizá la transferencia de <strong>{formatCurrency(transferTotal)}</strong> usando el <strong>Alias de abajo</strong>, y envianos el comprobante por Instagram para que preparemos tu paquete de inmediato.
+                        Tu pedido está reservado por 24 horas. Ya recibimos tu comprobante de transferencia de <strong>{formatCurrency(transferTotal)}</strong>. Corroboraremos los datos y prepararemos tu paquete para su despacho de inmediato. ¡Muchas gracias!
                       </p>
                     </div>
 
@@ -1190,9 +1189,9 @@ export default function CheckoutModal({
                 </div>
 
                 {/* Recordatorio de envío de comprobante y nro de orden */}
-                <div className="bg-[#FFFDF9] border border-amber-205 rounded-xl p-4 max-w-md mx-auto text-center space-y-1 shadow-xs">
-                  <p className="text-[11px] sm:text-xs text-brand-900 leading-relaxed font-sans">
-                    ⚠️ <strong>Si abonás por Transferencia Bancaria:</strong> Recordá que para poder despachar tu pedido, debés enviarnos por Instagram tanto tu <strong>Número de Orden ({generatedOrderId || "#1024"})</strong> como la <strong>captura o comprobante de pago</strong>. ¡Así corroboramos y preparamos tu despacho más rápido!
+                <div className="bg-[#ECFDF5] border border-green-200 rounded-xl p-4 max-w-md mx-auto text-center space-y-1 shadow-xs">
+                  <p className="text-[11px] sm:text-xs text-[#065F46] leading-relaxed font-sans font-medium">
+                    🙌 <strong>¡Todo Listo!</strong> Tu comprobante ya quedó guardado automáticamente en tu número de orden: <strong>{generatedOrderId || "#1024"}</strong>. No necesitás reenviarlo por otro medio. Lo verificaremos y prepararemos tu pedido de inmediato.
                   </p>
                 </div>
 

@@ -196,6 +196,14 @@ export default function App() {
         // Insert / Update each active product
         for (const product of products) {
           if (product && product.id) {
+            // OPTIMIZATION: If the product contains heavy base64 strings starting with "data:",
+            // let the server-side API POST convert them first and update Firestore securely!
+            const hasBase64 = product.media?.some((m: any) => m.url && m.url.startsWith("data:"));
+            if (hasBase64) {
+              console.log(`[Firestore Direct] Skipping direct document upload for ${product.id} due to Base64 presence. Server-side API will convert and synchronize.`);
+              continue;
+            }
+
             const cleanedProduct = cleanObjectForFirestore(product);
             await setDoc(doc(db, "products", product.id), cleanedProduct);
             existingIds.delete(product.id);
@@ -225,6 +233,30 @@ export default function App() {
     .then((r) => r.json())
     .then((res) => {
       console.log("Portafolio sincronizado en el servidor:", res);
+
+      // OPTIMIZATION: If the server successfully extracted large base64 media into static persistent server files,
+      // update our frontend React state to use these URLs instead of holding the giant raw base64 string in memory.
+      if (res.success && res.products && Array.isArray(res.products)) {
+        let hasChanges = false;
+        const currentUrls = products.flatMap(p => (p.media || []).map(m => m.url));
+        const newUrls = res.products.flatMap((p: any) => (p.media || []).map((m: any) => m.url));
+
+        if (currentUrls.length === newUrls.length) {
+          for (let i = 0; i < currentUrls.length; i++) {
+            if (currentUrls[i] !== newUrls[i]) {
+              hasChanges = true;
+              break;
+            }
+          }
+        } else {
+          hasChanges = true;
+        }
+
+        if (hasChanges) {
+          console.log("[Media Extractor] Updating reactive state with converted server static assets:", res.products);
+          setProducts(res.products);
+        }
+      }
     })
     .catch((err) => {
       console.warn("Error enviando cambios al servidor de catálogos:", err);
@@ -1328,7 +1360,7 @@ export default function App() {
               <div className="space-y-3">
                 <h5 className="text-xs font-bold uppercase tracking-wider text-brand-300">Términos del Servicio</h5>
                 <p className="text-[11px] text-brand-300 font-light leading-relaxed">
-                  Los precios publicados corresponden a pagos con tarjeta de débito o crédito (en hasta 3 cuotas sin interés, sin recargos ocultos). El descuento especial del 15% off se aplica de forma exclusiva si elegís abonar vía Transferencia Bancaria. <strong className="text-brand-100 font-semibold">Importante:</strong> Si abonás vía transferencia, es obligatorio enviar el comprobante de pago junto con tu número de orden a nuestro Instagram para realizar el despacho correspondiente.
+                  Los precios publicados corresponden a pagos con tarjeta de débito o crédito (en hasta 3 cuotas sin interés, sin recargos ocultos). El descuento especial del 15% off se aplica de forma exclusiva si elegís abonar vía Transferencia Bancaria. <strong className="text-brand-100 font-semibold">Importante:</strong> Si abonás vía transferencia bancaria, recordá adjuntar la foto o captura del comprobante durante el pago para que el sistema procese tu orden de inmediato.
                 </p>
               </div>
             </div>
