@@ -207,7 +207,10 @@ export default function CheckoutModal({
               paymentMethods: {
                 creditCard: "all",
                 debitCard: "all",
-                bankTransfer: "all", // DEBIN / Red Link automatic transfer natively!
+                maxInstallments: 3,
+                types: {
+                  excluded: ["ticket", "bank_transfer"]
+                }
               },
               visual: {
                 style: {

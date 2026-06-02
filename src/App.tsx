@@ -111,7 +111,7 @@ export default function App() {
     }
   }, []);
 
-  // Fetch products from backend server or Cloud Firestore on mount
+  // Fetch products from backend server or Cloud Firestore on mount with high-performance instant-local rendering
   useEffect(() => {
     async function loadCatalog() {
       console.log("[Catalog Loader] Initializing consolidated catalog startup loader...");
@@ -137,106 +137,127 @@ export default function App() {
       }
       console.log(`[Catalog Loader] Local browser storage holds ${loadedLocal.length} products.`);
 
-      // 2. Try to fetch from cloud sources (Firestore and Express backup server)
-      let loadedCloud: Product[] = [];
-      const cloudMap = new Map<string, Product>();
-      
-      // A. Try direct Firestore
-      if (!isFirestoreQuotaExceeded) {
-        try {
-          console.log("[Catalog Loader] Fetching from Cloud Firestore...");
-          const querySnapshot = await getDocs(collection(db, "products"));
-          querySnapshot.forEach((docSnap) => {
-            const p = docSnap.data() as Product;
+      // OPTIMIZATION: Instant non-blocking UI render of local products so users see catalog in 0ms!
+      if (loadedLocal.length > 0) {
+        setProducts(loadedLocal);
+        setHasLoadedInitial(true);
+      }
+
+      // 2. Query cloud sources with strict timeouts to prevent hangs
+      const fetchCloudAndServer = async () => {
+        let loadedCloud: Product[] = [];
+        const cloudMap = new Map<string, Product>();
+
+        // Query Firestore with 2.5 second timeout
+        const firestorePromise = async () => {
+          if (!isFirestoreQuotaExceeded) {
+            try {
+              console.log("[Catalog Loader] Fetching from Cloud Firestore...");
+              const docPromise = getDocs(collection(db, "products"));
+              const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("Firestore timeout")), 2500)
+              );
+              const querySnapshot = (await Promise.race([docPromise, timeoutPromise])) as any;
+
+              querySnapshot.forEach((docSnap: any) => {
+                const p = docSnap.data() as Product;
+                if (p && p.id) {
+                  cloudMap.set(p.id, p);
+                }
+              });
+              console.log(`[Catalog Loader] Cloud Firestore returned ${cloudMap.size} products.`);
+            } catch (fbErr) {
+              console.warn("[Catalog Loader] Firestore connection timed out or failed. Falling back.", fbErr);
+              handleFirestoreError(fbErr, "loadCatalog");
+            }
+          }
+        };
+
+        // Query Fallback local server API with 3.5 second timeout
+        const serverPromise = async () => {
+          try {
+            console.log("[Catalog Loader] Fetching from fallback server API...");
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
+            const res = await fetch("/api/products", { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+              const data = await res.json();
+              if (data && Array.isArray(data)) {
+                data.forEach((p: Product) => {
+                  if (p && p.id) {
+                    cloudMap.set(p.id, p);
+                  }
+                });
+                console.log(`[Catalog Loader] Backup server API retrieved ${data.length} products.`);
+              }
+            }
+          } catch (err) {
+            console.warn("[Catalog Loader] Fallback server fetch timed out or failed:", err);
+          }
+        };
+
+        // Run both async fetches in parallel so they don't block each other
+        await Promise.allSettled([firestorePromise(), serverPromise()]);
+
+        loadedCloud = filterOutDemoProducts(Array.from(cloudMap.values()));
+
+        // 3. Smart Merge conflict resolution (Combining local products with cloud products)
+        if (loadedCloud.length > 0) {
+          const mergedMap = new Map<string, Product>();
+
+          // Start with cloud/server products
+          loadedCloud.forEach((p) => {
+            if (p && p.id) mergedMap.set(p.id, p);
+          });
+
+          // Override or append with local browser products
+          loadedLocal.forEach((p) => {
             if (p && p.id) {
-              cloudMap.set(p.id, p);
+              mergedMap.set(p.id, p);
             }
           });
-          console.log(`[Catalog Loader] Cloud Firestore returned ${cloudMap.size} products.`);
-        } catch (fbErr) {
-          handleFirestoreError(fbErr, "loadCatalog");
-        }
-      }
 
-      // B. Always try fallback Express/Vercel server API to read merged products on disk (especially if Firestore write failed)
-      try {
-        console.log("[Catalog Loader] Fetching from fallback server API...");
-        const res = await fetch("/api/products");
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data)) {
-            data.forEach((p: Product) => {
-              if (p && p.id) {
-                cloudMap.set(p.id, p);
-              }
-            });
-            console.log(`[Catalog Loader] Consolidated Cloud + Server API total products: ${cloudMap.size}`);
+          const mergedList = Array.from(mergedMap.values());
+          
+          let deletedCustomIds = new Set<string>();
+          try {
+            const deletedStr = localStorage.getItem("deleted_custom_product_ids");
+            if (deletedStr) {
+              deletedCustomIds = new Set(JSON.parse(deletedStr));
+            }
+          } catch (_) {}
+
+          const finalMerged = mergedList.filter((p) => {
+            if (p.isCustom && deletedCustomIds.has(p.id)) {
+              return false; // Filter out explicitly deleted custom product
+            }
+            return true;
+          });
+
+          const finalProducts = finalMerged.length > 0 ? finalMerged : INITIAL_PRODUCTS;
+          setProducts(finalProducts);
+          
+          // 4. Auto-heal: If the cloud was empty but we had local items, sync it back
+          if (loadedCloud.length === 0 && loadedLocal.length > 0) {
+            console.log("[Catalog Loader] Self-healing: Re-populating out-of-sync backend server with local catalog...");
+            fetch("/api/products", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ products: finalProducts })
+            }).catch((err) => console.warn("[Catalog Loader] Failed to automatically sync catalog to server:", err));
           }
         }
-      } catch (err) {
-        console.warn("[Catalog Loader] Backup server fetch failed:", err);
-      }
 
-      loadedCloud = filterOutDemoProducts(Array.from(cloudMap.values()));
+        setHasLoadedInitial(true);
+      };
 
-      // 3. Smart Merge conflict resolution (Combining local products with cloud products)
-      let initial = INITIAL_PRODUCTS;
-      
-      if (loadedLocal.length > 0 || loadedCloud.length > 0) {
-        // Resolve conflicts using our robust merger
-        const mergedMap = new Map<string, Product>();
-
-        // Start with cloud/server products
-        loadedCloud.forEach((p) => {
-          if (p && p.id) mergedMap.set(p.id, p);
-        });
-
-        // Override or append with local browser products (local edits are authoritative or represent unsynced updates)
-        loadedLocal.forEach((p) => {
-          if (p && p.id) {
-            mergedMap.set(p.id, p);
-          }
-        });
-
-        const mergedList = Array.from(mergedMap.values());
-        
-        // Load explicitly deleted custom product IDs to avoid re-populating items the user recently deleted
-        let deletedCustomIds = new Set<string>();
-        try {
-          const deletedStr = localStorage.getItem("deleted_custom_product_ids");
-          if (deletedStr) {
-            deletedCustomIds = new Set(JSON.parse(deletedStr));
-          }
-        } catch (_) {}
-
-        const finalMerged = mergedList.filter((p) => {
-          if (p.isCustom && deletedCustomIds.has(p.id)) {
-            return false; // Filter out explicitly deleted custom product
-          }
-          return true;
-        });
-
-        initial = finalMerged.length > 0 ? finalMerged : INITIAL_PRODUCTS;
-      }
-
-      console.log(`[Catalog Loader] Completed catalog consolidation. Final active count: ${initial.length} products.`);
-      
-      setProducts(initial);
-      setHasLoadedInitial(true);
-
-      // 4. Auto-heal: If the server catalog or cloud was empty but we had local items,
-      // upload our local consolidated state back to the server so it's backed up.
-      if (loadedCloud.length === 0 && loadedLocal.length > 0) {
-        console.log("[Catalog Loader] Self-healing: Re-populating out-of-sync backend server with local catalog...");
-        fetch("/api/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ products: initial })
-        }).catch((err) => console.warn("[Catalog Loader] Failed to automatically sync catalog to server:", err));
-      }
+      // Run parallel background cloud/server load
+      fetchCloudAndServer();
 
       // 5. Run Base64 converter to make sure media structures are up-to-date
-      convertProductsIdbToBase64(initial).then(({ updatedProducts, changed }) => {
+      convertProductsIdbToBase64(loadedLocal.length > 0 ? loadedLocal : INITIAL_PRODUCTS).then(({ updatedProducts, changed }) => {
         if (changed) {
           setProducts(updatedProducts);
           console.log("[Catalog Loader] Migrated loaded catalog images to full Base64!");
@@ -247,13 +268,14 @@ export default function App() {
     loadCatalog();
   }, []);
 
-  // Sync state to local storage, IndexedDB, Firebase Firestore and fallback server whenever modified
+  // Sync state to local storage, IndexedDB, Firebase Firestore and fallback server whenever modified with 2.5s debouncing
   useEffect(() => {
     if (!hasLoadedInitial) return;
 
     let active = true;
+    let syncTimer: any = null;
 
-    async function syncCatalog() {
+    async function runSync() {
       // 1. Proactively convert any local idb:// URLs in products to Base64 dataURL
       // This is crucial so that Firestore and the backup server receive proper standard images.
       const { updatedProducts, changed } = await convertProductsIdbToBase64(products);
@@ -265,91 +287,119 @@ export default function App() {
         return; // The state change will re-trigger this useEffect.
       }
 
-      // 2. Persist to IndexedDB (virtually unlimited size)
+      // 2. Persist to IndexedDB instantly (virtually unlimited size, client-side, ultra-fast)
       saveProductsToIndexedDB(products);
 
-      // 3. Persist to LocalStorage (5MB limit fallback)
+      // 3. Persist to LocalStorage instantly (5MB limit fallback)
       try {
         localStorage.setItem("store_products_list", JSON.stringify(products));
       } catch (e) {
         console.warn("No se pudo persistir la lista de productos en localStorage (es posible que exceda la cuota por las imágenes base64, pero se guardó con éxito en IndexedDB):", e);
       }
 
-      // 4. Persist directly to Firebase Cloud Firestore (Direct client-side sync, works on Vercel out-of-the-box!)
-      if (!isFirestoreQuotaExceeded) {
-        try {
-          const querySnapshot = await getDocs(collection(db, "products"));
-          const existingIds = new Set<string>();
-          querySnapshot.forEach((docSnap) => {
-            existingIds.add(docSnap.id);
-          });
-
-          // Insert / Update each active product
-          for (const product of products) {
-            if (product && product.id) {
-              const cleanedProduct = cleanObjectForFirestore(product);
-              await setDoc(doc(db, "products", product.id), cleanedProduct);
-              existingIds.delete(product.id);
-            }
-          }
-
-          // Clean up from firestore if any item was deleted
-          for (const remainingId of existingIds) {
-            await deleteDoc(doc(db, "products", remainingId));
-          }
-
-          console.log(`[Firestore Direct] Synchronized ${products.length} products to Cloud Database successfully!`);
-        } catch (fbSyncErr) {
-          handleFirestoreError(fbSyncErr, "syncToCloudFirestore");
-        }
-      }
-
-      // 5. Persist to Express/Vercel server
-      try {
-        const response = await fetch("/api/products", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ products })
-        });
-        const res = await response.json();
+      // 4. DEBOUNCE the heavy and slow cloud database network transactions by 2.5 seconds!
+      // This prevents lagging the UI with repeated expensive Firebase reads/writes and HTTP fetch payloads during transitions.
+      syncTimer = setTimeout(async () => {
         if (!active) return;
 
-        console.log("Portafolio sincronizado en el servidor:", res);
+        // A. Persist directly to Firebase Cloud Firestore
+        if (!isFirestoreQuotaExceeded) {
+          try {
+            console.log("[Firestore Sync] Started debounced sync of products collection to Firestore...");
+            // Execute Firestore querying with a 3.5s timeout
+            const fetchDocsPromise = getDocs(collection(db, "products"));
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Firestore getDocs timed out")), 3500)
+            );
+            const querySnapshot = (await Promise.race([fetchDocsPromise, timeoutPromise])) as any;
+            
+            if (!active) return;
+            const existingIds = new Set<string>();
+            querySnapshot.forEach((docSnap: any) => {
+              existingIds.add(docSnap.id);
+            });
 
-        // OPTIMIZATION: If the server successfully extracted large base64 media into static persistent server files,
-        // update our frontend React state to use these URLs instead of holding the giant raw base64 string in memory.
-        if (res.success && res.products && Array.isArray(res.products)) {
-          let hasChanges = false;
-          const currentUrls = products.flatMap(p => (p.media || []).map(m => m.url));
-          const newUrls = res.products.flatMap((p: any) => (p.media || []).map((m: any) => m.url));
-
-          if (currentUrls.length === newUrls.length) {
-            for (let i = 0; i < currentUrls.length; i++) {
-              if (currentUrls[i] !== newUrls[i]) {
-                hasChanges = true;
-                break;
+            // Insert / Update each active product
+            for (const product of products) {
+              if (product && product.id) {
+                const cleanedProduct = cleanObjectForFirestore(product);
+                await setDoc(doc(db, "products", product.id), cleanedProduct);
+                existingIds.delete(product.id);
               }
             }
-          } else {
-            hasChanges = true;
-          }
 
-          if (hasChanges) {
-            console.log("[Media Extractor] Updating reactive state with converted server static assets:", res.products);
-            setProducts(res.products);
+            // Clean up from firestore if any item was deleted
+            for (const remainingId of existingIds) {
+              await deleteDoc(doc(db, "products", remainingId));
+            }
+
+            console.log(`[Firestore Sync] Debounced Firestore match successful. Synchronized ${products.length} products.`);
+          } catch (fbSyncErr) {
+            console.warn("[Firestore Sync] Error during Firestore sync:", fbSyncErr);
+            handleFirestoreError(fbSyncErr, "syncToCloudFirestore");
           }
         }
-      } catch (err) {
-        console.warn("Error enviando cambios al servidor de catálogos:", err);
-      }
+
+        // B. Persist to Express/Vercel backup server API
+        try {
+          console.log("[Backup Server Sync] Sending debounced update package to catalog backup API...");
+          const controller = new AbortController();
+          const localTimeoutId = setTimeout(() => controller.abort(), 4000);
+          
+          const response = await fetch("/api/products", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ products }),
+            signal: controller.signal
+          });
+          clearTimeout(localTimeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`Catalog API responded with HTTP status ${response.status}`);
+          }
+          const res = await response.json();
+          if (!active) return;
+
+          console.log("[Backup Server Sync] Portafolio sincronizado en el servidor:", res);
+
+          // OPTIMIZATION: If the server successfully extracted large base64 media into static persistent server files,
+          // update our frontend React state to use these URLs instead of holding the giant raw base64 string in memory.
+          if (res.success && res.products && Array.isArray(res.products)) {
+            let hasChanges = false;
+            const currentUrls = products.flatMap(p => (p.media || []).map(m => m.url));
+            const newUrls = res.products.flatMap((p: any) => (p.media || []).map((m: any) => m.url));
+
+            if (currentUrls.length === newUrls.length) {
+              for (let i = 0; i < currentUrls.length; i++) {
+                if (currentUrls[i] !== newUrls[i]) {
+                  hasChanges = true;
+                  break;
+                }
+              }
+            } else {
+              hasChanges = true;
+            }
+
+            if (hasChanges) {
+              console.log("[Media Extractor] Updating reactive state with converted server static assets:", res.products);
+              setProducts(res.products);
+            }
+          }
+        } catch (err) {
+          console.warn("[Backup Server Sync] Error sending changes to backup catalog server:", err);
+        }
+      }, 2500);
     }
 
-    syncCatalog();
+    runSync();
 
     return () => {
       active = false;
+      if (syncTimer) {
+        clearTimeout(syncTimer);
+      }
     };
   }, [products, hasLoadedInitial]);
 
@@ -937,6 +987,16 @@ export default function App() {
 
     setPendingOrders((prev) => [newOrder, ...prev]);
     
+    // Prepare a super lightweight copy of the order for fast background notification dispatch
+    // Strips out multi-megabyte raw Base64 image files which can hit Vercel payload limits or stall slower mobile networks.
+    const lightOrder = {
+      ...newOrder,
+      details: {
+        ...newOrder.details,
+        receiptImage: newOrder.details?.receiptImage ? "[Adjunto en Base de Datos]" : ""
+      }
+    };
+
     // Disparar Webhook / Email automático en segundo plano de forma 100% silenciosa e invisible para el comprador
     try {
       fetch("/api/send-order-email", {
@@ -945,7 +1005,7 @@ export default function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          order: newOrder,
+          order: lightOrder,
           adminEmail,
           webhookUrl: adminWebhookUrl
         })
