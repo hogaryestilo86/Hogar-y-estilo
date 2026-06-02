@@ -11,6 +11,15 @@ import { storeMedia, ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from
 // Cache public key config to speed up payment brick loading and optimize conversions
 let cachedMpPublicConfig: { publicKey: string; isReal: boolean } | null = null;
 
+// Preload Mercado Pago SDK script globally at module evaluation to eliminate load latency!
+if (typeof window !== "undefined" && typeof (window as any).MercadoPago === "undefined" && !document.getElementById("mp-sdk-script")) {
+  const script = document.createElement("script");
+  script.id = "mp-sdk-script";
+  script.src = "https://sdk.mercadopago.com/js/v2";
+  script.async = true;
+  document.body.appendChild(script);
+}
+
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -190,6 +199,22 @@ export default function CheckoutModal({
   const transferTotal = Math.round(subtotal * 0.85) + shipping;
   const installmentAmount = Math.round(finalListTotal / 3);
 
+  const formDataRef = useRef(formData);
+  const cartItemsRef = useRef(cartItems);
+  const shippingRef = useRef(shipping);
+
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
+
+  useEffect(() => {
+    cartItemsRef.current = cartItems;
+  }, [cartItems]);
+
+  useEffect(() => {
+    shippingRef.current = shipping;
+  }, [shipping]);
+
   // React hook to generate Mercado Pago Brick at checkout automatically
   useEffect(() => {
     let active = true;
@@ -258,9 +283,9 @@ export default function CheckoutModal({
             initialization: {
               amount: finalListTotal,
               payer: {
-                email: formData.email || "correo@ejemplo.com",
-                firstName: formData.fullName.split(" ")[0] || "Cliente",
-                lastName: formData.fullName.split(" ").slice(1).join(" ") || "DecoHome",
+                email: formDataRef.current.email || "correo@ejemplo.com",
+                firstName: formDataRef.current.fullName.split(" ")[0] || "Cliente",
+                lastName: formDataRef.current.fullName.split(" ").slice(1).join(" ") || "DecoHome",
               },
             },
             customization: {
@@ -301,9 +326,9 @@ export default function CheckoutModal({
                     },
                     body: JSON.stringify({
                       paymentData: paymentFormData,
-                      cartItems,
-                      shipping,
-                      payerDetails: formData,
+                      cartItems: cartItemsRef.current,
+                      shipping: shippingRef.current,
+                      payerDetails: formDataRef.current,
                     }),
                   });
 
@@ -327,11 +352,11 @@ export default function CheckoutModal({
                   if (onOrderComplete) {
                     onOrderComplete(
                       { 
-                        ...formData, 
+                        ...formDataRef.current, 
                         paymentMethod: "credit", 
                         receiptImage: paymentResult.point_of_interaction?.transaction_data?.ticket_url || "" 
                       }, 
-                      cartItems, 
+                      cartItemsRef.current, 
                       paymentResult.id ? `MP-${paymentResult.id}` : undefined
                     );
                   }
@@ -401,7 +426,7 @@ export default function CheckoutModal({
         }
       };
     }
-  }, [isOpen, step, formData.paymentMethod, cartItems, shipping, formData.fullName, formData.email]);
+  }, [isOpen, step, formData.paymentMethod]);
 
   if (!isOpen) return null;
 
@@ -752,6 +777,66 @@ export default function CheckoutModal({
                 </p>
               </div>
 
+              {/* Product Visual Row (Ensures the user CAN ALWAYS SEE the product's image or video when they are ready to pay!) */}
+              <div className="bg-white border border-brand-200 rounded-xl p-3 shadow-2xs space-y-2.5">
+                <p className="text-[10.5px] font-sans font-extrabold text-brand-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-brand-100 pb-1.5">
+                  <span>📦 Productos Elegidos para Pagar:</span>
+                </p>
+                <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                  {cartItems.map((item) => {
+                    const product = item.product;
+                    const activeMedia = product.media && product.media.length > 0 ? product.media[0] : null;
+                    const isVideoMedia = activeMedia?.type === "video";
+                    const mediaUrl = activeMedia?.url || getCategoryPlaceholder(product.category);
+
+                    return (
+                      <div key={product.id} className="flex items-center gap-3 bg-brand-50/50 p-2 rounded-lg border border-brand-200/50">
+                        <div className="w-14 h-14 rounded-lg border border-brand-200 overflow-hidden shrink-0 bg-brand-100 flex items-center justify-center relative shadow-inner">
+                          {isVideoMedia ? (
+                            <ResolvedVideo
+                              src={mediaUrl}
+                              backupUrl={activeMedia?.backupUrl}
+                              className="w-full h-full object-cover"
+                              muted
+                              playsInline
+                              autoPlay
+                              loop
+                            />
+                          ) : (
+                            <ResolvedImage
+                              src={mediaUrl}
+                              backupUrl={activeMedia?.backupUrl}
+                              alt={product.title}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          )}
+                          <span className="absolute -top-1.5 -right-1.5 bg-brand-900 text-white font-mono text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-xs">
+                            x{item.quantity}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <span className="text-[9px] uppercase tracking-wider font-semibold text-brand-500 block">
+                            {product.category || "General"}
+                          </span>
+                          <h4 className="font-serif font-bold text-brand-900 text-xs truncate">
+                            {product.title}
+                          </h4>
+                          <p className="text-[10px] text-brand-600 font-light mt-0.5 font-sans">
+                            Precio unitario: {formatCurrency(product.basePrice)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-bold text-brand-900 font-mono block">
+                            {formatCurrency(product.basePrice * item.quantity)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Selector de métodos de pago */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Transferencia bancaria (Fácil y destacada con 15% descuento) */}
@@ -1078,7 +1163,7 @@ export default function CheckoutModal({
                     </div>
 
                     <p className="text-xs text-blue-100 leading-relaxed font-sans">
-                      Pagá de forma segura con tu tarjeta de crédito/débito o por transferencia bancaria automática (DEBIN/Red Link) utilizando la pasarela oficial integrada.
+                      Pagá de forma segura con tu tarjeta de crédito o tarjeta de débito utilizando la pasarela oficial integrada.
                     </p>
 
                     {mpError && (
