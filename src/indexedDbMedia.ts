@@ -427,12 +427,59 @@ interface ResolvedVideoProps extends VideoHTMLAttributes<HTMLVideoElement> {
   src: string | undefined;
 }
 
-export const ResolvedVideo = React.forwardRef<HTMLVideoElement, ResolvedVideoProps>(
+export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
   ({ src, ...props }, ref) => {
     const resolved = useResolvedUrl(src);
+    if (!resolved) return null;
+
+    // Helper to extract embedded URL details
+    const getEmbed = (url: string) => {
+      // YouTube
+      let ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]+)/i);
+      if (ytMatch && ytMatch[1]) {
+        return {
+          type: "youtube",
+          url: `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=${props.autoPlay ? 1 : 0}&mute=${props.muted ? 1 : 0}&controls=${props.controls ? 1 : 0}&loop=1&playlist=${ytMatch[1]}`
+        };
+      }
+      
+      // Google Drive
+      let gdMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
+      if (gdMatch && gdMatch[1]) {
+        return {
+          type: "gdrive",
+          url: `https://drive.google.com/file/d/${gdMatch[1]}/preview`
+        };
+      }
+
+      // Vimeo
+      let vmMatch = url.match(/vimeo\.com\/([0-9]+)/i);
+      if (vmMatch && vmMatch[1]) {
+        return {
+          type: "vimeo",
+          url: `https://player.vimeo.com/video/${vmMatch[1]}?autoplay=${props.autoPlay ? 1 : 0}&muted=${props.muted ? 1 : 0}&loop=1`
+        };
+      }
+
+      return null;
+    };
+
+    const embed = getEmbed(resolved);
+
+    if (embed) {
+      return React.createElement("iframe", {
+        src: embed.url,
+        className: props.className,
+        style: { border: "none", width: "100%", height: "100%", ...props.style },
+        allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture",
+        allowFullScreen: true,
+        loading: "lazy"
+      });
+    }
+
     return React.createElement("video", {
       ref,
-      src: resolved || null,
+      src: resolved,
       ...props
     });
   }

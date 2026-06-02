@@ -1,8 +1,12 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+
+// Load environment variables from .env
+dotenv.config();
 import fs from "fs";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
@@ -99,22 +103,23 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
-        contents: `${systemPrompt}\n\n${userMessage}`,
+        contents: userMessage,
         config: {
+          systemInstruction: systemPrompt,
           responseMimeType: "application/json",
           responseSchema: {
-            type: "OBJECT",
+            type: Type.OBJECT,
             properties: {
               title: { 
-                type: "STRING",
+                type: Type.STRING,
                 description: "Título sofisticado de alta gama para el producto" 
               },
               description: { 
-                type: "STRING", 
+                type: Type.STRING, 
                 description: "Descripción persuasiva en formato Markdown" 
               },
               seoFeatures: { 
-                type: "STRING", 
+                type: Type.STRING, 
                 description: "Palabras clave de SEO separadas exclusivamente por coma" 
               }
             },
@@ -124,7 +129,16 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       });
 
       const jsonText = response.text || "{}";
-      const parsedData = JSON.parse(jsonText);
+      
+      // Robust cleaning of candidate string from Gemini 
+      let cleaned = jsonText.trim();
+      if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```(?:json)?\n?/, "");
+        cleaned = cleaned.replace(/\n?```$/, "");
+      }
+      cleaned = cleaned.trim();
+      
+      const parsedData = JSON.parse(cleaned);
       
       res.json({
         title: parsedData.title || title || "Producto Premium",

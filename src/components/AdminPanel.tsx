@@ -241,6 +241,7 @@ export default function AdminPanel({
   const [githubPath, setGithubPath] = useState(() => localStorage.getItem("github_sync_path") || "products.json");
   const [isSyncingGithub, setIsSyncingGithub] = useState(false);
   const [showGithubSettings, setShowGithubSettings] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(() => localStorage.getItem("github_last_sync_time") || "");
 
   const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
     if (showToast) {
@@ -606,6 +607,18 @@ export default function AdminPanel({
 
       notify("✨ ¡ÉXITO! Catálogo de productos guardado directamente en tu repositorio de GitHub.", "success");
       notify("⚡ Vercel ahora está regenerando tu sitio web. Estará actualizado en vivo en 30-40 segundos sin perder nada.", "info");
+
+      const now = new Date();
+      const formattedTime = now.toLocaleString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+      localStorage.setItem("github_last_sync_time", formattedTime);
+      setLastSyncTime(formattedTime);
     } catch (err: any) {
       console.error("Error sincronizando catálogo con Github:", err);
       
@@ -859,8 +872,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
         const response = await ai.models.generateContent({
           model: "gemini-3.5-flash",
-          contents: `${systemPrompt}\n\n${userMessage}`,
+          contents: userMessage,
           config: {
+            systemInstruction: systemPrompt,
             responseMimeType: "application/json",
             responseSchema: {
               type: Type.OBJECT,
@@ -884,7 +898,15 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         });
 
         const jsonText = response.text || "{}";
-        const parsedData = JSON.parse(jsonText);
+        
+        let cleaned = jsonText.trim();
+        if (cleaned.startsWith("```")) {
+          cleaned = cleaned.replace(/^```(?:json)?\n?/, "");
+          cleaned = cleaned.replace(/\n?```$/, "");
+        }
+        cleaned = cleaned.trim();
+
+        const parsedData = JSON.parse(cleaned);
 
         if (parsedData.title) setTitle(parsedData.title);
         if (parsedData.description) setDescription(parsedData.description);
@@ -1252,7 +1274,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           <div>
             <p className="text-[10px] font-bold text-brand-500 uppercase tracking-widest leading-none">Vistas de la Tienda</p>
             <h4 className="font-serif text-2xl font-black text-brand-900 mt-1">{storeMetrics.viewsCount}</h4>
-            <p className="text-[10px] text-green-700 font-semibold mt-1">▲ 14% más esta semana</p>
+            <p className="text-[10px] text-purple-700 font-semibold mt-1 flex items-center gap-1">📡 En vivo (Sincronizado vía Firebase)</p>
           </div>
         </div>
 
@@ -2446,6 +2468,18 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   </>
                 )}
               </button>
+
+              {lastSyncTime && (
+                <div className="mt-2.5 p-2.5 bg-green-50 border border-green-200 rounded-xl text-center text-[10.5px] text-green-800 font-medium flex items-center justify-center gap-2 animate-in fade-in duration-300">
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <span>
+                    ✓ Última sincronización con éxito: <strong>{lastSyncTime}</strong>. ¡Cambios activos en vivo!
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="bg-brand-50 rounded-xl p-3 border border-brand-150 text-[11px] text-brand-850 leading-relaxed space-y-2">

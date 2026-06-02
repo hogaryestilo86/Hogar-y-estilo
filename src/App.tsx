@@ -15,7 +15,7 @@ import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
 import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB } from "./indexedDbMedia";
-import { collection, getDocs, setDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, setDoc, doc, deleteDoc, getDoc } from "firebase/firestore";
 import { db, cleanObjectForFirestore } from "./firebase";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
@@ -315,6 +315,11 @@ export default function App() {
     localStorage.setItem("admin_notification_webhook", newWebhookUrl);
   };
 
+  // Admin access control states
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
+  const [adminLoginError, setAdminLoginError] = useState("");
+
   // Analytics Metrics (Requerimiento 6 de Estadísticas)
   const [storeMetrics, setStoreMetrics] = useState(() => {
     const saved = localStorage.getItem("store_metrics_data");
@@ -434,6 +439,17 @@ export default function App() {
     } catch (e) {
       console.warn("Storage error for storeMetrics:", e);
     }
+
+    // Also sync storeMetrics with Firebase Cloud Firestore
+    async function syncMetricsToCloud() {
+      try {
+        await setDoc(doc(db, "analytics", "global"), storeMetrics, { merge: true });
+        console.log("[Firestore Analytics] Global metrics synchronized in real time:", storeMetrics);
+      } catch (fbErr) {
+        console.warn("Silent failure syncing analytics metrics to Cloud Firestore:", fbErr);
+      }
+    }
+    syncMetricsToCloud();
   }, [storeMetrics]);
 
   useEffect(() => {
@@ -452,18 +468,60 @@ export default function App() {
     }
   }, [bankDetails]);
 
-  // Page Views automatic mount increment
+  // Page Views automatic load and global cloud increment
   useEffect(() => {
-    setStoreMetrics((prev: any) => ({
-      ...prev,
-      viewsCount: prev.viewsCount + 1,
-    }));
+    async function loadAndIncrementViews() {
+      try {
+        const analyticsRef = doc(db, "analytics", "global");
+        const docSnap = await getDoc(analyticsRef);
+        
+        let views = 0;
+        let abandoned = 0;
+        let purchases = 0;
+        let pendingDispatches = 0;
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          views = data.viewsCount || 0;
+          abandoned = data.abandonedCartCount || 0;
+          purchases = data.purchasesCount || 0;
+          pendingDispatches = data.pendingDispatchesCount || 0;
+        }
+
+        // Only increment view count if this is a real buyer/visitor (not an admin)
+        const isCurrentlyAdmin = localStorage.getItem("is_admin_mode") === "true";
+        if (!isCurrentlyAdmin) {
+          views += 1;
+          await setDoc(analyticsRef, {
+            viewsCount: views,
+            abandonedCartCount: abandoned,
+            purchasesCount: purchases,
+            pendingDispatchesCount: pendingDispatches,
+          }, { merge: true });
+        }
+
+        setStoreMetrics({
+          viewsCount: views,
+          abandonedCartCount: abandoned,
+          purchasesCount: purchases,
+          pendingDispatchesCount: pendingDispatches,
+        });
+      } catch (e) {
+        console.warn("Error fetching / updating global analytics from Firestore:", e);
+        // Fallback to local increment if Firestore query fails
+        setStoreMetrics((prev: any) => ({
+          ...prev,
+          viewsCount: (prev?.viewsCount || 0) + 1,
+        }));
+      }
+    }
+    loadAndIncrementViews();
   }, []);
 
-  // Admin access control states
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
-  const [adminLoginError, setAdminLoginError] = useState("");
+  // Sync admin authentication state with localStorage to distinguish admin views
+  useEffect(() => {
+    localStorage.setItem("is_admin_mode", isAdminAuthenticated ? "true" : "false");
+  }, [isAdminAuthenticated]);
 
   // Categories query set (Herramientas, Iluminación, Destacados, etc.)
   const categories = ["Todos", "Destacados", "Cocina", "Hogar", "Belleza", "Herramientas", "Iluminación", "Niños"];
