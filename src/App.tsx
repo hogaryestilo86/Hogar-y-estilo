@@ -15,7 +15,7 @@ import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
 import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB } from "./indexedDbMedia";
-import { collection, getDocs, setDoc, doc, deleteDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, setDoc, doc, deleteDoc, getDoc, onSnapshot, disableNetwork } from "firebase/firestore";
 import { db, cleanObjectForFirestore } from "./firebase";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
@@ -74,6 +74,15 @@ function handleFirestoreError(error: any, context: string) {
     if (!isFirestoreQuotaExceeded) {
       isFirestoreQuotaExceeded = true;
       console.error("🔥 [Firestore Resiliency Alert] Firestore Free Daily Quota Exceeded! Switching client database channel to Local Offline Storage + Express Server fallback modes seamlessly.");
+      try {
+        disableNetwork(db).then(() => {
+          console.log("[Firestore Resiliency] Firebase Firestore network disabled successfully to prevent repetitive socket polling and retry overhead.");
+        }).catch((err) => {
+          console.warn("[Firestore Resiliency] Minor issue disabling firestore network:", err);
+        });
+      } catch (e) {
+        console.warn("[Firestore Resiliency] Error triggering disableNetwork:", e);
+      }
     }
   }
 }
