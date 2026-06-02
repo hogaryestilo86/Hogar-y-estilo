@@ -147,6 +147,7 @@ export default function ProductCard({
             <ResolvedImage
               src={activeMedia.url}
               backupUrl={activeMedia.backupUrl}
+              category={product.category}
               alt={product.title}
               loading="lazy"
               referrerPolicy="no-referrer"

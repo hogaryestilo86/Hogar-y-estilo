@@ -2473,6 +2473,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                           <ResolvedImage
                             src={(item.media && item.media[0]?.url) || getCategoryPlaceholder(item.category)}
                             backupUrl={item.media && item.media[0]?.backupUrl}
+                            category={item.category}
                             alt={item.title}
                             className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
                             referrerPolicy="no-referrer"

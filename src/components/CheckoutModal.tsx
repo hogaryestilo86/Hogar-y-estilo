@@ -691,6 +691,7 @@ export default function CheckoutModal({
                               <ResolvedImage
                                 src={mediaUrl}
                                 backupUrl={activeMedia?.backupUrl}
+                                category={product.category}
                                 alt={product.title}
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
@@ -806,6 +807,7 @@ export default function CheckoutModal({
                             <ResolvedImage
                               src={mediaUrl}
                               backupUrl={activeMedia?.backupUrl}
+                              category={product.category}
                               alt={product.title}
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"
@@ -934,6 +936,7 @@ export default function CheckoutModal({
                               <ResolvedImage
                                 src={mediaUrl}
                                 backupUrl={activeMedia?.backupUrl}
+                                category={product.category}
                                 alt={product.title}
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"

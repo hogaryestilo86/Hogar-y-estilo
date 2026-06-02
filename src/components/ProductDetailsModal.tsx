@@ -13,6 +13,7 @@ interface ProductDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddToCart: (product: Product) => void;
+  onBuyNow?: (product: Product) => void;
   showToast?: (message: string, type?: "success" | "error" | "info") => void;
 }
 
@@ -21,6 +22,7 @@ export default function ProductDetailsModal({
   isOpen,
   onClose,
   onAddToCart,
+  onBuyNow,
   showToast,
 }: ProductDetailsModalProps) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -161,6 +163,7 @@ export default function ProductDetailsModal({
               <ResolvedImage
                 src={activeMediaList[activeMediaIndex]?.url || getCategoryPlaceholder(product?.category)}
                 backupUrl={activeMediaList[activeMediaIndex]?.backupUrl}
+                category={product?.category}
                 alt={product.title}
                 referrerPolicy="no-referrer"
                 className="max-w-full max-h-full object-contain"
@@ -192,6 +195,7 @@ export default function ProductDetailsModal({
                       <ResolvedImage
                         src={item.backupUrl || getCategoryPlaceholder(product.category)}
                         backupUrl={item.backupUrl}
+                        category={product.category}
                         alt={`Video Thumbnail`}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover opacity-60 transition-transform hover:scale-105"
@@ -209,6 +213,7 @@ export default function ProductDetailsModal({
                     <ResolvedImage
                       src={item.url}
                       backupUrl={item.backupUrl}
+                      category={product.category}
                       alt={`Thumbnail ${idx + 1}`}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
@@ -332,13 +337,25 @@ export default function ProductDetailsModal({
 
           </div>
 
-          {/* Quick CTA bottom button */}
-          <div className="pt-6 mt-4 border-t border-[#c4bba3]">
+          {/* Quick CTA bottom buttons */}
+          <div className="pt-6 mt-4 border-t border-[#c4bba3] flex flex-col sm:flex-row gap-3">
+            {onBuyNow && (
+              <button
+                onClick={() => {
+                  onBuyNow(product);
+                  onClose();
+                }}
+                className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
+              >
+                <Sparkles className="w-4.5 h-4.5 text-amber-300 animate-pulse" />
+                <span>Comprar ahora</span>
+              </button>
+            )}
             <button
               onClick={() => onAddToCart(product)}
-              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-transform transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
+              className="flex-1 bg-[#fdf2f5] hover:bg-[#fce7ec] text-pink-700 border border-pink-300 font-extrabold text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-2xs hover:shadow-sm"
             >
-              <ShoppingCart className="w-4.5 h-4.5 text-white" />
+              <ShoppingCart className="w-4.5 h-4.5 text-pink-600" />
               <span>Agregar al Carrito • {formatCurrency(listPrice)}</span>
             </button>
           </div>

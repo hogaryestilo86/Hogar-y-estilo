@@ -1733,6 +1733,7 @@ export default function App() {
           handleAddToCart(p);
           setSelectedProduct(null); // Auto close details panel
         }}
+        onBuyNow={handleBuyNow}
         showToast={showToast}
       />
 
