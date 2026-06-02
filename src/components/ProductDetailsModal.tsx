@@ -125,6 +125,7 @@ export default function ProductDetailsModal({
               <div className="relative w-full h-full flex items-center justify-center bg-black">
                 <ResolvedVideo
                   src={activeMediaList[activeMediaIndex].url}
+                  backupUrl={activeMediaList[activeMediaIndex].backupUrl}
                   className="max-w-full max-h-full object-contain"
                   style={{ maxWidth: "100%", objectFit: "contain" }}
                   autoPlay
@@ -149,6 +150,7 @@ export default function ProductDetailsModal({
             ) : (
               <ResolvedImage
                 src={activeMediaList[activeMediaIndex]?.url || getCategoryPlaceholder(product?.category)}
+                backupUrl={activeMediaList[activeMediaIndex]?.backupUrl}
                 alt={product.title}
                 referrerPolicy="no-referrer"
                 className="max-w-full max-h-full object-contain"
@@ -182,6 +184,7 @@ export default function ProductDetailsModal({
                   ) : (
                     <ResolvedImage
                       src={item.url}
+                      backupUrl={item.backupUrl}
                       alt={`Thumbnail ${idx + 1}`}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"

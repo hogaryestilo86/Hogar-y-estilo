@@ -224,6 +224,8 @@ export async function storeMedia(rawBlob: Blob): Promise<string> {
 /**
  * Automatically converts any product's legacy idb:// media URLs to Base64
  * whenever the admin opens the page (allowing automatic remote syncing to the cloud/git).
+ * Also preloads backupUrl with base64 data for standard assets so they can be securely
+ * synced to Firestore, ensuring zero-broken-image loads for Vercel clients.
  */
 export async function convertProductsIdbToBase64(products: Product[]): Promise<{ updatedProducts: Product[]; changed: boolean }> {
   let changed = false;
@@ -233,6 +235,7 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
       let prodChanged = false;
       const updatedMedia = await Promise.all(
         prod.media.map(async (item) => {
+          // 1. Convert legacy IDB urls
           if (item.url && item.url.startsWith("idb://")) {
             const key = item.url.replace("idb://", "");
             try {
@@ -255,6 +258,31 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
               console.warn(`No se pudo resolver o migrar la URL idb://${key} a Base64:`, err);
             }
           }
+
+          // 2. Pre-generate backupUrl base64 string for relative upload paths if missing and we are in dev/local mode
+          if (item.url && (item.url.startsWith("/uploads/") || item.url.startsWith("uploads/")) && !item.backupUrl) {
+            try {
+              const fileRes = await fetch(item.url);
+              if (fileRes.ok) {
+                const blob = await fileRes.blob();
+                const dataUrl = await new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    if (typeof reader.result === "string") resolve(reader.result);
+                    else reject(new Error("FileReader failed to compile blob"));
+                  };
+                  reader.onerror = reject;
+                  reader.readAsDataURL(blob);
+                });
+                item.backupUrl = dataUrl;
+                prodChanged = true;
+                changed = true;
+              }
+            } catch (err) {
+              console.warn(`Could not preload static backupUrl base64 for ${item.url}:`, err);
+            }
+          }
+
           return item;
         })
       );
@@ -364,55 +392,68 @@ export async function resolveIdbUrl(url: string | undefined): Promise<string> {
 /**
  * React Hook that dynamically and synchronously (from cache) resolves ANY url.
  * Handles standard http/https, base64, and persistent idb:// urls automatically.
+ * Incorporates backupUrl to enable offline fallback and zero-broken-image delivery.
  */
-export function useResolvedUrl(url: string | undefined): string {
+export function useResolvedUrl(url: string | undefined, backupUrl?: string): string {
   const [resolved, setResolved] = useState<string>(() => {
-    if (!url) return "";
-    if (!url.startsWith("idb://")) return url;
+    if (!url) return backupUrl || "";
+    if (url.startsWith("idb://")) {
+      const key = url.replace("idb://", "");
+      if (globalResolvedCache[key]) {
+        return globalResolvedCache[key];
+      }
+      if (inMemoryFallbackCache[key]) {
+        return inMemoryFallbackCache[key];
+      }
+      return backupUrl || ""; // loading placeholder
+    }
     
-    const key = url.replace("idb://", "");
-    if (globalResolvedCache[key]) {
-      return globalResolvedCache[key];
+    // Quick fallback when running in static deployments (Vercel) where local files in /uploads/
+    // aren't physically present on the server until GitHub sync re-deploys them
+    if ((url.startsWith("/uploads/") || url.startsWith("uploads/")) && backupUrl) {
+      return backupUrl;
     }
-    if (inMemoryFallbackCache[key]) {
-      return inMemoryFallbackCache[key];
-    }
-    return ""; // loading placeholder
+    return url;
   });
 
   useEffect(() => {
     if (!url) {
-      setResolved("");
+      setResolved(backupUrl || "");
       return;
     }
 
     if (!url.startsWith("idb://")) {
-      setResolved(url);
+      if ((url.startsWith("/uploads/") || url.startsWith("uploads/")) && backupUrl) {
+        setResolved(backupUrl);
+      } else {
+        setResolved(url);
+      }
       return;
     }
 
     let active = true;
     resolveIdbUrl(url).then((res) => {
       if (active) {
-        setResolved(res);
+        setResolved(res || backupUrl || "");
       }
     });
 
     return () => {
       active = false;
     };
-  }, [url]);
+  }, [url, backupUrl]);
 
   return resolved;
 }
 
 interface ResolvedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   src: string | undefined;
+  backupUrl?: string;
 }
 
 export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImageProps>(
-  ({ src, ...props }, ref) => {
-    const resolved = useResolvedUrl(src);
+  ({ src, backupUrl, ...props }, ref) => {
+    const resolved = useResolvedUrl(src, backupUrl);
     const finalSrc = resolved || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
     return React.createElement("img", {
       ref,
@@ -425,11 +466,12 @@ ResolvedImage.displayName = "ResolvedImage";
 
 interface ResolvedVideoProps extends VideoHTMLAttributes<HTMLVideoElement> {
   src: string | undefined;
+  backupUrl?: string;
 }
 
 export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
-  ({ src, ...props }, ref) => {
-    const resolved = useResolvedUrl(src);
+  ({ src, backupUrl, ...props }, ref) => {
+    const resolved = useResolvedUrl(src, backupUrl);
     if (!resolved) return null;
 
     // Helper to extract embedded URL details

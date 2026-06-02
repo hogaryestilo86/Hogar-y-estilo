@@ -56,6 +56,28 @@ const filterOutDemoProducts = (list: any[]): Product[] => {
   });
 };
 
+let isFirestoreQuotaExceeded = false;
+
+function handleFirestoreError(error: any, context: string) {
+  console.warn(`[Firestore Resiliency] Error in ${context}:`, error);
+  const errMsg = String(error?.message || error || "").toLowerCase();
+  const errCode = String(error?.code || "").toLowerCase();
+  
+  if (
+    errCode.includes("resource-exhausted") || 
+    errCode.includes("quota") || 
+    errMsg.includes("resource_exhausted") || 
+    errMsg.includes("quota limit exceeded") || 
+    errMsg.includes("quota exceeded") ||
+    errMsg.includes("exhausted")
+  ) {
+    if (!isFirestoreQuotaExceeded) {
+      isFirestoreQuotaExceeded = true;
+      console.error("🔥 [Firestore Resiliency Alert] Firestore Free Daily Quota Exceeded! Switching client database channel to Local Offline Storage + Express Server fallback modes seamlessly.");
+    }
+  }
+}
+
 export default function App() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
@@ -64,30 +86,34 @@ export default function App() {
   useEffect(() => {
     async function loadCatalog() {
       // 1. Fetch from Firestore first (highest priority, permanent, cloud-safe, works on Vercel)
-      try {
-        console.log("Loading catalog directly from cloud Firestore...");
-        const querySnapshot = await getDocs(collection(db, "products"));
-        const firestoreProducts: Product[] = [];
-        querySnapshot.forEach((docSnap) => {
-          firestoreProducts.push(docSnap.data() as Product);
-        });
-
-        if (firestoreProducts.length > 0) {
-          const clean = filterOutDemoProducts(firestoreProducts);
-          setProducts(clean);
-          setHasLoadedInitial(true);
-          console.log(`Loaded ${clean.length} products directly from Firestore!`);
-          
-          convertProductsIdbToBase64(clean).then(({ updatedProducts, changed }) => {
-            if (changed) {
-              setProducts(updatedProducts);
-              console.log("Migrated loaded cloud products to embedded Base64!");
-            }
+      if (!isFirestoreQuotaExceeded) {
+        try {
+          console.log("Loading catalog directly from cloud Firestore...");
+          const querySnapshot = await getDocs(collection(db, "products"));
+          const firestoreProducts: Product[] = [];
+          querySnapshot.forEach((docSnap) => {
+            firestoreProducts.push(docSnap.data() as Product);
           });
-          return; // Succeeded! Skip redundant offline/local routines
+
+          if (firestoreProducts.length > 0) {
+            const clean = filterOutDemoProducts(firestoreProducts);
+            setProducts(clean);
+            setHasLoadedInitial(true);
+            console.log(`Loaded ${clean.length} products directly from Firestore!`);
+            
+            convertProductsIdbToBase64(clean).then(({ updatedProducts, changed }) => {
+              if (changed) {
+                setProducts(updatedProducts);
+                console.log("Migrated loaded cloud products to embedded Base64!");
+              }
+            });
+            return; // Succeeded! Skip redundant offline/local routines
+          }
+        } catch (fbErr) {
+          handleFirestoreError(fbErr, "loadCatalog");
         }
-      } catch (fbErr) {
-        console.warn("Could not connect directly to Firebase Cloud Firestore, falling back:", fbErr);
+      } else {
+        console.log("[loadCatalog] Firestore is marked as exhausted. Skipping direct cloud getDocs, using local + proxy server databases.");
       }
 
       // 2. Get local backups if offline or Firebase un-provisioned
@@ -186,6 +212,9 @@ export default function App() {
 
     // 3. Persist directly to Firebase Cloud Firestore (Direct client-side sync, works on Vercel out-of-the-box!)
     async function syncToCloudFirestore() {
+      if (isFirestoreQuotaExceeded) {
+        return;
+      }
       try {
         const querySnapshot = await getDocs(collection(db, "products"));
         const existingIds = new Set<string>();
@@ -196,14 +225,6 @@ export default function App() {
         // Insert / Update each active product
         for (const product of products) {
           if (product && product.id) {
-            // OPTIMIZATION: If the product contains heavy base64 strings starting with "data:",
-            // let the server-side API POST convert them first and update Firestore securely!
-            const hasBase64 = product.media?.some((m: any) => m.url && m.url.startsWith("data:"));
-            if (hasBase64) {
-              console.log(`[Firestore Direct] Skipping direct document upload for ${product.id} due to Base64 presence. Server-side API will convert and synchronize.`);
-              continue;
-            }
-
             const cleanedProduct = cleanObjectForFirestore(product);
             await setDoc(doc(db, "products", product.id), cleanedProduct);
             existingIds.delete(product.id);
@@ -217,7 +238,7 @@ export default function App() {
 
         console.log(`[Firestore Direct] Synchronized ${products.length} products to Cloud Database successfully!`);
       } catch (fbSyncErr) {
-        console.warn("Failed to synchronize directly to Firebase Firestore:", fbSyncErr);
+        handleFirestoreError(fbSyncErr, "syncToCloudFirestore");
       }
     }
     syncToCloudFirestore();
@@ -603,6 +624,9 @@ export default function App() {
 
     // Also sync storeMetrics with Firebase Cloud Firestore
     async function syncMetricsToCloud() {
+      if (isFirestoreQuotaExceeded) {
+        return;
+      }
       if (
         lastCloudMetricsRef.current &&
         lastCloudMetricsRef.current.viewsCount === storeMetrics.viewsCount &&
@@ -618,7 +642,7 @@ export default function App() {
         await setDoc(doc(db, "analytics", "global"), storeMetrics, { merge: true });
         console.log("[Firestore Analytics] Global metrics synchronized in real time:", storeMetrics);
       } catch (fbErr) {
-        console.warn("Silent failure syncing analytics metrics to Cloud Firestore:", fbErr);
+        handleFirestoreError(fbErr, "syncMetricsToCloud");
       }
     }
     syncMetricsToCloud();
@@ -626,6 +650,9 @@ export default function App() {
 
   // Real-time Firestore subscription to update metrics instantly
   useEffect(() => {
+    if (isFirestoreQuotaExceeded) {
+      return () => {};
+    }
     const analyticsRef = doc(db, "analytics", "global");
     const unsubscribe = onSnapshot(analyticsRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -650,7 +677,7 @@ export default function App() {
         }
       }
     }, (err) => {
-      console.warn("Silent failure subscribing to real-time firestore analytics:", err);
+      handleFirestoreError(err, "onSnapshot real-time metrics");
     });
 
     return () => unsubscribe();
@@ -675,6 +702,16 @@ export default function App() {
   // Page Views automatic load and global cloud increment
   useEffect(() => {
     async function loadAndIncrementViews() {
+      if (isFirestoreQuotaExceeded) {
+        // Instant local fallback views increment
+        setStoreMetrics((prev: any) => ({
+          viewsCount: (prev?.viewsCount || 0) + 1,
+          abandonedCartCount: prev?.abandonedCartCount || 0,
+          purchasesCount: prev?.purchasesCount || 0,
+          pendingDispatchesCount: prev?.pendingDispatchesCount || 0,
+        }));
+        return;
+      }
       try {
         const analyticsRef = doc(db, "analytics", "global");
         const docSnap = await getDoc(analyticsRef);
@@ -713,7 +750,7 @@ export default function App() {
         lastCloudMetricsRef.current = initialMetrics;
         setStoreMetrics(initialMetrics);
       } catch (e) {
-        console.warn("Error fetching / updating global analytics from Firestore:", e);
+        handleFirestoreError(e, "loadAndIncrementViews");
         // Fallback to local increment if Firestore query fails
         setStoreMetrics((prev: any) => ({
           ...prev,

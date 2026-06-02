@@ -6,6 +6,7 @@
 export interface ProductMedia {
   type: "image" | "video";
   url: string;
+  backupUrl?: string;
 }
 
 export interface ProductReview {

@@ -127,32 +127,50 @@ Reglas críticas:
       const userMessage = `Título provisto: "${title || ""}"
 Descripción básica / Notas del producto: "${description || ""}"`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: userMessage,
-        config: {
-          systemInstruction: systemPrompt,
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { 
-                type: Type.STRING,
-                description: "Título sofisticado de alta gama para el producto" 
-              },
-              description: { 
-                type: Type.STRING, 
-                description: "Descripción persuasiva en formato Markdown" 
-              },
-              seoFeatures: { 
-                type: Type.STRING, 
-                description: "Palabras clave de SEO separadas exclusivamente por coma" 
+      const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+      let response = null;
+      let lastErr = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`[Gemini Optimizador] Intentando con el modelo: ${modelName}...`);
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: userMessage,
+            config: {
+              systemInstruction: systemPrompt,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { 
+                    type: Type.STRING,
+                    description: "Título sofisticado de alta gama para el producto" 
+                  },
+                  description: { 
+                    type: Type.STRING, 
+                    description: "Descripción persuasiva en formato Markdown" 
+                  },
+                  seoFeatures: { 
+                    type: Type.STRING, 
+                    description: "Palabras clave de SEO separadas exclusivamente por coma" 
+                  }
+                },
+                required: ["title", "description", "seoFeatures"]
               }
-            },
-            required: ["title", "description", "seoFeatures"]
-          }
+            }
+          });
+          console.log(`[Gemini Optimizador] Éxito con el modelo: ${modelName}!`);
+          break; // Break loop on success
+        } catch (err: any) {
+          console.warn(`[Gemini Optimizador] Falló con el modelo ${modelName}:`, err.message || err);
+          lastErr = err;
         }
-      });
+      }
+
+      if (!response) {
+        throw new Error(`Ambos modelos de optimización fallaron. Último error: ${lastErr?.message || lastErr}`);
+      }
 
       const jsonText = response.text || "{}";
       
@@ -312,7 +330,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 fs.writeFileSync(filepath, Buffer.from(base64Data, "base64"));
                 console.log(`[Media Extractor] Successfully saved heavy base64 media to: /uploads/${filename} (${mimeType})`);
 
-                return { ...mediaItem, url: `/uploads/${filename}` };
+                return { ...mediaItem, url: `/uploads/${filename}`, backupUrl: mediaItem.url };
               }
             } catch (err) {
               console.error("[Media Extractor] Error saving base64 to server file-system:", err);

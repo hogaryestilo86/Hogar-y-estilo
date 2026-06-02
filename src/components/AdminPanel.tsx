@@ -405,6 +405,7 @@ export default function AdminPanel({
               
               if (putRes.ok) {
                 console.log(`¡Archivo ${filenameToUse} subido exitosamente al repositorio GitHub!`);
+                mediaItem.backupUrl = mediaItem.url;
                 mediaItem.url = `/uploads/${filenameToUse}`;
               } else {
                 console.warn(`La subida de ${filenameToUse} a GitHub falló con estado:`, putRes.status);
@@ -995,32 +996,50 @@ Reglas críticas:
         const userMessage = `Título provisto: "${title || ""}"
 Descripción básica / Notas del producto: "${description || ""}"`;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: userMessage,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                title: { 
-                  type: Type.STRING, 
-                  description: "Título sofisticado de alta gama para el producto" 
-                },
-                description: { 
-                  type: Type.STRING, 
-                  description: "Descripción persuasiva en formato Markdown" 
-                },
-                seoFeatures: { 
-                  type: Type.STRING, 
-                  description: "Palabras clave de SEO separadas exclusivamente por coma" 
+        const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+        let response = null;
+        let lastErr = null;
+
+        for (const modelName of modelsToTry) {
+          try {
+            console.log(`[Client Gemini] Intentando con el modelo: ${modelName}...`);
+            response = await ai.models.generateContent({
+              model: modelName,
+              contents: userMessage,
+              config: {
+                systemInstruction: systemPrompt,
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { 
+                      type: Type.STRING, 
+                      description: "Título sofisticado de alta gama para el producto" 
+                    },
+                    description: { 
+                      type: Type.STRING, 
+                      description: "Descripción persuasiva en formato Markdown" 
+                    },
+                    seoFeatures: { 
+                      type: Type.STRING, 
+                      description: "Palabras clave de SEO separadas exclusivamente por coma" 
+                    }
+                  },
+                  required: ["title", "description", "seoFeatures"]
                 }
-              },
-              required: ["title", "description", "seoFeatures"]
-            }
+              }
+            });
+            console.log(`[Client Gemini] Éxito con el modelo: ${modelName}!`);
+            break; // Break loop on success
+          } catch (err: any) {
+            console.warn(`[Client Gemini] Falló con el modelo ${modelName}:`, err.message || err);
+            lastErr = err;
           }
-        });
+        }
+
+        if (!response) {
+          throw new Error(`Fallo el SDK local tras probar todos los modelos. Último error: ${lastErr?.message || lastErr}`);
+        }
 
         const jsonText = response.text || "{}";
         
@@ -1893,16 +1912,20 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-bold text-brand-800 uppercase tracking-widest mb-1.5">
-                    Características destacadas (Separadas por Comas)
+                  <label className="block text-xs font-bold text-brand-800 uppercase tracking-widest mb-1.5 flex items-center gap-1.5 flex-wrap">
+                    <span>Palabras Clave de SEO (Google) y Características</span>
+                    <span className="bg-brand-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">Útil para Buscadores</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="Ej. 100% travertino real, Altura 45cm, Pulido mate"
+                    placeholder="Ej. cemento real de Rosario, estilo japandi rústico, mesa de luz artesanal"
                     value={featuresText}
                     onChange={(e) => setFeaturesText(e.target.value)}
-                    className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900"
+                    className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 select-all"
                   />
+                  <p className="text-[10px] text-brand-505 mt-1 italic">
+                    Separadas por coma. El optimizador inteligente de Gemini autorellenará este campo para posicionar tu producto en los buscadores de Google de inmediato.
+                  </p>
                 </div>
               </div>
 
@@ -2380,6 +2403,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                         {item.media && item.media[0]?.type === "video" ? (
                           <ResolvedVideo
                             src={item.media[0]?.url}
+                            backupUrl={item.media[0]?.backupUrl}
                             className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
                             muted
                             playsInline
@@ -2387,6 +2411,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                         ) : (
                           <ResolvedImage
                             src={(item.media && item.media[0]?.url) || getCategoryPlaceholder(item.category)}
+                            backupUrl={item.media && item.media[0]?.backupUrl}
                             alt={item.title}
                             className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
                             referrerPolicy="no-referrer"

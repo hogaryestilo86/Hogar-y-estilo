@@ -93,6 +93,7 @@ export default function ProductCard({
               <ResolvedVideo
                 ref={videoRef}
                 src={activeMedia.url}
+                backupUrl={activeMedia.backupUrl}
                 className="w-full h-full object-contain bg-neutral-50/80 p-2"
                 autoPlay
                 muted={isMuted}
@@ -115,6 +116,7 @@ export default function ProductCard({
           ) : (
             <ResolvedImage
               src={activeMedia.url}
+              backupUrl={activeMedia.backupUrl}
               alt={product.title}
               loading="lazy"
               referrerPolicy="no-referrer"

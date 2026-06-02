@@ -783,6 +783,19 @@ export default function CheckoutModal({
                     </div>
                     
                     <div className="space-y-3.5">
+                      {/* Highlighted Net Transfer Amount Box */}
+                      <div className="bg-[#00284d] border-2 border-emerald-500/60 p-4 rounded-xl flex items-center justify-between gap-4 text-left shadow-md animate-in zoom-in-95 duration-250">
+                        <div>
+                          <span className="block text-[10px] text-emerald-400 uppercase tracking-widest font-extrabold mb-1">Monto neto a transferir:</span>
+                          <span className="font-sans font-black text-emerald-400 text-2xl sm:text-3xl tracking-wide select-all">
+                            {formatCurrency(transferTotal)}
+                          </span>
+                        </div>
+                        <div className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-black tracking-wide uppercase">
+                          15% OFF Aplicado
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-blue-100">
                         <div className="bg-[#00284d] p-3 rounded-lg border border-[#009ee3]/20">
                           <span className="block text-[10px] text-blue-300 uppercase tracking-widest font-bold">Banco</span>
@@ -1096,7 +1109,7 @@ export default function CheckoutModal({
                             <span>🔔 Notificación Enviada a Instagram</span>
                           </div>
                           <p className="text-[10px] text-brand-700 leading-normal font-light max-w-xs mx-auto">
-                            Enviamos un aviso automático del pago de <strong>{formData.fullName} ({generatedOrderId || "1024"})</strong> al canal directo de administración para confirmación veloz.
+                            Enviamos un aviso automático de tu pago a <strong>deco.home.rosario</strong> para una confirmación veloz de la orden ({generatedOrderId || "1024"}).
                           </p>
                         </div>
                       </div>
@@ -1195,47 +1208,7 @@ export default function CheckoutModal({
                   </p>
                 </div>
 
-                {/* 4. DATOS BANCARIOS (SI ES TRANSFERENCIA) */}
-                {isTransfer && (
-                  <div className="bg-green-50/70 border-2 border-green-200 p-5 sm:p-6 rounded-2xl max-w-md mx-auto text-left space-y-4 shadow-xs">
-                    <div className="flex items-center gap-2 border-b border-green-200 pb-2.5">
-                      <Landmark className="w-4.5 h-4.5 text-green-800" />
-                      <span className="font-bold text-xs uppercase tracking-wider text-green-950">🏦 Datos bancarios para transferir:</span>
-                    </div>
 
-                    <div className="space-y-3 text-[11px] font-mono text-brand-800 bg-white p-4 rounded-xl border border-brand-100">
-                      <p><strong>Banco:</strong> {bankDetails?.bankName || "Banco de la Nación Argentina"}</p>
-                      <p><strong>Titular:</strong> {bankDetails?.accountHolder || "Hogar y Estilo S.H."}</p>
-                      <p><strong>CBU CVU:</strong> <span className="font-bold text-brand-950 break-all">{bankDetails?.cbu || ""}</span></p>
-                      
-                      <div className="p-3 border border-dashed border-green-200 bg-green-50/50 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 my-2 text-left">
-                        <div>
-                          <p className="text-[10px] text-brand-500 font-bold uppercase tracking-wider font-sans">Alias para Copiar:</p>
-                          <p className="text-sm font-sans font-extrabold text-brand-950 tracking-wider select-all">{bankDetails?.alias || "deco.home.rosario"}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(bankDetails?.alias || "deco.home.rosario");
-                            notify("¡Alias de CBU copiado!", "success");
-                          }}
-                          className="bg-green-700 hover:bg-green-800 text-white font-sans px-3.5 py-2 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors active:scale-95 whitespace-nowrap self-stretch sm:self-auto justify-center"
-                        >
-                          <Copy className="w-3.5 h-3.5 text-white" />
-                          <span>Copiar Alias</span>
-                        </button>
-                      </div>
-
-                      <p className="text-[10px] text-brand-600 font-sans italic leading-tight pt-1">
-                        ⚠️ Por seguridad y para evitar errores de un número que puedan errar, solo se puede copiar con un toque el Alias. Por favor, utilizalo para transferir.
-                      </p>
-
-                      <p className="border-t border-brand-100 pt-2 shrink-0">
-                        <strong>Monto neto a transferir:</strong> <strong className="text-green-800 text-sm font-bold font-mono">{formatCurrency(transferTotal)}</strong>
-                      </p>
-                    </div>
-                  </div>
-                )}
 
                 {/* 5. ACREDITACIÓN DE TARJETA (SI ES TARJETA) */}
                 {!isTransfer && (
