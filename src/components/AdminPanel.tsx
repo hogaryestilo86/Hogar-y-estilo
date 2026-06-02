@@ -307,8 +307,117 @@ export default function AdminPanel({
       localStorage.setItem("github_sync_branch", branchToUse);
       localStorage.setItem("github_sync_path", pathToUse);
 
+      notify("Asegurando que todas las fotos y videos del catálogo estén respaldados en GitHub...", "info");
+      
+      // Realizar copia profunda para evitar efectos colaterales en la interfaz activa mientras subimos
+      const updatedCatalog = JSON.parse(JSON.stringify(dataToSave));
+      
+      for (const prod of updatedCatalog) {
+        if (!prod || !prod.media || !Array.isArray(prod.media)) continue;
+        
+        for (const mediaItem of prod.media) {
+          if (!mediaItem || !mediaItem.url) continue;
+          
+          let base64ToUpload: string | null = null;
+          let filenameToUse: string | null = null;
+          
+          if (mediaItem.url.startsWith("data:")) {
+            // Es un archivo nuevo cargado como Base64 dataURL
+            try {
+              const regex = /^data:([a-zA-Z0-9-]+\/[a-zA-Z0-9-+.#]+);base64,(.+)$/;
+              const matches = mediaItem.url.match(regex);
+              if (matches) {
+                const mimeType = matches[1];
+                const base64Data = matches[2];
+                base64ToUpload = base64Data;
+                
+                let ext = "jpg";
+                if (mimeType.includes("video/mp4")) ext = "mp4";
+                else if (mimeType.includes("video/webm")) ext = "webm";
+                else if (mimeType.includes("image/png")) ext = "png";
+                else if (mimeType.includes("image/webp")) ext = "webp";
+                else if (mimeType.includes("image/gif")) ext = "gif";
+                
+                filenameToUse = `media_${Date.now()}_${Math.floor(Math.random() * 100000)}.${ext}`;
+              }
+            } catch (err) {
+              console.warn("Error interpretando data URL:", err);
+            }
+          } else if (mediaItem.url.startsWith("/uploads/") || mediaItem.url.startsWith("uploads/")) {
+            // Referencia a un archivo en el servidor local. ¡Veamos si ya existe en GitHub!
+            const filename = mediaItem.url.split("/").pop();
+            if (filename) {
+              const gitCheckUrl = `https://api.github.com/repos/${cleanRepo}/contents/public/uploads/${filename}?ref=${branchToUse}`;
+              try {
+                const checkRes = await fetch(gitCheckUrl, {
+                  headers: {
+                    "Authorization": `token ${tokenToUse}`
+                  }
+                });
+                
+                if (checkRes.status === 404) {
+                  // ¡No está en Git todavía! Lo descargamos del servidor local para subirlo
+                  notify(`Subiendo foto o video de producto a tu GitHub: ${filename}...`, "info");
+                  const fileRes = await fetch(mediaItem.url);
+                  if (fileRes.ok) {
+                    const blob = await fileRes.blob();
+                    const reader = new FileReader();
+                    const base64Promise = new Promise<string>((resolve, reject) => {
+                      reader.onloadend = () => {
+                        const resBase64 = (reader.result as string).split(",")[1];
+                        resolve(resBase64);
+                      };
+                      reader.onerror = reject;
+                    });
+                    reader.readAsDataURL(blob);
+                    
+                    base64ToUpload = await base64Promise;
+                    filenameToUse = filename;
+                  }
+                } else if (checkRes.ok) {
+                  console.log(`El archivo ${filename} ya está presente en GitHub. Omitiendo duplicación.`);
+                }
+              } catch (gitCheckErr) {
+                console.warn(`Error al verificar/subir el archivo ${filename} desde el servidor:`, gitCheckErr);
+              }
+            }
+          }
+          
+          // Si tenemos datos listos para subir a GitHub
+          if (base64ToUpload && filenameToUse) {
+            try {
+              const uploadUrl = `https://api.github.com/repos/${cleanRepo}/contents/public/uploads/${filenameToUse}`;
+              const putBody = {
+                message: `Subir multimedia de producto: ${filenameToUse} 📸🎬`,
+                content: base64ToUpload,
+                branch: branchToUse
+              };
+              
+              const putRes = await fetch(uploadUrl, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/vnd.github.v3+json",
+                  "Authorization": `token ${tokenToUse}`
+                },
+                body: JSON.stringify(putBody)
+              });
+              
+              if (putRes.ok) {
+                console.log(`¡Archivo ${filenameToUse} subido exitosamente al repositorio GitHub!`);
+                mediaItem.url = `/uploads/${filenameToUse}`;
+              } else {
+                console.warn(`La subida de ${filenameToUse} a GitHub falló con estado:`, putRes.status);
+              }
+            } catch (upErr) {
+              console.warn(`Error de red al subir el archivo ${filenameToUse} a la API de contenidos de GitHub:`, upErr);
+            }
+          }
+        }
+      }
+
       notify("Optimizando imágenes para asegurar una sincronización ultrarrápida...", "info");
-      const compressedCatalog = await compressAllProductsBase64(dataToSave);
+      const compressedCatalog = await compressAllProductsBase64(updatedCatalog);
       
       // Actualizar estado local si es necesario para mantener sincronía
       try {
@@ -2805,15 +2914,23 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             </div>
 
             <div className="bg-brand-50 rounded-xl overflow-hidden max-h-[60vh] flex items-center justify-center border border-brand-200 relative p-3">
-              <ResolvedImage 
-                src={selectedReceipt} 
-                alt="Comprobante completo" 
-                className="max-h-[55vh] h-auto max-w-full object-contain mx-auto shadow-sm rounded-lg"
-              />
+              <a 
+                href={selectedReceipt} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="cursor-zoom-in block w-full text-center"
+                title="Toca para abrir la imagen en pantalla completa en una nueva pestaña"
+              >
+                <ResolvedImage 
+                  src={selectedReceipt} 
+                  alt="Comprobante completo" 
+                  className="max-h-[55vh] h-auto max-w-full object-contain mx-auto shadow-sm rounded-lg hover:opacity-95 transition-opacity"
+                />
+              </a>
             </div>
 
-            <p className="text-[10px] text-brand-500 font-sans text-center">
-              Podés cruzar el nombre impreso en la captura con el nombre del cliente en la lista para despachar.
+            <p className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded-lg font-sans text-center font-semibold">
+              ✨ Toca la foto de arriba para abrirla en tamaño original en otra pestaña y ver cada detalle.
             </p>
 
             <div className="flex justify-end pt-1">

@@ -52,11 +52,30 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Ensure uploads directory exists and is served statically
-  const uploadsDir = path.join(process.cwd(), "uploads");
+  // Ensure uploads directory exists inside public folder so Vite can bundle on build (important for Vercel/dynamic paths)
+  const legacyDir = path.join(process.cwd(), "uploads");
+  const uploadsDir = path.join(process.cwd(), "public", "uploads");
+  
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
+  
+  if (fs.existsSync(legacyDir)) {
+    try {
+      const files = fs.readdirSync(legacyDir);
+      for (const file of files) {
+        const legacyFilePath = path.join(legacyDir, file);
+        const newFilePath = path.join(uploadsDir, file);
+        if (fs.statSync(legacyFilePath).isFile() && !fs.existsSync(newFilePath)) {
+          fs.copyFileSync(legacyFilePath, newFilePath);
+          console.log(`Migrated legacy local asset to public folder: ${file}`);
+        }
+      }
+    } catch (migErr) {
+      console.warn("Could not copy legacy assets to public directory:", migErr);
+    }
+  }
+  
   app.use("/uploads", express.static(uploadsDir));
 
   // Middleware for parsing JSON requests
@@ -253,8 +272,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         return res.status(400).json({ error: "Datos de catálogo inválidos." });
       }
 
-      // Ensure uploads directory exists and is registered
-      const uploadsDir = path.join(process.cwd(), "uploads");
+      // Ensure uploads directory exists inside public folder so Vite can bundle on build (important for Vercel/dynamic paths)
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }

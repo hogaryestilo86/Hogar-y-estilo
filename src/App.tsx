@@ -287,6 +287,133 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Dynamic Google SEO and Structured Keywords Parser & Loader
+  useEffect(() => {
+    try {
+      if (selectedProduct) {
+        // Individual Product View SEO Optimization
+        document.title = `${selectedProduct.title} | Hogar y Estilo`;
+        
+        // Dynamically create or update <meta name="description">
+        let descMeta = document.querySelector('meta[name="description"]');
+        if (!descMeta) {
+          descMeta = document.createElement("meta");
+          descMeta.setAttribute("name", "description");
+          document.head.appendChild(descMeta);
+        }
+        const plainDesc = selectedProduct.description
+          ? selectedProduct.description.replace(/[#*`_]/g, "").slice(0, 160)
+          : `Detalles, especificaciones y envío de ${selectedProduct.title} en Hogar y Estilo.`;
+        descMeta.setAttribute("content", `${plainDesc}...`);
+
+        // Dynamically load Google/Bing search index keywords (SEO features)
+        let keywordsMeta = document.querySelector('meta[name="keywords"]');
+        if (!keywordsMeta) {
+          keywordsMeta = document.createElement("meta");
+          keywordsMeta.setAttribute("name", "keywords");
+          document.head.appendChild(keywordsMeta);
+        }
+        const keywords = selectedProduct.features && selectedProduct.features.length > 0
+          ? selectedProduct.features.join(", ")
+          : `${selectedProduct.category.toLowerCase()}, hogar y estilo, decoración rosario, bazar premium`;
+        keywordsMeta.setAttribute("content", keywords);
+      } else {
+        // Main Catalog Category SEO optimization
+        const categoryLabel = selectedCategory === "Todos" 
+          ? "Decoración y Bazar en Rosario" 
+          : `${selectedCategory} - Diseño y Bazar`;
+        document.title = `${categoryLabel} | Hogar y Estilo`;
+
+        // Default or Category Description
+        let descMeta = document.querySelector('meta[name="description"]');
+        if (descMeta) {
+          descMeta.setAttribute(
+            "content",
+            `Descubrí nuestra colección premium de ${selectedCategory.toLowerCase()} en Hogar y Estilo. Envíos a todo el país. Selección de objetos de diseño para lograr un hogar cálido y único de Rosario.`
+          );
+        }
+
+        // Aggregate product keywords into massive collective SEO keywords tags for Google bots
+        let keywordsMeta = document.querySelector('meta[name="keywords"]');
+        if (!keywordsMeta) {
+          keywordsMeta = document.createElement("meta");
+          keywordsMeta.setAttribute("name", "keywords");
+          document.head.appendChild(keywordsMeta);
+        }
+        
+        const productTitles = (products || [])
+          .slice(0, 15)
+          .map(p => p.title.toLowerCase())
+          .join(", ");
+        
+        const baseTags = "hogar y estilo, decoración rosario, bazar rosario, organizadores de cocina, diseño nórdico, estilo japandi, envíos argentina";
+        keywordsMeta.setAttribute("content", productTitles ? `${baseTags}, ${productTitles}` : baseTags);
+      }
+
+      // JSON-LD dynamic script updating for advanced Google Search listing
+      let existingSchema = document.getElementById("hogar-estilo-seo-schema");
+      if (existingSchema) {
+        existingSchema.remove();
+      }
+
+      const script = document.createElement("script");
+      script.id = "hogar-estilo-seo-schema";
+      script.type = "application/ld+json";
+
+      let schemaData: any = {};
+      
+      if (selectedProduct) {
+        schemaData = {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": selectedProduct.title,
+          "description": selectedProduct.description.replace(/[#*`_]/g, "").slice(0, 200),
+          "category": selectedProduct.category,
+          "image": selectedProduct.media?.map(m => m.url) || [],
+          "brand": {
+            "@type": "Brand",
+            "name": "Hogar y Estilo"
+          },
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "ARS",
+            "price": selectedProduct.basePrice,
+            "availability": selectedProduct.paused ? "https://schema.org/OutOfStock" : "https://schema.org/InStock"
+          },
+          "keywords": selectedProduct.features?.join(", ") || ""
+        };
+      } else {
+        schemaData = {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          "name": "Hogar y Estilo | Bazar y Decoración de Diseño",
+          "description": "Tienda premium de dropshipping y diseño con base en Rosario, Santa Fe. Envíos con repuesto de regalo gratis en todas las compras.",
+          "itemListElement": (products || []).slice(0, 12).map((p, idx) => ({
+            "@type": "ListItem",
+            "position": idx + 1,
+            "item": {
+              "@type": "Product",
+              "name": p.title,
+              "description": p.description.slice(0, 150).replace(/[#*`_]/g, ""),
+              "image": p.media?.[0]?.url || "",
+              "offers": {
+                "@type": "Offer",
+                "priceCurrency": "ARS",
+                "price": p.basePrice
+              }
+            }
+          }))
+        };
+      }
+
+      script.textContent = JSON.stringify(schemaData);
+      document.head.appendChild(script);
+
+    } catch (seoErr) {
+      console.warn("Failed to synchronize dynamic browser SEO meta parameters:", seoErr);
+    }
+  }, [selectedProduct, selectedCategory, products]);
+
   // Calculamos los productos destacados dinámicamente para la vitrina deslizable manualmente
   const showcasePhotos = products
     .filter(p => p && p.featured && !p.paused)
