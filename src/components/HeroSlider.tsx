@@ -11,6 +11,7 @@ import { ResolvedImage, ResolvedVideo } from "../indexedDbMedia";
 interface ShowcasePhoto {
   url: string;
   type?: string;
+  backupUrl?: string;
   title: string;
   desc: string;
 }
@@ -105,6 +106,7 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
                 {isVideo ? (
                   <ResolvedVideo
                     src={resolvedUrl}
+                    backupUrl={item.backupUrl}
                     className="w-full h-full object-cover pointer-events-none"
                     autoPlay
                     muted
@@ -114,6 +116,7 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
                 ) : (
                   <ResolvedImage
                     src={resolvedUrl}
+                    backupUrl={item.backupUrl}
                     alt={item.title}
                     onError={(e) => {
                       e.currentTarget.src = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";

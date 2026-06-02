@@ -500,6 +500,7 @@ export default function App() {
     .map(p => ({
       url: p.media?.[0]?.url || "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85",
       type: p.media?.[0]?.type || "image",
+      backupUrl: p.media?.[0]?.backupUrl,
       title: p.title,
       desc: p.description
     }));
