@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Product } from "../types";
 import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
@@ -25,7 +25,21 @@ export default function ProductCard({
   const [hovered, setHovered] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true); // Cards start muted for silent grid scrolling
+  const [modalOpen, setModalOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Monitor detail modal open state dynamically to stop rendering video elements in background
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const isOpen = document.body.classList.contains("modal-open");
+      setModalOpen(isOpen);
+    });
+
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    setModalOpen(document.body.classList.contains("modal-open"));
+
+    return () => observer.disconnect();
+  }, []);
 
   // Auto price variables
   const listPrice = product?.basePrice || 0;
@@ -74,27 +88,37 @@ export default function ProductCard({
     >
       {/* Product Image / Video Section */}
       <div 
-        className="relative w-full h-64 sm:h-72 bg-[#d4cbba] overflow-hidden cursor-pointer border-b border-[#c4bba3]"
+        className="relative w-full h-[360px] sm:h-[400px] bg-[#d4cbba] overflow-hidden cursor-pointer border-b border-[#c4bba3]"
         onClick={() => onViewDetails(product)}
       >
         {/* Badges - Highly Eye-catching gradient badges inviting high conversions */}
-        <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5 pointer-events-none">
-          {product.basePrice >= 50000 && (
-            <span className="bg-gradient-to-r from-emerald-600 via-emerald-700 to-green-600 text-white text-[10.5px] font-black tracking-wider uppercase px-3 py-1.5 rounded-xl shadow-lg border border-emerald-400/40 flex items-center gap-1.5 backdrop-blur-xs animate-pulse">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
-              🚚 ¡ENVÍO GRATIS!
-            </span>
-          )}
-          {product.beforePrice && product.beforePrice > listPrice && (
-            <span className="bg-gradient-to-r from-red-650 via-[#DC2626] to-amber-600 text-white text-[10.5px] font-black tracking-wider uppercase px-3 py-1.5 rounded-xl shadow-lg border border-rose-500/40 flex items-center gap-1 backdrop-blur-xs">
-              🔥 MEGA OFERTA: {Math.round(((product.beforePrice - listPrice) / product.beforePrice) * 100)}% OFF
-            </span>
+        <div className="absolute top-3 left-0 right-0 z-20 px-3 flex flex-col gap-1.5 items-center justify-center pointer-events-none">
+          {product.basePrice >= 50000 ? (
+            <>
+              <span className="w-full text-center bg-gradient-to-r from-emerald-600 via-emerald-700 to-green-600 text-white text-[10.5px] font-black tracking-wider uppercase px-3 py-1.5 rounded-xl shadow-lg border border-emerald-400/40 flex items-center justify-center gap-1.5 backdrop-blur-xs animate-pulse">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+                🚚 ¡ENVÍO GRATIS!
+              </span>
+              {product.beforePrice && product.beforePrice > listPrice && (
+                <span className="w-full text-center bg-gradient-to-r from-[#DC2626] to-amber-600 text-white text-[10.5px] font-black tracking-wider uppercase px-3 py-1.5 rounded-xl shadow-md border border-rose-500/40 flex items-center justify-center gap-1 backdrop-blur-xs">
+                  🔥 ¡AHORRÁS {formatCurrency(product.beforePrice - listPrice)}!
+                </span>
+              )}
+            </>
+          ) : (
+            product.beforePrice && product.beforePrice > listPrice && (
+              <span className="max-w-[90%] text-center bg-gradient-to-r from-red-650 via-[#DC2626] to-amber-600 text-white text-[10.5px] font-black tracking-wider uppercase px-4 py-1.5 rounded-xl shadow-lg border border-rose-500/40 flex items-center justify-center gap-1.5 backdrop-blur-xs mx-auto animate-pulse">
+                🔥 ¡AHORRÁS {formatCurrency(product.beforePrice - listPrice)}!
+              </span>
+            )
           )}
         </div>
 
         {/* Media display */}
-        <div className="w-full h-full relative">
-          {activeMedia.type === "video" ? (
+        <div className={`w-full h-full relative ${
+          (product.basePrice >= 50000 || (product.beforePrice && product.beforePrice > listPrice)) ? "pt-[76px]" : "pt-2"
+        } pb-2`}>
+          {(activeMedia.type === "video" && !modalOpen) ? (
             <div className="w-full h-full relative">
               <ResolvedVideo
                 ref={videoRef}

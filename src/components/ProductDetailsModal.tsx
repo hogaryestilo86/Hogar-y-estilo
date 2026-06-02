@@ -31,6 +31,17 @@ export default function ProductDetailsModal({
   const [liked, setLiked] = useState(false);
   const [isMuted, setIsMuted] = useState(false); // Default to unmuted so sound is enabled check
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add("modal-open");
+    } else {
+      document.body.classList.remove("modal-open");
+    }
+    return () => {
+      document.body.classList.remove("modal-open");
+    };
+  }, [isOpen]);
+
   const notify = (msg: string, type: "success" | "error" | "info" = "success") => {
     if (showToast) {
       showToast(msg, type);
@@ -95,22 +106,22 @@ export default function ProductDetailsModal({
     }).format(val);
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-brand-950/75 backdrop-blur-md">
-      {/* Modal Container */}
-      <div className="bg-[#ded7c4] w-full max-w-4xl rounded-2xl border border-[#c4bba3] overflow-hidden shadow-2xl relative my-8 flex flex-col md:flex-row max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-black/80 backdrop-blur-sm">
+      {/* Modal Container - Darker Sand bg with ultra high-contrast styling */}
+      <div className="bg-[#d2c7b0] w-full max-w-4xl rounded-2xl border border-[#b8ad90] overflow-hidden shadow-2xl relative my-8 flex flex-col md:flex-row max-h-[90vh]">
         
         {/* Close Button Pin and Like Button */}
         <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
           <button
             onClick={() => setLiked(!liked)}
-            className="p-2 rounded-full bg-[#fcfbfa]/90 hover:bg-white text-rose-600 shadow-sm border border-[#c4bba3] cursor-pointer"
+            className="p-2 rounded-full bg-[#fcfbfa]/90 hover:bg-white text-rose-600 shadow-sm border border-[#b8ad90] cursor-pointer"
             aria-label="Guardar en favoritos"
           >
             <Heart className={`w-4 h-4 ${liked ? "fill-rose-600" : ""}`} />
           </button>
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-[#fcfbfa]/90 hover:bg-white text-brand-950 hover:text-black shadow-sm border border-[#c4bba3] cursor-pointer"
+            className="p-2 rounded-full bg-[#fcfbfa]/90 hover:bg-white text-brand-950 hover:text-black shadow-sm border border-[#b8ad90] cursor-pointer"
             aria-label="Cerrar detalles"
           >
             <X className="w-4 h-4" />
@@ -118,8 +129,8 @@ export default function ProductDetailsModal({
         </div>
 
         {/* Left Side: Media gallery & player */}
-        <div className="w-full md:w-1/2 bg-[#eedfc9]/40 flex flex-col justify-between border-r border-[#c4bba3] p-4 sm:p-6 overflow-y-auto max-h-[40vh] md:max-h-full">
-          <div className="relative w-full aspect-square rounded-xl bg-brand-950 overflow-hidden border border-[#c4bba3] flex items-center justify-center">
+        <div className="w-full md:w-1/2 bg-[#eedfc9]/40 flex flex-col justify-between border-r border-[#b8ad90] p-4 sm:p-6 overflow-y-auto max-h-[40vh] md:max-h-full">
+          <div className="relative w-full aspect-square rounded-xl bg-brand-950 overflow-hidden border border-[#b8ad90] flex items-center justify-center">
             {activeMediaList[activeMediaIndex]?.type === "video" ? (
               <div className="relative w-full h-full flex items-center justify-center bg-black">
                 <ResolvedVideo
@@ -173,13 +184,26 @@ export default function ProductDetailsModal({
                   key={idx}
                   onClick={() => setActiveMediaIndex(idx)}
                   className={`relative w-16 sm:w-20 aspect-square rounded-lg overflow-hidden border-2 cursor-pointer transition-all shrink-0 ${
-                    idx === activeMediaIndex ? "border-brand-950 scale-105" : "border-[#c4bba3] hover:border-brand-950"
+                    idx === activeMediaIndex ? "border-brand-950 scale-105" : "border-[#b8ad90] hover:border-brand-950"
                   }`}
                 >
                   {item.type === "video" ? (
-                    <div className="w-full h-full bg-black flex items-center justify-center relative">
-                      <span className="absolute inset-0 bg-brand-950/40 transition-colors" />
-                      <span className="text-white text-xs font-black leading-none">VÍDEO</span>
+                    <div className="w-full h-full relative bg-brand-950 flex items-center justify-center">
+                      <ResolvedImage
+                        src={item.backupUrl || getCategoryPlaceholder(product.category)}
+                        backupUrl={item.backupUrl}
+                        alt={`Video Thumbnail`}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover opacity-60 transition-transform hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
+                        <span className="p-1 rounded-full bg-white/20 backdrop-blur-xs text-white">
+                          <svg className="w-3 h-3 fill-white text-white" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </span>
+                        <span className="text-white text-[8px] font-black tracking-widest uppercase">VÍDEO</span>
+                      </div>
                     </div>
                   ) : (
                     <ResolvedImage
@@ -246,8 +270,8 @@ export default function ProductDetailsModal({
                       <span className="text-xs line-through text-red-650 font-black leading-none">
                         {formatCurrency(product.beforePrice)}
                       </span>
-                      <span className="bg-gradient-to-r from-red-600 to-amber-600 text-white text-[9.5px] font-black px-1.5 py-0.5 rounded shadow-xs">
-                        {Math.round(((product.beforePrice - listPrice) / product.beforePrice) * 100)}% OFF
+                      <span className="bg-gradient-to-r from-[#DC2626] to-amber-600 text-white text-[9.5px] font-black px-2 py-0.5 rounded shadow-xs animate-pulse">
+                        ¡AHORRÁS {formatCurrency(product.beforePrice - listPrice)}!
                       </span>
                     </div>
                   )}
