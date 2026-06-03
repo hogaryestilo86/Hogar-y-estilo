@@ -250,9 +250,17 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
                   reader.onerror = reject;
                   reader.readAsDataURL(blob);
                 });
+                let finalUrl = dataUrl;
+                if (blob && blob.type && blob.type.startsWith("image/")) {
+                  try {
+                    finalUrl = await compressBase64Image(dataUrl);
+                  } catch (compErr) {
+                    console.warn("Could not compress IDB migrated image:", compErr);
+                  }
+                }
                 prodChanged = true;
                 changed = true;
-                return { ...item, url: dataUrl };
+                return { ...item, url: finalUrl };
               }
             } catch (err) {
               console.warn(`No se pudo resolver o migrar la URL idb://${key} a Base64:`, err);
@@ -389,6 +397,38 @@ export async function resolveIdbUrl(url: string | undefined): Promise<string> {
   return "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
 }
 
+const globalBase64BlobCache: Record<string, string> = {};
+
+/**
+ * Converts a base64 data URL to a local binary Blob URL.
+ * Essential for video stream playback because modern browsers fail to play base64 directly in video elements.
+ */
+export function base64ToBlobUrl(dataUrl: string): string {
+  if (!dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
+  if (globalBase64BlobCache[dataUrl]) {
+    return globalBase64BlobCache[dataUrl];
+  }
+  try {
+    const parts = dataUrl.split(",");
+    if (parts.length < 2) return dataUrl;
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "";
+    const bstr = atob(parts[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    const blob = new Blob([u8arr], { type: mime });
+    const blobUrl = URL.createObjectURL(blob);
+    globalBase64BlobCache[dataUrl] = blobUrl;
+    return blobUrl;
+  } catch (err) {
+    console.warn("Failed to convert base64 to blob URL:", err);
+    return dataUrl;
+  }
+}
+
 /**
  * React Hook that dynamically and synchronously (from cache) resolves ANY url.
  * Handles standard http/https, base64, and persistent idb:// urls automatically.
@@ -400,6 +440,9 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
   
   const getInstantResolved = () => {
     if (!url) return backupUrl || "";
+    if (url.startsWith("data:video/")) {
+      return base64ToBlobUrl(url);
+    }
     if (!isIdbUrl) {
       if ((url.startsWith("/uploads/") || url.startsWith("uploads/")) && backupUrl) {
         return backupUrl;

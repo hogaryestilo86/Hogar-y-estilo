@@ -82,32 +82,32 @@ export default function ProductCard({
   return (
     <div
       id={`product-card-${product.id}`}
-      className="bg-[#ded7c4] border border-[#c4bba3] rounded-2xl shadow-sm hover:shadow-xl transition-all duration-350 flex flex-col group overflow-hidden h-full text-brand-950"
+      className="bg-card-bg border border-[#beb39e] rounded-2xl shadow-sm hover:shadow-xl transition-all duration-350 flex flex-col group overflow-hidden h-full text-neutral-900"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       {/* Product Image / Video Section */}
       <div 
-        className="relative w-full h-[360px] sm:h-[400px] bg-[#d4cbba] overflow-hidden cursor-pointer border-b border-[#c4bba3]"
+        className="relative w-full h-[360px] sm:h-[400px] bg-[#cbc0ad] overflow-hidden cursor-pointer border-b border-[#beb39e]"
         onClick={() => onViewDetails(product)}
       >
         {/* Badges - Highly Eye-catching gradient badges inviting high conversions */}
         <div className="absolute top-3 left-0 right-0 z-20 px-3 flex flex-col gap-1.5 items-center justify-center pointer-events-none">
           {product.basePrice >= 50000 ? (
             <>
-              <span className="w-full text-center bg-gradient-to-r from-emerald-600 via-emerald-700 to-green-600 text-white text-[10.5px] font-black tracking-wider uppercase px-3 py-1.5 rounded-xl shadow-lg border border-emerald-400/40 flex items-center justify-center gap-1.5 backdrop-blur-xs animate-pulse">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+              <span className="w-full text-center bg-[#2EC4C8] text-black text-[11px] font-black tracking-wider uppercase px-3 py-1.5 rounded-xl shadow-lg border border-cyan-400/30 flex items-center justify-center gap-1.5 backdrop-blur-xs animate-pulse">
+                <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
                 🚚 ¡ENVÍO GRATIS!
               </span>
               {product.beforePrice && product.beforePrice > listPrice && (
-                <span className="w-full text-center bg-gradient-to-r from-[#DC2626] to-amber-600 text-white text-[10.5px] font-black tracking-wider uppercase px-3 py-1.5 rounded-xl shadow-md border border-rose-500/40 flex items-center justify-center gap-1 backdrop-blur-xs">
+                <span className="w-full text-center bg-[#EE6966] text-white text-[11px] font-black tracking-wider uppercase px-3 py-1.5 rounded-xl shadow-md border border-rose-400/30 flex items-center justify-center gap-1 backdrop-blur-xs">
                   🔥 ¡AHORRÁS {formatCurrency(product.beforePrice - listPrice)}!
                 </span>
               )}
             </>
           ) : (
             product.beforePrice && product.beforePrice > listPrice && (
-              <span className="max-w-[90%] text-center bg-gradient-to-r from-red-650 via-[#DC2626] to-amber-600 text-white text-[10.5px] font-black tracking-wider uppercase px-4 py-1.5 rounded-xl shadow-lg border border-rose-500/40 flex items-center justify-center gap-1.5 backdrop-blur-xs mx-auto animate-pulse">
+              <span className="max-w-[90%] text-center bg-[#EE6966] text-white text-[11px] font-black tracking-wider uppercase px-4 py-1.5 rounded-xl shadow-lg border border-rose-400/30 flex items-center justify-center gap-1.5 backdrop-blur-xs mx-auto animate-pulse">
                 🔥 ¡AHORRÁS {formatCurrency(product.beforePrice - listPrice)}!
               </span>
             )
@@ -125,7 +125,7 @@ export default function ProductCard({
                 src={activeMedia.url}
                 backupUrl={activeMedia.backupUrl}
                 category={product.category}
-                className="w-full h-full object-contain bg-brand-950 p-1.5"
+                className="w-full h-full object-contain bg-neutral-950 p-1.5"
                 autoPlay
                 muted={isMuted}
                 loop
@@ -152,7 +152,7 @@ export default function ProductCard({
               alt={product.title}
               loading="lazy"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain bg-brand-950 p-1.5 transition-transform duration-700 ease-out group-hover:scale-105"
+              className="w-full h-full object-contain bg-neutral-950 p-1.5 transition-transform duration-700 ease-out group-hover:scale-105"
             />
           )}
         </div>
@@ -161,20 +161,20 @@ export default function ProductCard({
         {hasMultipleMedia && (
           <>
             <button
-              type="button"
-              onClick={handlePrevMedia}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 z-30 bg-white/95 hover:bg-white text-brand-950 p-2 rounded-full shadow-md backdrop-blur-xs transition-all active:scale-90 hover:scale-105 flex items-center justify-center cursor-pointer border border-[#c4bba3]"
-              title="Imagen Anterior"
+               type="button"
+               onClick={handlePrevMedia}
+               className="absolute left-2.5 top-1/2 -translate-y-1/2 z-30 bg-black/85 hover:bg-black text-[#DCB48D] p-2 rounded-full shadow-md backdrop-blur-xs transition-all active:scale-90 hover:scale-105 flex items-center justify-center cursor-pointer border border-[#DCB48D]/30"
+               title="Imagen Anterior"
             >
-              <ChevronLeft className="w-4 h-4 text-brand-950 stroke-[2.5]" />
+              <ChevronLeft className="w-4 h-4 text-[#DCB48D] stroke-[2.5]" />
             </button>
             <button
-              type="button"
-              onClick={handleNextMedia}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 z-30 bg-white/95 hover:bg-white text-brand-950 p-2 rounded-full shadow-md backdrop-blur-xs transition-all active:scale-90 hover:scale-105 flex items-center justify-center cursor-pointer border border-[#c4bba3]"
-              title="Siguiente Imagen"
+               type="button"
+               onClick={handleNextMedia}
+               className="absolute right-2.5 top-1/2 -translate-y-1/2 z-30 bg-black/85 hover:bg-black text-[#DCB48D] p-2 rounded-full shadow-md backdrop-blur-xs transition-all active:scale-90 hover:scale-105 flex items-center justify-center cursor-pointer border border-[#DCB48D]/30"
+               title="Siguiente Imagen"
             >
-              <ChevronRight className="w-4 h-4 text-brand-950 stroke-[2.5]" />
+              <ChevronRight className="w-4 h-4 text-[#DCB48D] stroke-[2.5]" />
             </button>
           </>
         )}
@@ -191,7 +191,7 @@ export default function ProductCard({
                   setMediaIndex(idx);
                 }}
                 className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                  idx === mediaIndex ? "bg-white w-4" : "bg-white/40 hover:bg-white/70"
+                  idx === mediaIndex ? "bg-[#DCB48D] w-4" : "bg-white/40 hover:bg-white/70"
                 }`}
                 title={`Ir a imagen ${idx + 1}`}
               />
@@ -200,24 +200,24 @@ export default function ProductCard({
         )}
 
         {/* Quick View Overlay (on Hover) */}
-        <div className="absolute inset-0 bg-brand-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-10">
-          <span className="bg-brand-950/95 text-white text-xs font-black tracking-widest uppercase px-5 py-3 rounded-full shadow-lg backdrop-blur-sm transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 scale-95 hover:scale-100 border border-brand-800">
+        <div className="absolute inset-0 bg-neutral-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-10">
+          <span className="bg-neutral-950/95 text-white text-xs font-black tracking-widest uppercase px-5 py-3 rounded-full shadow-lg backdrop-blur-sm transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 scale-95 hover:scale-100 border border-neutral-800">
             Ver Detalles
           </span>
         </div>
       </div>
 
       {/* Product Information Details */}
-      <div className="p-4 sm:p-5 flex flex-col grow justify-between">
+      <div className="p-4 sm:p-5 flex flex-col grow justify-between bg-card-bg">
         {/* Category & Stars */}
         <div>
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-[10px] tracking-widest text-brand-800 uppercase font-extrabold bg-[#cdbfab] px-2 py-0.5 rounded-md">
+            <span className="text-[10px] tracking-widest text-[#5c503b] uppercase font-extrabold bg-[#c0b49d] px-2 py-0.5 rounded-md">
               {product.category}
             </span>
-            <div className="flex items-center gap-1 bg-[#ccbfab] px-2 py-0.5 rounded-md border border-[#bfae98]">
-              <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-              <span className="text-xs font-black text-brand-950">
+            <div className="flex items-center gap-1 bg-[#c0b49d] px-2 py-0.5 rounded-md border border-[#ad9f87]">
+              <Star className="w-3 h-3 fill-[#DCB48D] text-[#DCB48D]" />
+              <span className="text-xs font-black text-neutral-900">
                 {(product?.reviews || []).length > 0 
                   ? ((product.reviews || []).reduce((acc, r) => acc + r.rating, 0) / (product.reviews || []).length).toFixed(1) 
                   : "5.0"}
@@ -227,51 +227,51 @@ export default function ProductCard({
 
           <h3 
             onClick={() => onViewDetails(product)}
-            className="font-serif text-lg sm:text-xl font-bold text-brand-950 hover:text-brand-800 cursor-pointer transition-colors line-clamp-1 mb-2"
+            className="font-serif text-lg sm:text-xl font-bold text-neutral-950 hover:text-neutral-800 cursor-pointer transition-colors line-clamp-1 mb-2 text-left"
           >
             {product.title}
           </h3>
 
-          <p className="text-xs sm:text-sm text-brand-900 font-normal line-clamp-2 md:line-clamp-3 mb-4 leading-relaxed">
+          <p className="text-xs sm:text-sm text-neutral-800 font-normal line-clamp-2 md:line-clamp-3 mb-4 leading-relaxed text-left">
             {product.description}
           </p>
         </div>
 
         {/* Premium Pricing Lógica */}
-        <div className="mt-2 border-t border-[#c4bba3] pt-3">
+        <div className="mt-2 border-t border-[#beb39e] pt-3">
           {/* Base regular lists price */}
-          <div className="flex items-baseline justify-between">
-            <span className="text-brand-800 text-xs font-bold">Precio de lista:</span>
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="text-neutral-700 text-xs font-semibold">Precio de lista:</span>
             <div className="flex flex-col items-end">
               {product.beforePrice && product.beforePrice > listPrice && (
-                <span className="text-xs line-through text-red-600 font-extrabold leading-none mb-0.5">
+                <span className="text-xs line-through text-[#F02D30] font-bold leading-none mb-0.5">
                   {formatCurrency(product.beforePrice)}
                 </span>
               )}
-              <span className="text-xl sm:text-2xl font-black tracking-tight text-brand-950 font-serif leading-none">
+              <span className={`text-xl sm:text-2xl font-black tracking-tight font-serif leading-none ${product.beforePrice && product.beforePrice > listPrice ? "text-[#F02D30]" : "text-neutral-950"}`}>
                 {formatCurrency(listPrice)}
               </span>
             </div>
           </div>
 
           {product.beforePrice && product.beforePrice > listPrice && (
-            <div className="flex justify-end mt-1.5">
-              <span className="bg-gradient-to-r from-red-50 to-amber-50 text-red-700 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border border-red-200 inline-flex items-center gap-1 shadow-xs animate-pulse">
+            <div className="flex justify-end mt-1.5 mb-1.5">
+              <span className="bg-[#EE6966]/20 text-neutral-900 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border border-[#EE6966]/30 inline-flex items-center gap-1 shadow-xs animate-pulse">
                 🔥 ¡Ahorrás {formatCurrency(product.beforePrice - listPrice)}!
               </span>
             </div>
           )}
 
           {/* installment calculation (3 installments without interest) */}
-          <div className="flex items-center gap-1.5 text-xs text-brand-900 mt-2 font-medium">
-            <CreditCard className="w-3.5 h-3.5 text-brand-750 shrink-0" />
-            <span>
-              Llevatelo en <strong className="text-brand-950 font-black">3 cuotas de {formatCurrency(installmentPrice)} sin interés</strong>
+          <div className="flex items-center gap-1.5 text-xs text-neutral-800 mt-2 font-medium">
+            <CreditCard className="w-3.5 h-3.5 text-neutral-700 shrink-0" />
+            <span className="text-left">
+              Llevatelo en <strong className="text-neutral-950 font-black">3 cuotas de {formatCurrency(installmentPrice)} sin interés</strong>
             </span>
           </div>
 
           {/* transfer discount (15% cash discount, bold green) */}
-          <div className="flex flex-col gap-1 text-xs mt-2 bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-xl">
+          <div className="flex flex-col gap-1 text-xs mt-2 bg-emerald-600/10 border border-emerald-600/20 p-2.5 rounded-xl text-left">
             <div className="flex items-center gap-1.5 font-bold text-emerald-800">
               <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>
@@ -279,7 +279,7 @@ export default function ProductCard({
               </span>
             </div>
             <div className="text-[10px] text-emerald-800/90 font-bold pl-5 leading-none">
-              💡 Pagando por Transferencia ahorrás <strong className="font-extrabold text-emerald-900">{formatCurrency(listPrice - transferPrice)}</strong> más
+              💡 Pagando por Transferencia ahorrás <strong className="font-extrabold text-[#F02D30]">{formatCurrency(listPrice - transferPrice)}</strong> más
             </div>
           </div>
         </div>
@@ -292,9 +292,9 @@ export default function ProductCard({
               e.stopPropagation();
               onBuyNow(product);
             }}
-            className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs sm:text-sm tracking-widest uppercase py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
+            className="w-full bg-[#DCB48D] hover:bg-[#c8a581] text-black font-bold text-xs sm:text-sm tracking-widest uppercase py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
           >
-            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+            <Sparkles className="w-4 h-4 text-black animate-pulse" />
             <span>Comprar ahora</span>
           </button>
           
@@ -305,9 +305,9 @@ export default function ProductCard({
               e.stopPropagation();
               onAddToCart(product);
             }}
-            className="w-full bg-[#fdf2f5] hover:bg-[#fce7ec] text-pink-700 border border-pink-300 font-black text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs hover:shadow-sm"
+            className="w-full bg-neutral-900 hover:bg-neutral-950 text-white border border-neutral-800 font-extrabold text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs hover:shadow-sm"
           >
-            <ShoppingCart className="w-3.5 h-3.5 text-pink-600" />
+            <ShoppingCart className="w-3.5 h-3.5 text-[#DCB48D]" />
             <span>Agregar al carrito</span>
           </button>
         </div>

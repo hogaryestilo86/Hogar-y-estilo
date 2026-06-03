@@ -6,7 +6,7 @@
 import React, { useRef } from "react";
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight } from "lucide-react";
 import { resolveImageUrl } from "../App";
-import { ResolvedImage, ResolvedVideo } from "../indexedDbMedia";
+import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface ShowcasePhoto {
   url: string;
@@ -14,6 +14,7 @@ interface ShowcasePhoto {
   backupUrl?: string;
   title: string;
   desc: string;
+  category?: string;
 }
 
 interface HeroSliderProps {
@@ -107,6 +108,7 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
                   <ResolvedVideo
                     src={resolvedUrl}
                     backupUrl={item.backupUrl}
+                    category={item.category}
                     className="w-full h-full object-cover pointer-events-none"
                     autoPlay
                     muted
@@ -117,9 +119,10 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
                   <ResolvedImage
                     src={resolvedUrl}
                     backupUrl={item.backupUrl}
+                    category={item.category}
                     alt={item.title}
                     onError={(e) => {
-                      e.currentTarget.src = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
+                      e.currentTarget.src = getCategoryPlaceholder(item.category);
                     }}
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     loading="lazy"

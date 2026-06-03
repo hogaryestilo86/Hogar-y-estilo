@@ -569,7 +569,8 @@ export default function App() {
       type: p.media?.[0]?.type || "image",
       backupUrl: p.media?.[0]?.backupUrl,
       title: p.title,
-      desc: p.description
+      desc: p.description,
+      category: p.category
     }));
 
   // Sticky instagram chat sim widget state

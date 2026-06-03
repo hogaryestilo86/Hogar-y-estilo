@@ -17,21 +17,31 @@
   --color-brand-700: #5f5749;
   --color-brand-800: #423d33;
   --color-brand-900: #292620;
+
+  /* Custom requested color theme variables */
+  --color-main-bg: #18181A;
+  --color-card-bg: #DACDB8;
+  --color-free-shipping: #2EC4C8;
+  --color-mega-offer: #EE6966;
+  --color-price-red: #F02D30;
+  --color-text-crema: #E4E0D6;
+  --color-gold-star: #DCB48D;
+  --color-header-bg: #1B1B1E;
 }
 
 /* Custom global overrides for smooth premium feel */
 body {
-  background-color: #FAF8F5;
-  background-image: radial-gradient(circle, #bfb9a6 1.5px, transparent 1.5px);
+  background-color: #18181A;
+  background-image: radial-gradient(circle, #2d2d30 1.5px, transparent 1.5px);
   background-size: 24px 24px;
-  color: #292620;
+  color: #E4E0D6;
   font-family: var(--font-sans);
   overflow-x: hidden;
 }
 
 .premium-grid-bg {
-  background-color: #FAF8F5 !important;
-  background-image: radial-gradient(circle, #bfb9a6 1.5px, transparent 1.5px) !important;
+  background-color: #18181A !important;
+  background-image: radial-gradient(circle, #2d2d30 1.5px, transparent 1.5px) !important;
   background-size: 24px 24px !important;
 }
 
