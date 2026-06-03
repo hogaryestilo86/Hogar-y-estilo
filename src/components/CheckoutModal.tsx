@@ -12,7 +12,9 @@ import { storeMedia, ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from
 let cachedMpPublicConfig: { publicKey: string; isReal: boolean } | null = null;
 
 // Preload Mercado Pago SDK script globally at module evaluation to eliminate load latency!
-if (typeof window !== "undefined" && typeof (window as any).MercadoPago === "undefined" && !document.getElementById("mp-sdk-script")) {
+if (typeof window !== "undefined" && typeof (window as any).MercadoPago === "undefined" && 
+    !document.getElementById("mp-sdk-script") && 
+    !document.querySelector('script[src*="mercadopago.com"]')) {
   const script = document.createElement("script");
   script.id = "mp-sdk-script";
   script.src = "https://sdk.mercadopago.com/js/v2";
@@ -58,7 +60,9 @@ export default function CheckoutModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    if (typeof (window as any).MercadoPago === "undefined" && !document.getElementById("mp-sdk-script")) {
+    if (typeof (window as any).MercadoPago === "undefined" && 
+        !document.getElementById("mp-sdk-script") && 
+        !document.querySelector('script[src*="mercadopago.com"]')) {
       const script = document.createElement("script");
       script.id = "mp-sdk-script";
       script.src = "https://sdk.mercadopago.com/js/v2";
@@ -231,12 +235,48 @@ export default function CheckoutModal({
               resolve();
               return;
             }
-            const script = document.createElement("script");
-            script.src = "https://sdk.mercadopago.com/js/v2";
-            script.async = true;
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error("No se pudo cargar el SDK de Mercado Pago."));
-            document.body.appendChild(script);
+            
+            let script = document.getElementById("mp-sdk-script") as HTMLScriptElement || 
+                         document.querySelector('script[src*="mercadopago.com"]') as HTMLScriptElement;
+            
+            if (!script) {
+              script = document.createElement("script");
+              script.id = "mp-sdk-script";
+              script.src = "https://sdk.mercadopago.com/js/v2";
+              script.async = true;
+              document.body.appendChild(script);
+            }
+
+            // Polling interval to catch execution of already-loaded script (0ms latency fallback!)
+            const interval = setInterval(() => {
+              if (typeof (window as any).MercadoPago !== "undefined") {
+                clearInterval(interval);
+                clearTimeout(timeout);
+                resolve();
+              }
+            }, 30);
+
+            const timeout = setTimeout(() => {
+              clearInterval(interval);
+              if (typeof (window as any).MercadoPago !== "undefined") {
+                resolve();
+              } else {
+                reject(new Error("La pasarela de pago tardó demasiado en responder. Por favor intentá de nuevo."));
+              }
+            }, 5500);
+
+            script.addEventListener("load", () => {
+              if (typeof (window as any).MercadoPago !== "undefined") {
+                clearInterval(interval);
+                clearTimeout(timeout);
+                resolve();
+              }
+            });
+            script.addEventListener("error", () => {
+              clearInterval(interval);
+              clearTimeout(timeout);
+              reject(new Error("No se pudo cargar el SDK de Mercado Pago."));
+            });
           });
 
           if (!active) return;
@@ -382,7 +422,18 @@ export default function CheckoutModal({
             } catch (e) {
               console.warn("No se pudo limpiar el contenedor de Mercado Pago antes de montar:", e);
             }
-            brickInstanceRef.current = await bricksBuilder.create("payment", "paymentCardBrickContainer", settings);
+            
+            const brickInstance = await bricksBuilder.create("payment", "paymentCardBrickContainer", settings);
+            
+            // If the user cancelled/navigated away while Mount Promise was resolving, immediately unmount to prevent leaks and page freezes!
+            if (!active) {
+              try {
+                await brickInstance.unmount();
+              } catch (_) {}
+              return;
+            }
+            
+            brickInstanceRef.current = brickInstance;
           }
         } catch (err: any) {
           console.error("Error al inicializar Mercado Pago Brick:", err);

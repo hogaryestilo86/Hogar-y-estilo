@@ -1929,8 +1929,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   >
                     <option value="Cocina">Cocina</option>
                     <option value="Hogar">Hogar</option>
-                    <option value="Belleza">Belleza</option>
-                    <option value="Cuidado Personal">Cuidado Personal</option>
+                    <option value="Belleza & Cuidado Personal">Belleza & Cuidado Personal</option>
                     <option value="Herramientas">Herramientas</option>
                     <option value="Iluminación">Iluminación</option>
                     <option value="Niños">Niños</option>
