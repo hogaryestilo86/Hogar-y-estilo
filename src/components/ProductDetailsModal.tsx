@@ -32,7 +32,6 @@ export default function ProductDetailsModal({
   const [localReviews, setLocalReviews] = useState<Record<string, ProductReview[]>>({});
   const [liked, setLiked] = useState(false);
   const [isMuted, setIsMuted] = useState(false); // Default to unmuted so sound is enabled check
-
   React.useEffect(() => {
     if (isOpen) {
       document.body.classList.add("modal-open");
@@ -338,9 +337,27 @@ export default function ProductDetailsModal({
 
           </div>
 
-          {/* Quick CTA bottom buttons */}
-          <div className="pt-6 mt-4 border-t border-[#c4bba3] space-y-3">
-            <div className="flex flex-col sm:flex-row gap-3">
+          {/* Quick CTA bottom buttons - Standard and fully available layout with warning sticker */}
+          <div className="pt-5 mt-4 border-t border-[#c4bba3] space-y-3.5">
+            {/* Informative advice box */}
+            <div className="bg-[#ebd9bd]/55 p-3.5 rounded-xl border border-[#c4bba3] text-left text-[11.5px] leading-relaxed text-brand-950 shadow-2xs">
+              <span className="font-extrabold text-red-700 block uppercase mb-1">🚨 AVISO DE STOCK DE SEGURIDAD:</span>
+              Para garantizar que el producto se encuentre disponible en el día, te sugerimos consultarnos el stock por mensaje privado en Instagram antes de realizar el pedido. ¡Te responderemos súper rápido!
+            </div>
+
+            {/* Direct Stock Consultation Option via Instagram DM - ALWAYS VISIBLE AND HIGHLY DISPLAYED */}
+            <a
+              href="https://instagram.com/deco.home.rosario"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-gradient-to-r from-purple-600 via-pink-650 to-orange-500 hover:from-purple-700 hover:via-pink-700 hover:to-orange-600 text-white font-black text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-all text-center cursor-pointer shadow-md transform hover:scale-[1.01] active:scale-95 border-0"
+            >
+              <Instagram className="w-5 h-5 text-white animate-pulse" />
+              <span>CONSULTAR STOCK POR INSTAGRAM 📱</span>
+            </a>
+
+            {/* Free Unconditional Shopping Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-1">
               {onBuyNow && (
                 <button
                   onClick={() => {
@@ -361,17 +378,6 @@ export default function ProductDetailsModal({
                 <span>Agregar al Carrito • {formatCurrency(listPrice)}</span>
               </button>
             </div>
-
-            {/* Direct Stock Consultation Option via Instagram DM */}
-            <a
-              href="https://instagram.com/deco.home.rosario"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-orange-500/10 hover:from-purple-500/20 hover:via-pink-500/20 hover:to-orange-500/20 text-pink-700 border border-pink-350 font-black text-xs tracking-widest uppercase py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all text-center cursor-pointer shadow-xs"
-            >
-              <Instagram className="w-4.5 h-4.5 text-pink-600 animate-pulse" />
-              <span>Consultar Stock (Instagram)</span>
-            </a>
           </div>
         </div>
       </div>

@@ -1563,13 +1563,13 @@ export default function App() {
                   {/* Step 1 */}
                   <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
                     <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">01</div>
-                    <div className="p-3 bg-brand-900 text-brand-100 rounded-xl inline-block">
-                      <ShoppingCart className="w-5 h-5 text-white" />
+                    <div className="p-3 bg-gradient-to-r from-purple-600 via-pink-650 to-orange-500 text-white rounded-xl inline-block">
+                      <Instagram className="w-5 h-5 text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <h4 className="font-serif text-base font-bold text-brand-950">Elegí tus favoritos</h4>
+                      <h4 className="font-serif text-base font-bold text-brand-950">Consultá Stock por Instagram</h4>
                       <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Navegá por nuestro catálogo de cocina, organizadores o cuidado personal, seleccioná tus artículos favoritos y agregalos al carrito.
+                        Hacé clic en el botón de <strong>Consultar Stock</strong> en cualquiera de tus artículos deseados. Te confirmamos disponibilidad de forma inmediata para evitar cualquier inconveniente antes de tu pago.
                       </p>
                     </div>
                   </div>
@@ -1578,12 +1578,12 @@ export default function App() {
                   <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
                     <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">02</div>
                     <div className="p-3 bg-brand-900 text-brand-100 rounded-xl inline-block">
-                      <Truck className="w-5 h-5 text-white" />
+                      <ShoppingCart className="w-5 h-5 text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <h4 className="font-serif text-base font-bold text-brand-950">Completá tus datos</h4>
+                      <h4 className="font-serif text-base font-bold text-brand-950">Elegí y Agregá al Carrito</h4>
                       <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Ingresá tus datos reales para el despacho y seleccioná el medio de pago preferido (tenés 15% de descuento por transferencia bancaria).
+                        Elegí tus favoritos y agregalos al carrito. No pusimos ningún bloqueo para que no sea un impedimento comprar, pero te sugerimos consultarnos por las dudas.
                       </p>
                     </div>
                   </div>
@@ -1591,13 +1591,13 @@ export default function App() {
                   {/* Step 3 */}
                   <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
                     <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">03</div>
-                    <div className="p-3 bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white rounded-xl inline-block">
-                      <Instagram className="w-5 h-5 text-white" />
+                    <div className="p-3 bg-brand-900 text-brand-100 rounded-xl inline-block">
+                      <Truck className="w-5 h-5 text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <h4 className="font-serif text-base font-bold text-brand-950">Adjuntá tu Comprobante</h4>
+                      <h4 className="font-serif text-base font-bold text-brand-950">Completá Pago y Despacho</h4>
                       <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Si pagás con transferencia, <strong>adjuntá una captura del comprobante antes de finalizar</strong>. Al confirmarlo, el sistema nos envía una <strong>notificación automática a Instagram</strong> y tu orden se registra al instante para despacho rápido. ¡Podés seguir el viaje con tu número de orden!
+                        Cargá tus datos de entrega, seleccioná opción de pago (¡aprovechá el <strong>15% OFF por transferencia</strong> adjuntando tu comprobante!) y finalizá tu orden. Se despacha en el día si el pago se confirma rápido.
                       </p>
                     </div>
                   </div>

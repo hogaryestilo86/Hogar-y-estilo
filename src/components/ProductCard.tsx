@@ -288,34 +288,9 @@ export default function ProductCard({
           </div>
         </div>
 
-        {/* Buy Now & Add to Cart Action Buttons set */}
+        {/* Dynamic CTAs - Unified Consultation and Instant Purchase blocks to guarantee conversion */}
         <div className="space-y-2 mt-4">
-          <button
-            id={`btn-buynow-${product.id}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onBuyNow(product);
-            }}
-            className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold text-xs sm:text-sm tracking-widest uppercase py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
-          >
-            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-            <span>Comprar ahora</span>
-          </button>
-          
-          <button
-            id={`btn-add-${product.id}`}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddToCart(product);
-            }}
-            className="w-full bg-[#fdf2f5] hover:bg-[#fce7ec] text-pink-700 border border-pink-300 font-black text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs hover:shadow-sm"
-          >
-            <ShoppingCart className="w-3.5 h-3.5 text-pink-600" />
-            <span>Agregar al carrito</span>
-          </button>
-
-          {/* Social direct messaging query to prevent stock gap sync issues */}
+          {/* Social direct messaging query styled as a highly prominent Instagram gradient button */}
           <a
             id={`btn-stock-instagram-${product.id}`}
             href={`https://instagram.com/deco.home.rosario`}
@@ -324,11 +299,40 @@ export default function ProductCard({
             onClick={(e) => {
               e.stopPropagation();
             }}
-            className="w-full bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-orange-500/10 hover:from-purple-500/20 hover:via-pink-500/20 hover:to-orange-500/20 text-pink-750 border border-pink-200/80 font-extrabold text-[11px] tracking-wide uppercase py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all text-center cursor-pointer shadow-xs"
+            className="w-full bg-gradient-to-r from-purple-600 via-pink-650 to-orange-500 hover:from-purple-700 hover:via-pink-700 hover:to-orange-600 text-white font-black text-[11px] tracking-widest uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all text-center cursor-pointer shadow-md transform hover:scale-[1.01] active:scale-95 border-0"
+            title="Consultar Stock del producto por Instagram"
           >
-            <Instagram className="w-4 h-4 text-pink-600 animate-pulse" />
-            <span>Consultar Stock (Instagram)</span>
+            <Instagram className="w-4 h-4 text-white animate-pulse" />
+            <span>Consultar Stock 📱</span>
           </a>
+
+          {/* Standard instant purchase hooks - Free of barriers */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              id={`btn-buynow-${product.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onBuyNow(product);
+              }}
+              className="bg-pink-600 hover:bg-pink-700 text-white font-bold text-[10px] tracking-wider uppercase py-2.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all transform active:scale-95 cursor-pointer shadow-xs"
+            >
+              <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" />
+              <span>Comprar</span>
+            </button>
+            
+            <button
+              id={`btn-add-${product.id}`}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToCart(product);
+              }}
+              className="bg-[#fdf2f5] hover:bg-[#fce7ec] text-pink-700 border border-pink-300 font-extrabold text-[10px] tracking-wider uppercase py-2.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer shadow-3xs"
+            >
+              <ShoppingCart className="w-3 h-3 text-pink-600" />
+              <span>+ Carrito</span>
+            </button>
+          </div>
         </div>
       </div>
 
