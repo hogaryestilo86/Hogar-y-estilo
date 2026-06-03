@@ -223,24 +223,22 @@ const cleanProductsForExport = (list: any[]): any[] => {
     const cleanMedia = media
       ? media.map((item: any) => {
           if (!item) return item;
-          const { backupUrl, ...mediaRest } = item;
           let finalUrl = item.url || "";
+          let finalBackupUrl = item.backupUrl || "";
           
           // Purge giant base64 videos (never store heavy base64 video files inside the JSON repo file)
           if (finalUrl.startsWith("data:video/")) {
             console.log("Purging heavy base64 video from export JSON file to avoid crashing limits.");
             finalUrl = ""; 
           }
-          // Compress or substitute massive images (>150KB) inside exported JSON to guarantee rapid clipboard copy
-          else if (finalUrl.startsWith("data:image/") && finalUrl.length > 200000) {
-            console.log("Replacing excessively large base64 image in export JSON with a lightweight placeholder to prevent clipboard crashes.");
-            // Keep the format but point to a standard elegant placeholder
-            finalUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80";
+          if (finalBackupUrl.startsWith("data:video/")) {
+            finalBackupUrl = "";
           }
           
           return {
-            ...mediaRest,
-            url: finalUrl
+            ...item,
+            url: finalUrl,
+            backupUrl: finalBackupUrl
           };
         })
       : undefined;
@@ -311,20 +309,29 @@ export default function AdminPanel({
           if (!prod.media || !Array.isArray(prod.media)) return prod;
           const optimizedMedia = await Promise.all(
             prod.media.map(async (item) => {
-              if (!item || !item.url) return item;
+              if (!item) return item;
+              let finalUrl = item.url || "";
+              let finalBackupUrl = item.backupUrl || "";
               
               // 1. Purge giant base64 videos completely to keep database slim and functional
-              if (item.url.startsWith("data:video/")) {
-                return { ...item, url: "" }; 
+              if (finalUrl.startsWith("data:video/")) {
+                finalUrl = ""; 
+              }
+              if (finalBackupUrl.startsWith("data:video/")) {
+                finalBackupUrl = "";
               }
               
               // 2. Intensely compress base64 images down to ultra-light Jpegs (resolution 400px, quality 0.5)
-              if (item.url.startsWith("data:image/")) {
-                const compressed = await compressBase64Image(item.url, 400, 0.5);
-                return { ...item, url: compressed };
+              if (finalUrl.startsWith("data:image/")) {
+                const compressed = await compressBase64Image(finalUrl, 400, 0.5);
+                finalUrl = compressed;
+              }
+              if (finalBackupUrl.startsWith("data:image/")) {
+                const compressedBackup = await compressBase64Image(finalBackupUrl, 400, 0.5);
+                finalBackupUrl = compressedBackup;
               }
               
-              return item;
+              return { ...item, url: finalUrl, backupUrl: finalBackupUrl };
             })
           );
           return { ...prod, media: optimizedMedia };
@@ -735,17 +742,16 @@ export default function AdminPanel({
           console.log("El archivo no existe todavía en GitHub. Retornando SHA undefined para creación.");
           shaFetched = true;
         } else if (getResponse.status === 403) {
-          // No tirar error inmediatamente por si es un repo privado que restringe contenido por tamaño, dejar que Trees fallback intente
           console.warn("API de Contenidos arrojó 403. Intentando API de Árboles...");
         }
       } catch (e: any) {
         if (e.message === "CREDENTIALS_INVALID_TOKEN") {
           throw e;
         }
-        console.warn("Excepción secundaria buscando SHA por Contenidos API, reintentando por Árbol de Git...", e);
+        console.warn("Excepción de Contents API, intentando fallback de Git trees...", e);
       }
 
-      // Intento B: API de Árboles de Git (Trees API - Robusta ante archivos pesados)
+      // Intento B: API de Árboles de Git (Trees API - Robusta ante archivos de tamaño mediano/grande)
       if (!shaFetched) {
         try {
           const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${branchToUse}?recursive=1&_t=${Date.now()}`;
@@ -769,8 +775,8 @@ export default function AdminPanel({
               if (match) {
                 sha = match.sha;
                 console.log("SHA fresco recuperado usando API de Árboles:", sha);
+                shaFetched = true;
               }
-              shaFetched = true;
             }
           } else if (treeResponse.status === 401) {
             throw new Error("CREDENTIALS_INVALID_TOKEN");
@@ -784,6 +790,54 @@ export default function AdminPanel({
             throw e;
           }
           console.error("Fallo general recuperando SHA del árbol de Git:", e);
+        }
+      }
+
+      // Intento C: Obtener el SHA directamente desde el árbol del último commit de la rama (Inmune a límites de tamaño y recursividad)
+      if (!shaFetched) {
+        try {
+          console.log("Intentando recuperar el SHA de products.json usando el árbol del último commit (Intento C)...");
+          const parentSha = await getLatestBranchCommitSha();
+          const commitUrl = `https://api.github.com/repos/${cleanRepo}/git/commits/${parentSha}`;
+          const commitResponse = await fetch(commitUrl, {
+            cache: "no-store",
+            headers: {
+              "Accept": "application/vnd.github.v3+json",
+              "Authorization": `token ${tokenToUse}`
+            }
+          });
+          if (commitResponse.ok) {
+            const commitData = await commitResponse.json();
+            const treeSha = commitData.tree?.sha;
+            if (treeSha) {
+              const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${treeSha}`;
+              const treeResponse = await fetch(treeUrl, {
+                cache: "no-store",
+                headers: {
+                  "Accept": "application/vnd.github.v3+json",
+                  "Authorization": `token ${tokenToUse}`
+                }
+              });
+              if (treeResponse.ok) {
+                const treeData = await treeResponse.json();
+                if (treeData && Array.isArray(treeData.tree)) {
+                  const targetPath = pathToUse.toLowerCase().replace(/^\/+/, "");
+                  const match = treeData.tree.find((item: any) => 
+                    item.path.toLowerCase().replace(/^\/+/, "") === targetPath
+                  );
+                  if (match) {
+                    sha = match.sha;
+                    console.log("SHA fresco recuperado usando API de Árbol del Último Commit (Intento C):", sha);
+                  } else {
+                    console.log("El archivo no se encontró en el árbol (Intento C). Se asume que es una creación.");
+                  }
+                  shaFetched = true;
+                }
+              }
+            }
+          }
+        } catch (e: any) {
+          console.error("Fallo recuperando SHA vía Intento C:", e);
         }
       }
 
@@ -812,14 +866,19 @@ export default function AdminPanel({
 
       let putResponse = await doPutFile(sha);
 
-      // Comprobar minuciosamente si hay un conflicto de versión (status 409 o un mensaje de error por desajuste de SHA)
-      let isConflict = putResponse.status === 409;
+      // Comprobar minuciosamente si hay un conflicto de versión (status 409 o 422 o un desajuste de SHA)
+      let isConflict = putResponse.status === 409 || putResponse.status === 422;
       if (!putResponse.ok && !isConflict) {
         try {
           const clonedRes = putResponse.clone();
           const errJson = await clonedRes.json();
           const errMsg = errJson.message || "";
-          if (errMsg.includes("does not match") || errMsg.includes("conflict")) {
+          if (
+            errMsg.includes("does not match") || 
+            errMsg.includes("conflict") || 
+            errMsg.includes("sha") || 
+            errMsg.includes("supplied")
+          ) {
             isConflict = true;
           }
         } catch (_) {}

@@ -157,22 +157,32 @@ export async function compressBase64Image(dataUrl: string, max_dim: number = 800
  * This guarantees that even if they have many products, the final products.json will always be tiny (under 500KB total)
  * and will NEVER hit GitHub REST size limits!
  */
-export async function compressAllProductsBase64(products: Product[]): Promise<Product[]> {
+export async function compressAllProductsBase64(products: Product[], max_dim: number = 800, quality: number = 0.65): Promise<Product[]> {
   return Promise.all(
     products.map(async (prod) => {
       if (!prod.media || !Array.isArray(prod.media)) return prod;
       const updatedMedia = await Promise.all(
         prod.media.map(async (item) => {
-          if (item.url && item.url.startsWith("data:image/")) {
+          let finalUrl = item.url || "";
+          let finalBackupUrl = item.backupUrl || "";
+
+          if (finalUrl.startsWith("data:image/")) {
             try {
-              const compressed = await compressBase64Image(item.url);
-              return { ...item, url: compressed };
+              finalUrl = await compressBase64Image(finalUrl, max_dim, quality);
             } catch (err) {
-              console.error("Error compressing base64 media:", err);
-              return item;
+              console.error("Error compressing base64 media url:", err);
             }
           }
-          return item;
+
+          if (finalBackupUrl.startsWith("data:image/")) {
+            try {
+              finalBackupUrl = await compressBase64Image(finalBackupUrl, max_dim, quality);
+            } catch (err) {
+              console.error("Error compressing base64 media backupUrl:", err);
+            }
+          }
+
+          return { ...item, url: finalUrl, backupUrl: finalBackupUrl };
         })
       );
       return { ...prod, media: updatedMedia };
