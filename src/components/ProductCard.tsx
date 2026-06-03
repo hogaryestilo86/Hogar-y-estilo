@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Product } from "../types";
-import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft, Volume2, VolumeX, ChevronLeft, ChevronRight, Play, X, Video } from "lucide-react";
+import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft, Volume2, VolumeX, ChevronLeft, ChevronRight, Play, X, Video, Instagram } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface ProductCardProps {
@@ -314,6 +314,21 @@ export default function ProductCard({
             <ShoppingCart className="w-3.5 h-3.5 text-pink-600" />
             <span>Agregar al carrito</span>
           </button>
+
+          {/* Social direct messaging query to prevent stock gap sync issues */}
+          <a
+            id={`btn-stock-instagram-${product.id}`}
+            href={`https://instagram.com/deco.home.rosario`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            className="w-full bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-orange-500/10 hover:from-purple-500/20 hover:via-pink-500/20 hover:to-orange-500/20 text-pink-750 border border-pink-200/80 font-extrabold text-[11px] tracking-wide uppercase py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all text-center cursor-pointer shadow-xs"
+          >
+            <Instagram className="w-4 h-4 text-pink-600 animate-pulse" />
+            <span>Consultar Stock (Instagram)</span>
+          </a>
         </div>
       </div>
 
@@ -362,9 +377,6 @@ export default function ProductCard({
               <span>🎬 Video de Demostración</span>
               <span>•</span>
               <span>Categoría: {product.category}</span>
-            </p>
-            <p className="text-white/50 text-[11px] mt-2 font-medium">
-              Este video está almacenado de manera segura en tu base de datos de manera híper-liviana para que la tienda sea súper rápida 💎
             </p>
           </div>
         </div>

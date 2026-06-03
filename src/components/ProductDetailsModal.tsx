@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { Product, ProductReview } from "../types";
-import { X, Star, ShoppingCart, Check, ShieldCheck, Heart, Sparkles, MessageSquare, Plus, Send, Truck, Volume2, VolumeX } from "lucide-react";
+import { X, Star, ShoppingCart, Check, ShieldCheck, Heart, Sparkles, MessageSquare, Plus, Send, Truck, Volume2, VolumeX, Instagram } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface ProductDetailsModalProps {
@@ -339,26 +339,39 @@ export default function ProductDetailsModal({
           </div>
 
           {/* Quick CTA bottom buttons */}
-          <div className="pt-6 mt-4 border-t border-[#c4bba3] flex flex-col sm:flex-row gap-3">
-            {onBuyNow && (
+          <div className="pt-6 mt-4 border-t border-[#c4bba3] space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {onBuyNow && (
+                <button
+                  onClick={() => {
+                    onBuyNow(product);
+                    onClose();
+                  }}
+                  className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
+                >
+                  <Sparkles className="w-4.5 h-4.5 text-amber-300 animate-pulse" />
+                  <span>Comprar ahora</span>
+                </button>
+              )}
               <button
-                onClick={() => {
-                  onBuyNow(product);
-                  onClose();
-                }}
-                className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-md hover:shadow-lg hover:scale-[1.01]"
+                onClick={() => onAddToCart(product)}
+                className="flex-1 bg-[#fdf2f5] hover:bg-[#fce7ec] text-pink-700 border border-pink-300 font-extrabold text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-2xs hover:shadow-sm"
               >
-                <Sparkles className="w-4.5 h-4.5 text-amber-300 animate-pulse" />
-                <span>Comprar ahora</span>
+                <ShoppingCart className="w-4.5 h-4.5 text-pink-600" />
+                <span>Agregar al Carrito • {formatCurrency(listPrice)}</span>
               </button>
-            )}
-            <button
-              onClick={() => onAddToCart(product)}
-              className="flex-1 bg-[#fdf2f5] hover:bg-[#fce7ec] text-pink-700 border border-pink-300 font-extrabold text-xs sm:text-sm tracking-widest uppercase py-4 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 cursor-pointer shadow-2xs hover:shadow-sm"
+            </div>
+
+            {/* Direct Stock Consultation Option via Instagram DM */}
+            <a
+              href="https://instagram.com/deco.home.rosario"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-orange-500/10 hover:from-purple-500/20 hover:via-pink-500/20 hover:to-orange-500/20 text-pink-700 border border-pink-350 font-black text-xs tracking-widest uppercase py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all text-center cursor-pointer shadow-xs"
             >
-              <ShoppingCart className="w-4.5 h-4.5 text-pink-600" />
-              <span>Agregar al Carrito • {formatCurrency(listPrice)}</span>
-            </button>
+              <Instagram className="w-4.5 h-4.5 text-pink-600 animate-pulse" />
+              <span>Consultar Stock (Instagram)</span>
+            </a>
           </div>
         </div>
       </div>
