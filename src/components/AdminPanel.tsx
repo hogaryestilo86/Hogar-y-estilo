@@ -214,6 +214,26 @@ function OrderRowComponent({
   );
 }
 
+// Memory-efficient product cleaner for export/save/sync to prevent mobile tab crashes
+const cleanProductsForExport = (list: any[]): any[] => {
+  if (!list) return [];
+  return list.map((prod) => {
+    if (!prod) return prod;
+    const { media, ...rest } = prod;
+    const cleanMedia = media
+      ? media.map((item: any) => {
+          if (!item) return item;
+          const { backupUrl, ...mediaRest } = item;
+          return mediaRest;
+        })
+      : undefined;
+    return {
+      ...rest,
+      ...(cleanMedia ? { media: cleanMedia } : {}),
+    };
+  });
+};
+
 export default function AdminPanel({
   products,
   onAddProduct,
@@ -479,16 +499,7 @@ export default function AdminPanel({
       // Strip massive backupUrl base64 fields from the JSON catalog pushed to GitHub.
       // Since individual static images are uploaded separately under public/uploads/ and compiled during Vercel builds,
       // having backupUrls inside products.json is redundant and balloons the file size, causing 422 Payload Too Large errors.
-      const githubCatalog = JSON.parse(JSON.stringify(compressedCatalog));
-      githubCatalog.forEach((prod: any) => {
-        if (prod && prod.media && Array.isArray(prod.media)) {
-          prod.media.forEach((item: any) => {
-            if (item) {
-              delete item.backupUrl;
-            }
-          });
-        }
-      });
+      const githubCatalog = cleanProductsForExport(compressedCatalog);
 
       const jsonStr = JSON.stringify(githubCatalog, null, 2);
 
@@ -2309,17 +2320,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     }
 
                     try {
-                      // Clone the list to prevent deleting backupUrl from the active React in-memory state
-                      const cleanList = JSON.parse(JSON.stringify(listToExport));
-                      cleanList.forEach((prod: any) => {
-                        if (prod && prod.media && Array.isArray(prod.media)) {
-                          prod.media.forEach((item: any) => {
-                            if (item) {
-                              delete item.backupUrl;
-                            }
-                          });
-                        }
-                      });
+                      // Memory-efficient clean listing for copy/export
+                      const cleanList = cleanProductsForExport(listToExport);
                       const jsonStr = JSON.stringify(cleanList, null, 2);
                       setCopiedJsonValue(jsonStr);
                       try {
@@ -2403,17 +2405,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     }
 
                     try {
-                      // Clone the list to prevent deleting backupUrl from the active React in-memory state
-                      const cleanList = JSON.parse(JSON.stringify(listToExport));
-                      cleanList.forEach((prod: any) => {
-                        if (prod && prod.media && Array.isArray(prod.media)) {
-                          prod.media.forEach((item: any) => {
-                            if (item) {
-                              delete item.backupUrl;
-                            }
-                          });
-                        }
-                      });
+                      // Memory-efficient clean listing for copy/export
+                      const cleanList = cleanProductsForExport(listToExport);
                       const jsonStr = JSON.stringify(cleanList, null, 2);
                       const blob = new Blob([jsonStr], { type: "application/json" });
                       const url = URL.createObjectURL(blob);
@@ -2812,17 +2805,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                         notify("El catálogo estaba vacío pero agregamos el borrador que tienes rellenado en el formulario.", "info");
                       }
 
-                      // Clone the list to prevent deleting backupUrl from the active React in-memory state
-                      const cleanList = JSON.parse(JSON.stringify(listToExport));
-                      cleanList.forEach((prod: any) => {
-                        if (prod && prod.media && Array.isArray(prod.media)) {
-                          prod.media.forEach((item: any) => {
-                            if (item) {
-                              delete item.backupUrl;
-                            }
-                          });
-                        }
-                      });
+                      // Memory-efficient clean listing for copy/export
+                      const cleanList = cleanProductsForExport(listToExport);
                       const jsonStr = JSON.stringify(cleanList, null, 2);
                       setCopiedJsonValue(jsonStr);
                       try {
@@ -2856,17 +2840,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   type="button"
                   onClick={() => {
                     try {
-                      // Clone the products list to prevent deleting backupUrl from the active React in-memory state
-                      const cleanList = JSON.parse(JSON.stringify(products));
-                      cleanList.forEach((prod: any) => {
-                        if (prod && prod.media && Array.isArray(prod.media)) {
-                          prod.media.forEach((item: any) => {
-                            if (item) {
-                              delete item.backupUrl;
-                            }
-                          });
-                        }
-                      });
+                      // Memory-efficient clean listing for copy/export
+                      const cleanList = cleanProductsForExport(products);
                       const jsonStr = JSON.stringify(cleanList, null, 2);
                       const blob = new Blob([jsonStr], { type: "application/json" });
                       const url = URL.createObjectURL(blob);
