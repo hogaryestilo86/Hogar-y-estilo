@@ -138,6 +138,7 @@ export default function ProductDetailsModal({
                 <ResolvedVideo
                   src={activeMediaList[activeMediaIndex].url}
                   backupUrl={activeMediaList[activeMediaIndex].backupUrl}
+                  category={product.category}
                   className="max-w-full max-h-full object-contain"
                   style={{ maxWidth: "100%", objectFit: "contain" }}
                   autoPlay

@@ -681,6 +681,7 @@ export default function CheckoutModal({
                               <ResolvedVideo
                                 src={mediaUrl}
                                 backupUrl={activeMedia?.backupUrl}
+                                category={product.category}
                                 className="w-full h-full object-cover"
                                 muted
                                 playsInline
@@ -797,6 +798,7 @@ export default function CheckoutModal({
                             <ResolvedVideo
                               src={mediaUrl}
                               backupUrl={activeMedia?.backupUrl}
+                              category={product.category}
                               className="w-full h-full object-cover"
                               muted
                               playsInline
@@ -926,6 +928,7 @@ export default function CheckoutModal({
                               <ResolvedVideo
                                 src={mediaUrl}
                                 backupUrl={activeMedia?.backupUrl}
+                                category={product.category}
                                 className="w-full h-full object-cover"
                                 muted
                                 playsInline

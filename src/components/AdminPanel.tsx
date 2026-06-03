@@ -2112,9 +2112,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                             {/* Media render */}
                             <div className="w-full h-full relative">
                               {item.type === "video" ? (
-                                <ResolvedVideo src={item.url} className="w-full h-full object-cover" muted />
+                                <ResolvedVideo src={item.url} className="w-full h-full object-cover" muted category={category} />
                               ) : (
-                                <ResolvedImage src={item.url} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                <ResolvedImage src={item.url} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" category={category} />
                               )}
                             </div>
 
@@ -2465,6 +2465,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                           <ResolvedVideo
                             src={item.media[0]?.url}
                             backupUrl={item.media[0]?.backupUrl}
+                            category={item.category}
                             className={`w-12 h-12 rounded object-cover border shrink-0 bg-brand-100 ${item.paused ? "border-neutral-300" : "border-brand-200"}`}
                             muted
                             playsInline

@@ -446,15 +446,34 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
 interface ResolvedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   src: string | undefined;
   backupUrl?: string;
+  category?: string;
 }
 
 export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImageProps>(
-  ({ src, backupUrl, ...props }, ref) => {
+  ({ src, backupUrl, category, ...props }, ref) => {
     const resolved = useResolvedUrl(src, backupUrl);
-    const finalSrc = resolved || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
+    const [hasError, setHasError] = useState(false);
+
+    // Reset error when src or backupUrl changes
+    useEffect(() => {
+      setHasError(false);
+    }, [src, backupUrl]);
+
+    const finalSrc = hasError
+      ? (backupUrl || getCategoryPlaceholder(category))
+      : (resolved || getCategoryPlaceholder(category));
+
     return React.createElement("img", {
       ref,
-      src: finalSrc || null,
+      src: finalSrc,
+      onError: (e: any) => {
+        if (!hasError) {
+          setHasError(true);
+        } else {
+          // If fallback fails as well, use a guaranteed Unsplash placeholder to prevent infinite loops
+          e.target.src = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80";
+        }
+      },
       ...props
     });
   }
@@ -464,29 +483,39 @@ ResolvedImage.displayName = "ResolvedImage";
 interface ResolvedVideoProps extends VideoHTMLAttributes<HTMLVideoElement> {
   src: string | undefined;
   backupUrl?: string;
+  category?: string;
 }
 
 export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
-  ({ src, backupUrl, ...props }, ref) => {
+  ({ src, backupUrl, category, ...props }, ref) => {
     const resolved = useResolvedUrl(src, backupUrl);
+    const [hasError, setHasError] = useState(false);
 
-    if (!resolved) return null;
+    // Reset error whenever src or backupUrl changes
+    useEffect(() => {
+      setHasError(false);
+    }, [src, backupUrl]);
 
     // Detect if resolved URL is actually an image (e.g. during preloading, fallback, or image type)
-    const isImage = (url: string) => {
+    const isImage = (url: string | undefined) => {
+      if (!url) return true;
       return url.startsWith("data:image/") || 
              url.match(/\.(jpg|jpeg|png|webp|gif|svg)/i) !== null ||
              url.includes("images.unsplash.com") ||
              (backupUrl && url === backupUrl && !url.match(/\.(mp4|webm|ogg|mov)/i));
     };
 
-    if (isImage(resolved)) {
+    const finalSource = resolved || backupUrl || getCategoryPlaceholder(category);
+
+    if (!resolved || isImage(finalSource) || hasError) {
       return React.createElement("img", {
-        src: backupUrl || resolved || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82",
+        src: backupUrl || resolved || getCategoryPlaceholder(category),
         className: props.className,
         style: props.style,
         referrerPolicy: "no-referrer",
-        onError: () => console.warn(`Fallback image failed to load for ${src}`)
+        onError: (e: any) => {
+          e.target.src = getCategoryPlaceholder(category);
+        }
       });
     }
 
@@ -542,6 +571,7 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       poster: backupUrl || undefined,
       onError: (e) => {
         console.warn(`Video failed to load: ${resolved}, falling back to poster/image`, e);
+        setHasError(true);
       },
       ...props
     });

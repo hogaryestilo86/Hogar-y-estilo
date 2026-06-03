@@ -124,6 +124,7 @@ export default function ProductCard({
                 ref={videoRef}
                 src={activeMedia.url}
                 backupUrl={activeMedia.backupUrl}
+                category={product.category}
                 className="w-full h-full object-contain bg-brand-950 p-1.5"
                 autoPlay
                 muted={isMuted}

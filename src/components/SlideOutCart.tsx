@@ -180,6 +180,7 @@ export default function SlideOutCart({
                       {isVideoMedia ? (
                         <ResolvedVideo
                           src={mediaUrl}
+                          category={product.category}
                           className="w-full h-full object-cover"
                           muted
                           playsInline
@@ -190,8 +191,9 @@ export default function SlideOutCart({
                         <ResolvedImage
                           src={mediaUrl}
                           backupUrl={activeMedia?.backupUrl}
+                          category={product.category}
                           alt={product.title}
-                          referrerPolicy="no-referrer"
+                          referrerPolicy="no-referrer; same-origin"
                           className="w-full h-full object-cover"
                         />
                       )}
