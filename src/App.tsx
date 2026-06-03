@@ -895,7 +895,7 @@ export default function App() {
   }, [isAdminAuthenticated]);
 
   // Categories query set (Herramientas, Iluminación, Destacados, etc.)
-  const categories = ["Todos", "Destacados", "Cocina", "Hogar", "Belleza", "Herramientas", "Iluminación", "Niños"];
+  const categories = ["Todos", "Destacados", "Cocina", "Hogar", "Belleza", "Cuidado Personal", "Herramientas", "Iluminación", "Niños"];
 
   // Handlers
   const handleAddToCart = (product: Product) => {
@@ -1378,7 +1378,7 @@ export default function App() {
                       {/* Rendering of categories inside expanded Workspace */}
                       {selectedCategory === "Todos" ? (
                         <div className="space-y-12">
-                          {["Cocina", "Hogar", "Belleza", "Herramientas", "Iluminación", "Niños"].map((catName) => {
+                          {["Cocina", "Hogar", "Belleza", "Cuidado Personal", "Herramientas", "Iluminación", "Niños"].map((catName) => {
                             const catProducts = filteredProducts.filter((p) => p.category === catName);
                             if (catProducts.length === 0) return null;
                             
@@ -1386,6 +1386,7 @@ export default function App() {
                             if (catName === "Cocina") emoji = "🍳";
                             else if (catName === "Hogar") emoji = "🛋️";
                             else if (catName === "Belleza") emoji = "💅";
+                            else if (catName === "Cuidado Personal") emoji = "🧴";
                             else if (catName === "Herramientas") emoji = "🛠️";
                             else if (catName === "Iluminación") emoji = "💡";
                             else if (catName === "Niños") emoji = "🧸";

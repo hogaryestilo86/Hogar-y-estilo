@@ -267,29 +267,7 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
             }
           }
 
-          // 2. Pre-generate backupUrl base64 string for relative upload paths if missing and we are in dev/local mode
-          if (item.url && (item.url.startsWith("/uploads/") || item.url.startsWith("uploads/")) && !item.backupUrl) {
-            try {
-              const fileRes = await fetch(item.url);
-              if (fileRes.ok) {
-                const blob = await fileRes.blob();
-                const dataUrl = await new Promise<string>((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    if (typeof reader.result === "string") resolve(reader.result);
-                    else reject(new Error("FileReader failed to compile blob"));
-                  };
-                  reader.onerror = reject;
-                  reader.readAsDataURL(blob);
-                });
-                item.backupUrl = dataUrl;
-                prodChanged = true;
-                changed = true;
-              }
-            } catch (err) {
-              console.warn(`Could not preload static backupUrl base64 for ${item.url}:`, err);
-            }
-          }
+          // No client-side base64 conversion needed for static server assets to prevent infinite loops.
 
           return item;
         })
