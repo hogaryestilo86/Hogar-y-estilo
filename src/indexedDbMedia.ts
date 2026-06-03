@@ -104,12 +104,12 @@ export async function compressImageBlob(blob: Blob): Promise<Blob> {
 /**
  * Compresses any existing image base64 data URL to a lightweight Jpeg format (width/height <= 800px, 0.65 quality).
  */
-export async function compressBase64Image(dataUrl: string): Promise<string> {
+export async function compressBase64Image(dataUrl: string, max_dim: number = 800, quality: number = 0.65): Promise<string> {
   if (!dataUrl || !dataUrl.startsWith("data:image/") || dataUrl.includes("image/gif")) {
     return dataUrl;
   }
-  // If already under 60KB (roughly 80,000 chars), skip to minimize processing time
-  if (dataUrl.length < 80000) {
+  // If no custom constraints and already under 60KB (roughly 80,000 chars), skip to minimize processing time
+  if (max_dim === 800 && quality === 0.65 && dataUrl.length < 80000) {
     return dataUrl;
   }
   return new Promise((resolve) => {
@@ -117,7 +117,6 @@ export async function compressBase64Image(dataUrl: string): Promise<string> {
     img.onload = () => {
       try {
         const canvas = document.createElement("canvas");
-        const max_dim = 800;
         let width = img.width;
         let height = img.height;
         if (width > height) {
@@ -136,7 +135,7 @@ export async function compressBase64Image(dataUrl: string): Promise<string> {
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL("image/jpeg", 0.65);
+          const compressed = canvas.toDataURL("image/jpeg", quality);
           resolve(compressed);
         } else {
           resolve(dataUrl);
