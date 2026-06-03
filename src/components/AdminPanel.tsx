@@ -1007,6 +1007,7 @@ export default function AdminPanel({
   };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const videoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -1135,6 +1136,7 @@ export default function AdminPanel({
     setMediaList(updatedMedia);
     setProcessingMedia(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (videoFileInputRef.current) videoFileInputRef.current.value = "";
   };
 
   const removeMediaItem = (index: number) => {
@@ -2153,32 +2155,76 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               </div>
 
               {/* Media loader drag & drop component */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-brand-800 uppercase tracking-widest">
-                  Imágenes y Videos del Producto
+              <div className="space-y-3.5">
+                <label className="block text-xs font-bold text-brand-800 uppercase tracking-widest text-left">
+                  Multimedia del Producto (Fotos y Video)
                 </label>
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-brand-300 hover:border-brand-800 hover:bg-brand-100/50 rounded-xl p-6 text-center cursor-pointer transition-all space-y-2.5"
-                >
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    multiple
-                    accept="image/png, image/jpeg, image/webp, video/mp4, video/webm"
-                    onChange={handleMediaUpload}
-                    className="hidden"
-                  />
-                  <div className="flex justify-center gap-3 text-brand-500 text-2xl">
-                    <FileImage className="w-7 h-7" />
-                    <FileVideo className="w-7 h-7" />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* CARD A: FOTOS */}
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-brand-300 hover:border-brand-800 hover:bg-brand-100/50 rounded-xl p-5 text-center cursor-pointer transition-all space-y-2.5 flex flex-col items-center justify-center min-h-[140px]"
+                  >
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      multiple
+                      accept="image/png, image/jpeg, image/webp"
+                      onChange={handleMediaUpload}
+                      className="hidden"
+                    />
+                    <div className="p-3 bg-brand-100 rounded-full text-brand-650">
+                      <FileImage className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs sm:text-sm text-brand-900 font-extrabold">
+                        📸 SUBIR FOTOS (LOCALES)
+                      </p>
+                      <p className="text-[10.5px] text-brand-600 font-normal mt-1 leading-normal max-w-xs mx-auto">
+                        Presiona aquí para elegir imágenes (PNG, JPG o WebP). Se achicarán solas para preservar espacio.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs sm:text-sm text-brand-800 font-medium">
-                      Haz clic para examinar archivos locales
-                    </p>
-                    <p className="text-[10.5px] text-brand-500 font-light mt-1">
-                      Formatos: PNG, JPG, WebP (máx 12MB, auto-comprimido) • Video: MP4, WebM (Soporta hasta 100MB gracias a tu canal DB GitHub 💎)
+
+                  {/* CARD B: VIDEOS */}
+                  <div 
+                    onClick={() => videoFileInputRef.current?.click()}
+                    className="relative border-2 border-dashed border-pink-400 hover:border-pink-600 bg-pink-50/20 hover:bg-pink-100/40 rounded-xl p-5 text-center cursor-pointer transition-all space-y-2.5 flex flex-col items-center justify-center min-h-[140px]"
+                  >
+                    <input
+                      type="file"
+                      ref={videoFileInputRef}
+                      accept="video/mp4, video/webm"
+                      onChange={handleMediaUpload}
+                      className="hidden"
+                    />
+                    {/* Pulsating badge to draw eye */}
+                    <span className="absolute -top-2.5 right-4 bg-pink-600 text-white text-[8px] font-black tracking-widest px-2 py-0.5 rounded-full uppercase shadow-xs animate-bounce">
+                      Recomendado 🔥
+                    </span>
+                    
+                    <div className="p-3 bg-pink-100 rounded-full text-pink-650">
+                      <FileVideo className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs sm:text-sm text-pink-900 font-extrabold uppercase tracking-tight">
+                        🎬 SUBIR VIDEO DEL PRODUCTO
+                      </p>
+                      <p className="text-[10.5px] text-pink-700 font-normal mt-1 leading-normal max-w-xs mx-auto">
+                        Presiona aquí para elegir un video (.MP4 o .WebM) desde tu dispositivo. ¡Se reproducirá en vivo en el catálogo!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Explicación de cómo funciona el video */}
+                <div className="p-3 bg-indigo-50 border border-indigo-150 rounded-xl flex items-start gap-2.5 text-left">
+                  <span className="text-lg">💡</span>
+                  <div className="space-y-0.5">
+                    <p className="text-[11px] font-black text-indigo-950 uppercase tracking-wide">¿Cómo verán el video tus clientes?</p>
+                    <p className="text-[10.5px] text-indigo-800 leading-normal font-medium">
+                      El video aparecerá en tu catálogo como un elegante **botón flotante ("VER VIDEO 🎬")** arriba de la foto de portada. Cuando toquen ahí, se abrirá un reproductor gigante hermoso a pantalla completa con controles de reproducción de sonido. ¡No ralentiza la tienda!
                     </p>
                   </div>
                 </div>
