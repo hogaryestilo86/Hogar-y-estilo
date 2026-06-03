@@ -2309,7 +2309,18 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     }
 
                     try {
-                      const jsonStr = JSON.stringify(listToExport, null, 2);
+                      // Clone the list to prevent deleting backupUrl from the active React in-memory state
+                      const cleanList = JSON.parse(JSON.stringify(listToExport));
+                      cleanList.forEach((prod: any) => {
+                        if (prod && prod.media && Array.isArray(prod.media)) {
+                          prod.media.forEach((item: any) => {
+                            if (item) {
+                              delete item.backupUrl;
+                            }
+                          });
+                        }
+                      });
+                      const jsonStr = JSON.stringify(cleanList, null, 2);
                       setCopiedJsonValue(jsonStr);
                       try {
                         await navigator.clipboard.writeText(jsonStr);
@@ -2392,7 +2403,18 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     }
 
                     try {
-                      const jsonStr = JSON.stringify(listToExport, null, 2);
+                      // Clone the list to prevent deleting backupUrl from the active React in-memory state
+                      const cleanList = JSON.parse(JSON.stringify(listToExport));
+                      cleanList.forEach((prod: any) => {
+                        if (prod && prod.media && Array.isArray(prod.media)) {
+                          prod.media.forEach((item: any) => {
+                            if (item) {
+                              delete item.backupUrl;
+                            }
+                          });
+                        }
+                      });
+                      const jsonStr = JSON.stringify(cleanList, null, 2);
                       const blob = new Blob([jsonStr], { type: "application/json" });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement("a");
@@ -2790,7 +2812,18 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                         notify("El catálogo estaba vacío pero agregamos el borrador que tienes rellenado en el formulario.", "info");
                       }
 
-                      const jsonStr = JSON.stringify(listToExport, null, 2);
+                      // Clone the list to prevent deleting backupUrl from the active React in-memory state
+                      const cleanList = JSON.parse(JSON.stringify(listToExport));
+                      cleanList.forEach((prod: any) => {
+                        if (prod && prod.media && Array.isArray(prod.media)) {
+                          prod.media.forEach((item: any) => {
+                            if (item) {
+                              delete item.backupUrl;
+                            }
+                          });
+                        }
+                      });
+                      const jsonStr = JSON.stringify(cleanList, null, 2);
                       setCopiedJsonValue(jsonStr);
                       try {
                         await navigator.clipboard.writeText(jsonStr);
@@ -2823,8 +2856,18 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   type="button"
                   onClick={() => {
                     try {
-                      let listToExport = [...products];
-                      const jsonStr = JSON.stringify(listToExport, null, 2);
+                      // Clone the products list to prevent deleting backupUrl from the active React in-memory state
+                      const cleanList = JSON.parse(JSON.stringify(products));
+                      cleanList.forEach((prod: any) => {
+                        if (prod && prod.media && Array.isArray(prod.media)) {
+                          prod.media.forEach((item: any) => {
+                            if (item) {
+                              delete item.backupUrl;
+                            }
+                          });
+                        }
+                      });
+                      const jsonStr = JSON.stringify(cleanList, null, 2);
                       const blob = new Blob([jsonStr], { type: "application/json" });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement("a");
