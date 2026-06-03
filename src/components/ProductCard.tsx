@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Product } from "../types";
-import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft, Volume2, VolumeX, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShoppingCart, Star, Sparkles, CreditCard, ArrowRightLeft, Volume2, VolumeX, ChevronLeft, ChevronRight, Play, X, Video } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface ProductCardProps {
@@ -46,9 +46,19 @@ export default function ProductCard({
   const installmentPrice = Math.round(listPrice / 3);
   const transferPrice = Math.round(listPrice * 0.85);
 
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const mediaList = product?.media || [];
-  const activeMedia = mediaList[mediaIndex] || mediaList[0] || { type: "image", url: getCategoryPlaceholder(product?.category) };
-  const hasMultipleMedia = mediaList.length > 1;
+  
+  // Filter out image assets only for high-speed, zero-flicker background card scrolling
+  const imageMediaList = mediaList.filter(item => item && item.type === "image");
+  
+  // Fallback to initial display category placeholder if no custom images exist
+  const displayMediaList = imageMediaList.length > 0
+    ? imageMediaList
+    : [{ type: "image", url: getCategoryPlaceholder(product?.category), backupUrl: undefined }];
+
+  const activeMedia = displayMediaList[mediaIndex] || displayMediaList[0] || { type: "image", url: getCategoryPlaceholder(product?.category), backupUrl: undefined };
+  const hasMultipleMedia = displayMediaList.length > 1;
 
   const handleMouseEnter = () => {
     setHovered(true);
@@ -60,15 +70,19 @@ export default function ProductCard({
 
   const handlePrevMedia = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (mediaList.length <= 1) return;
-    setMediaIndex((prev) => (prev > 0 ? prev - 1 : mediaList.length - 1));
+    if (displayMediaList.length <= 1) return;
+    setMediaIndex((prev) => (prev > 0 ? prev - 1 : displayMediaList.length - 1));
   };
 
   const handleNextMedia = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (mediaList.length <= 1) return;
-    setMediaIndex((prev) => (prev < mediaList.length - 1 ? prev + 1 : 0));
+    if (displayMediaList.length <= 1) return;
+    setMediaIndex((prev) => (prev < displayMediaList.length - 1 ? prev + 1 : 0));
   };
+
+  // Find if there is any local/remote video asset attached to this product for the floating bubble
+  const videoItem = mediaList.find(item => item && item.type === "video");
+  const hasVideo = !!videoItem;
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("es-AR", {
@@ -118,42 +132,32 @@ export default function ProductCard({
         <div className={`w-full h-full relative ${
           (product.basePrice >= 50000 || (product.beforePrice && product.beforePrice > listPrice)) ? "pt-[76px]" : "pt-2"
         } pb-2`}>
-          {(activeMedia.type === "video" && !modalOpen) ? (
-            <div className="w-full h-full relative">
-              <ResolvedVideo
-                ref={videoRef}
-                src={activeMedia.url}
-                backupUrl={activeMedia.backupUrl}
-                category={product.category}
-                className="w-full h-full object-contain bg-brand-950 p-1.5"
-                autoPlay
-                muted={isMuted}
-                loop
-                playsInline
-              />
-              {/* Botón flotante para silenciar/activar sonido en tarjetas */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation(); // Evita abrir los detalles al tocar el silenciador
-                  setIsMuted(!isMuted);
-                }}
-                className="absolute bottom-3 right-3 z-30 bg-black/75 hover:bg-black/90 text-white p-1.5 rounded-full shadow-lg border border-white/30 transition-all active:scale-95 flex items-center justify-center cursor-pointer pointer-events-auto hover:scale-105"
-                title={isMuted ? "Activar sonido" : "Silenciar"}
-              >
-                {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-200" /> : <Volume2 className="w-3.5 h-3.5 text-white animate-pulse" />}
-              </button>
-            </div>
-          ) : (
-            <ResolvedImage
-              src={activeMedia.url}
-              backupUrl={activeMedia.backupUrl}
-              category={product.category}
-              alt={product.title}
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-contain bg-brand-950 p-1.5 transition-transform duration-700 ease-out group-hover:scale-105"
-            />
+          <ResolvedImage
+            src={activeMedia.url}
+            backupUrl={activeMedia.backupUrl}
+            category={product.category}
+            alt={product.title}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-contain bg-brand-950 p-1.5 transition-transform duration-700 ease-out group-hover:scale-105"
+          />
+
+          {/* Floating and pulsating interactive video bubble above the photo */}
+          {hasVideo && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation(); // Avoid triggering standard product details drawer
+                setShowVideoModal(true);
+              }}
+              className="absolute bottom-4 left-4 z-40 bg-pink-650 hover:bg-pink-700 text-white text-[10px] font-black tracking-widest pl-2 bg-gradient-to-r from-pink-600 to-rose-600 border border-pink-400 pl-3 pr-4 py-2.5 rounded-full shadow-2xl flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all cursor-pointer select-none pointer-events-auto"
+              title="Click para ver video del producto"
+            >
+              <span className="flex items-center justify-center p-1 rounded-full bg-yellow-400 text-rose-950 animate-pulse">
+                <Play className="w-2.5 h-2.5 fill-current" />
+              </span>
+              <span>VER VIDEO 🎬</span>
+            </button>
           )}
         </div>
 
@@ -312,6 +316,59 @@ export default function ProductCard({
           </button>
         </div>
       </div>
+
+      {/* Floating Video Modal Lightbox - Expands beautifully and plays with sound */}
+      {showVideoModal && videoItem && (
+        <div 
+          className="fixed inset-0 z-[250] bg-black/95 backdrop-blur-md flex flex-col justify-center items-center p-4 transition-all duration-300"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowVideoModal(false);
+          }}
+        >
+          {/* Close button inside modal */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowVideoModal(false);
+            }}
+            className="absolute top-5 right-5 z-[260] p-3 text-white bg-black/60 hover:bg-black/90 border border-white/20 rounded-full transition-all active:scale-95 hover:scale-110 cursor-pointer flex items-center justify-center shadow-lg"
+            title="Cerrar reproductor"
+          >
+            <X className="w-5 h-5 stroke-[2.5]" />
+          </button>
+
+          {/* Large video player container */}
+          <div 
+            className="relative w-full max-w-2xl aspect-[9/16] sm:max-h-[85vh] flex items-center justify-center bg-black/50 rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ResolvedVideo
+              src={videoItem.url}
+              backupUrl={videoItem.backupUrl}
+              category={product.category}
+              className="w-full h-full object-contain"
+              autoPlay
+              controls
+              playsInline
+            />
+          </div>
+
+          {/* Video Metadata / Details banner */}
+          <div className="text-center mt-5 max-w-md px-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-white font-black text-lg tracking-tight">{product.title}</h3>
+            <p className="text-pink-300/90 text-xs mt-1.5 font-mono uppercase tracking-widest flex items-center justify-center gap-1.5">
+              <span>🎬 Video de Demostración</span>
+              <span>•</span>
+              <span>Categoría: {product.category}</span>
+            </p>
+            <p className="text-white/50 text-[11px] mt-2 font-medium">
+              Este video está almacenado de manera segura en tu base de datos de manera híper-liviana para que la tienda sea súper rápida 💎
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

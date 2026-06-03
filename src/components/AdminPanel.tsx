@@ -7,7 +7,7 @@ import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
 import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings } from "lucide-react";
-import { ResolvedImage, ResolvedVideo, storeMedia, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image } from "../indexedDbMedia";
+import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image } from "../indexedDbMedia";
 
 interface AdminPanelProps {
   products: Product[];
@@ -1108,8 +1108,8 @@ export default function AdminPanel({
             url: idbUrl,
           });
         } else {
-          // Guardar video en IndexedDB para que persista entre sesiones de forma óptima
-          const idbUrl = await storeMedia(file);
+          // Guardar video en IndexedDB para que persista entre sesiones de forma óptima sin inflar el catálogo con Base64
+          const idbUrl = await storeMediaAsIdbReference(file);
           updatedMedia.push({
             type: "video",
             url: idbUrl,
@@ -2205,7 +2205,15 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       }
                       
                       const lowercaseUrl = urlVal.toLowerCase();
-                      const isVid = lowercaseUrl.endsWith(".mp4") || lowercaseUrl.endsWith(".webm") || lowercaseUrl.includes("video") || lowercaseUrl.startsWith("data:video");
+                      const isVid = 
+                        lowercaseUrl.endsWith(".mp4") || 
+                        lowercaseUrl.endsWith(".webm") || 
+                        lowercaseUrl.includes("video") || 
+                        lowercaseUrl.startsWith("data:video") ||
+                        lowercaseUrl.includes("youtube.com") ||
+                        lowercaseUrl.includes("youtu.be") ||
+                        lowercaseUrl.includes("vimeo.com") ||
+                        lowercaseUrl.includes("drive.google.com");
                       
                       setMediaList([
                         ...mediaList,

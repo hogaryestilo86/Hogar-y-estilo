@@ -231,6 +231,33 @@ export async function storeMedia(rawBlob: Blob): Promise<string> {
 }
 
 /**
+ * Saves any local file (such as heavy videos and images) in IndexedDB
+ * and directly returns an ultra-lightweight key reference starting with "idb://".
+ * This completely avoids heavy base64 strings in memory for maximum app speed!
+ */
+export async function storeMediaAsIdbReference(rawBlob: Blob): Promise<string> {
+  const blob = await compressImageBlob(rawBlob);
+  const key = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    const db = await getDb();
+    const arrayBuffer = await blob.arrayBuffer();
+    const dataToStore = {
+      isWrapped: true,
+      mimeType: blob.type,
+      data: arrayBuffer
+    };
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    store.put(dataToStore, key);
+  } catch (err) {
+    console.warn("Could not save local IDB database element:", err);
+  }
+
+  return `idb://${key}`;
+}
+
+/**
  * Automatically converts any product's legacy idb:// media URLs to Base64
  * whenever the admin opens the page (allowing automatic remote syncing to the cloud/git).
  * Also preloads backupUrl with base64 data for standard assets so they can be securely
@@ -250,6 +277,14 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
             try {
               const blob = await getMedia(key);
               if (blob) {
+                // EXTREMELY IMPORTANT SAFEGUARD: Avoid converting videos to heavy base64 strings!
+                // Video files are very large and converting them to base64 completely blocks the React state,
+                // triggers Firestore quota warnings and causes GitHub API 422 errors due to massive JSON payloads.
+                // We keep them as IDB references locally, and sync them as independent physical files to GitHub uploads.
+                if (blob.type && blob.type.startsWith("video/")) {
+                  return item;
+                }
+
                 const dataUrl = await new Promise<string>((resolve, reject) => {
                   const reader = new FileReader();
                   reader.onloadend = () => {
