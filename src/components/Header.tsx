@@ -53,11 +53,11 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-header-bg/95 backdrop-blur-md border-b border-neutral-800 shadow-sm transition-all duration-300">
+    <header className="sticky top-0 z-40 bg-brand-50/90 backdrop-blur-md border-b border-brand-200 shadow-sm transition-all duration-300">
       {/* Top Banner */}
-      <div className="bg-neutral-950 text-text-crema text-center text-[10px] sm:text-[11px] py-2 tracking-widest font-normal uppercase flex items-center justify-center gap-2 px-4 shadow-sm flex-wrap border-b border-neutral-800">
+      <div className="bg-brand-900 text-brand-100 text-center text-[10px] sm:text-[11px] py-2 tracking-widest font-normal uppercase flex items-center justify-center gap-2 px-4 shadow-sm flex-wrap">
         <span className="flex items-center gap-1">🚚 Envío Inmediato Gratis desde $50.000 (Entrega 2-5 días)</span>
-        <span className="text-neutral-700">•</span>
+        <span className="text-brand-400">•</span>
         <span className="flex items-center gap-1.5"><span className="text-sky-400">💳</span> Compra 100% Protegida por Mercado Pago</span>
       </div>
 
@@ -68,14 +68,14 @@ export default function Header({
           onClick={handleLogoClick}
           id="brand-logo-trigger"
         >
-          <div className="bg-[#DCB48D] text-black p-2 rounded-lg pointer-events-none">
+          <div className="bg-brand-800 text-brand-100 p-2 rounded-lg pointer-events-none">
             <Sofa className="w-5 sm:w-6 h-5 sm:h-6" />
           </div>
           <div className="pointer-events-none text-left">
-            <h1 className="font-serif text-2xl sm:text-3xl font-semibold tracking-wide text-text-crema">
+            <h1 className="font-serif text-2xl sm:text-3xl font-semibold tracking-wide text-brand-900">
               Hogar & Estilo
             </h1>
-            <p className="text-[10px] tracking-[0.25em] text-[#DCB48D] uppercase">
+            <p className="text-[10px] tracking-[0.25em] text-brand-500 uppercase">
               Cocina, Bazar & Organización Funcional
             </p>
           </div>
@@ -84,14 +84,14 @@ export default function Header({
         {/* Dynamic Navigation Tabs & Search & Actions */}
         <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 sm:gap-4 grow md:grow-0">
           {/* Main Action Tabs */}
-          <div className="flex bg-neutral-900/80 p-1 rounded-full border border-neutral-800">
+          <div className="flex bg-brand-100 p-1 rounded-full border border-brand-200">
             <button
               id="btn-nav-shop"
               onClick={() => onTabChange("shop")}
               className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide transition-all cursor-pointer ${
                 activeTab === "shop"
-                  ? "bg-[#DCB48D] text-black shadow-sm"
-                  : "text-text-crema/80 hover:text-text-crema hover:bg-[#DCB48D]/20"
+                  ? "bg-brand-900 text-brand-100 shadow-sm"
+                  : "text-brand-700 hover:text-brand-900"
               }`}
             >
               Tienda
@@ -101,8 +101,8 @@ export default function Header({
               onClick={() => onTabChange("tracker")}
               className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide transition-all cursor-pointer ${
                 activeTab === "tracker"
-                  ? "bg-[#DCB48D] text-black shadow-sm"
-                  : "text-text-crema/80 hover:text-text-crema hover:bg-[#DCB48D]/20"
+                  ? "bg-brand-900 text-brand-100 shadow-sm"
+                  : "text-brand-700 hover:text-brand-900"
               }`}
             >
               Seguimiento
@@ -113,8 +113,8 @@ export default function Header({
                 onClick={() => onTabChange("admin")}
                 className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium tracking-wide transition-all cursor-pointer ${
                   activeTab === "admin"
-                    ? "bg-[#DCB48D]/80 text-black shadow-sm"
-                    : "text-text-crema/80 hover:text-text-crema hover:bg-[#DCB48D]/20"
+                    ? "bg-brand-500 text-brand-100 shadow-sm"
+                    : "text-brand-700 hover:text-brand-900"
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
@@ -132,9 +132,9 @@ export default function Header({
                 placeholder="Buscar lámpara, mesa..."
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full bg-neutral-900 text-text-crema pl-9 pr-4 py-2 rounded-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-[#DCB48D] border border-neutral-800 placeholder-text-crema/40 transition-all font-light"
+                className="w-full bg-brand-100 text-brand-900 pl-9 pr-4 py-2 rounded-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-brand-400 border border-brand-200 placeholder-brand-500 transition-all font-light"
               />
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#DCB48D]" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-500" />
             </div>
           )}
 
@@ -142,12 +142,12 @@ export default function Header({
           <button
             id="shopping-cart-toggle"
             onClick={onCartToggle}
-            className="relative p-2.5 rounded-full hover:bg-neutral-800 text-[#DCB48D] transition-all cursor-pointer flex items-center justify-center border border-neutral-800"
+            className="relative p-2.5 rounded-full hover:bg-brand-200 text-brand-800 transition-all cursor-pointer flex items-center justify-center border border-brand-300"
             aria-label="Ver Carrito de Compras"
           >
             <ShoppingBag className="w-4 sm:w-5 h-4 sm:h-5" />
             {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-[#EE6966] text-black text-[10px] md:text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-bounce shadow">
+              <span className="absolute -top-1.5 -right-1.5 bg-green-700 text-brand-100 text-[10px] md:text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center animate-bounce shadow">
                 {cartCount}
               </span>
             )}

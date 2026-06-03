@@ -31,17 +31,17 @@
 
 /* Custom global overrides for smooth premium feel */
 body {
-  background-color: #18181A;
-  background-image: radial-gradient(circle, #2d2d30 1.5px, transparent 1.5px);
+  background-color: #FAF8F5;
+  background-image: radial-gradient(circle, #bfb9a6 1.5px, transparent 1.5px);
   background-size: 24px 24px;
-  color: #E4E0D6;
+  color: #292620;
   font-family: var(--font-sans);
   overflow-x: hidden;
 }
 
 .premium-grid-bg {
-  background-color: #18181A !important;
-  background-image: radial-gradient(circle, #2d2d30 1.5px, transparent 1.5px) !important;
+  background-color: #FAF8F5 !important;
+  background-image: radial-gradient(circle, #bfb9a6 1.5px, transparent 1.5px) !important;
   background-size: 24px 24px !important;
 }
 
