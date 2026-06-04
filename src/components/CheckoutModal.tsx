@@ -1253,63 +1253,15 @@ export default function CheckoutModal({
                       <span className="text-xs text-blue-300 bg-[#002f54] px-2 py-0.5 rounded-md font-mono font-semibold">🔒 Conexión Segura</span>
                     </div>
 
-                    <p className="text-xs text-blue-100 leading-relaxed font-sans">
-                      Pagá de forma segura con tu tarjeta de crédito o tarjeta de débito utilizando la pasarela oficial integrada.
+                    <p className="text-xs text-blue-100 leading-relaxed font-sans mt-1">
+                      Pagá de forma segura con tu tarjeta de crédito o tarjeta de débito utilizando la pasarela oficial integrada de Mercado Pago en hasta 18 cuotas fijas (o hasta 3 cuotas sin interés según tu banco).
                     </p>
-
-                    {/* Elegante Selector de Cuotas para intereses calculados */}
-                    <div className="bg-[#00284d] p-4 rounded-xl border border-[#009ee3]/30 space-y-3">
-                      <span className="block text-[10px] text-blue-300 uppercase tracking-widest font-extrabold">Seleccioná tu plan de financiación preferido:</span>
-                      
-                      <div className="grid grid-cols-1 gap-2">
-                        {[3, 6, 9, 12, 18].map((inst) => {
-                          const { total, fee } = getCreditTotalAndFee(inst);
-                          const isSelected = (formData.installments || 3) === inst;
-                          return (
-                            <button
-                              key={inst}
-                              type="button"
-                              onClick={() => {
-                                setFormData(prev => ({ ...prev, ...formData, installments: inst }));
-                              }}
-                              className={`flex items-center justify-between p-3 rounded-lg border text-left transition-all cursor-pointer ${
-                                isSelected
-                                  ? "border-emerald-500 bg-[#001b33] text-white shadow-sm ring-1 ring-emerald-500"
-                                  : "border-[#009ee3]/20 bg-[#002f54]/40 hover:bg-[#002f54]/70 text-blue-100 hover:text-white"
-                              }`}
-                            >
-                              <div>
-                                <span className="font-bold text-xs sm:text-sm block">
-                                  {inst} {inst === 3 ? "Cuotas Sin Interés ✨" : "Cuotas Fijas"}
-                                </span>
-                                <span className={`text-[10px] block ${isSelected ? "text-emerald-400 font-semibold" : "text-blue-300"}`}>
-                                  Total con tarjeta: {formatCurrency(total)}
-                                </span>
-                              </div>
-                              <span className="text-sm font-black font-serif text-emerald-400">
-                                {inst}x {formatCurrency(fee)}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
 
                     {mpError && (
                       <div className="p-4 bg-red-950/70 border border-red-500 rounded-xl mb-4">
                         <p className="text-xs text-red-200 font-medium">{mpError}</p>
                       </div>
                     )}
-
-                    {/* Alerta de Cuotas */}
-                    <div className="bg-amber-50 border-2 border-amber-400 p-4 rounded-xl text-amber-950 font-sans text-xs space-y-1.5 animate-pulse">
-                      <p className="font-black flex items-center gap-1.5 text-sm text-amber-950">
-                        <span>📢 PASO OBLIGATORIO:</span>
-                      </p>
-                      <p className="font-semibold leading-relaxed">
-                        Al completar los datos de tu tarjeta en el formulario de abajo, <strong className="text-amber-950 font-extrabold underline decoration-amber-600 decoration-2">asegurate de elegir exactamente tu plan de cuotas (3, 6, 9, 12 o 18 cuotas)</strong> en el menú desplegable interno de Mercado Pago para que se aplique correctamente tu financiación elegida.
-                      </p>
-                    </div>
 
                     {/* Mercado Pago Brick will render inside this container */}
                     <div key="mp-brick-container" className="w-full relative min-h-[250px]">
