@@ -344,7 +344,7 @@ export default function CheckoutModal({
               paymentMethods: {
                 creditCard: "all",
                 debitCard: "all",
-                maxInstallments: formDataRef.current.installments || 3,
+                maxInstallments: 18,
                 types: {
                   excluded: ["ticket", "bank_transfer"]
                 }
@@ -1300,6 +1300,16 @@ export default function CheckoutModal({
                         <p className="text-xs text-red-200 font-medium">{mpError}</p>
                       </div>
                     )}
+
+                    {/* Alerta de Cuotas */}
+                    <div className="bg-amber-50 border-2 border-amber-400 p-4 rounded-xl text-amber-950 font-sans text-xs space-y-1.5 animate-pulse">
+                      <p className="font-black flex items-center gap-1.5 text-sm text-amber-950">
+                        <span>📢 PASO OBLIGATORIO:</span>
+                      </p>
+                      <p className="font-semibold leading-relaxed">
+                        Al completar los datos de tu tarjeta en el formulario de abajo, <strong className="text-amber-950 font-extrabold underline decoration-amber-600 decoration-2">asegurate de elegir exactamente tu plan de cuotas (3, 6, 9, 12 o 18 cuotas)</strong> en el menú desplegable interno de Mercado Pago para que se aplique correctamente tu financiación elegida.
+                      </p>
+                    </div>
 
                     {/* Mercado Pago Brick will render inside this container */}
                     <div key="mp-brick-container" className="w-full relative min-h-[250px]">

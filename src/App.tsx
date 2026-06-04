@@ -1165,7 +1165,7 @@ export default function App() {
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Carta 1: Calidad Garantizada */}
-                <div className="flex items-start gap-4 bg-amber-50/90 border border-amber-200 p-5 rounded-2xl shadow-xs">
+                <div className="flex items-start gap-4 bg-amber-50/95 border border-amber-200 p-5 rounded-2xl shadow-xs">
                   <div className="bg-amber-100 p-3 rounded-xl text-amber-800 shrink-0">
                     <ShieldCheck className="w-6 h-6" />
                   </div>
@@ -1178,20 +1178,20 @@ export default function App() {
                 </div>
 
                 {/* Carta 2: Estilo Único */}
-                <div className="flex items-start gap-4 bg-amber-100/75 border border-amber-300 p-5 rounded-2xl shadow-xs">
-                  <div className="bg-amber-200/80 p-3 rounded-xl text-amber-900 shrink-0">
+                <div className="flex items-start gap-4 bg-amber-50/95 border border-amber-200 p-5 rounded-2xl shadow-xs">
+                  <div className="bg-amber-100 p-3 rounded-xl text-amber-800 shrink-0">
                     <Star className="w-6 h-6 fill-amber-400 text-amber-700 animate-pulse" />
                   </div>
                   <div>
                     <h4 className="font-serif font-black text-amber-950 text-sm">Estilo Único ✨</h4>
-                    <p className="text-xs text-amber-950 mt-1 font-semibold leading-relaxed">
+                    <p className="text-xs text-amber-900 mt-1 font-semibold leading-relaxed">
                       Seleccionamos los mejores productos de decoración, bazar y organización para lograr un hogar cálido, ordenado y con personalidad.
                     </p>
                   </div>
                 </div>
 
                 {/* Carta 3: Beneficio de Transferencia */}
-                <div className="flex items-start gap-4 bg-amber-50/90 border border-amber-200 p-5 rounded-2xl shadow-xs">
+                <div className="flex items-start gap-4 bg-amber-50/95 border border-amber-200 p-5 rounded-2xl shadow-xs">
                   <div className="bg-amber-100 p-3 rounded-xl text-amber-800 shrink-0">
                     <Landmark className="w-6 h-6" />
                   </div>
