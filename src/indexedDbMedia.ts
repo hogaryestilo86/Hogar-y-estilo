@@ -503,15 +503,24 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
   const idbKey = isIdbUrl && url ? url.replace("idb://", "") : "";
   
   const getInstantResolved = () => {
-    if (!url) return backupUrl || "";
-    if (url.startsWith("data:video/")) {
-      return base64ToBlobUrl(url);
+    let finalBackup = backupUrl || "";
+    if (finalBackup && !finalBackup.startsWith("/") && !finalBackup.startsWith("http") && !finalBackup.startsWith("data:") && !finalBackup.startsWith("idb://")) {
+      finalBackup = "/" + finalBackup;
+    }
+
+    if (!url) return finalBackup;
+    if (url.startsWith("data:video/") || url.startsWith("data:image/")) {
+      return url.startsWith("data:video/") ? base64ToBlobUrl(url) : url;
     }
     if (!isIdbUrl) {
-      if ((url.startsWith("/uploads/") || url.startsWith("uploads/")) && backupUrl) {
-        return backupUrl;
+      let resolvedUrl = url;
+      if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://")) {
+        resolvedUrl = "/" + resolvedUrl;
       }
-      return url;
+      if ((resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/")) && finalBackup) {
+        return finalBackup;
+      }
+      return resolvedUrl;
     }
     if (idbKey && globalResolvedCache[idbKey]) {
       return globalResolvedCache[idbKey];
@@ -519,7 +528,7 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
     if (idbKey && inMemoryFallbackCache[idbKey]) {
       return inMemoryFallbackCache[idbKey];
     }
-    return backupUrl || "";
+    return finalBackup;
   };
 
   const instantValue = getInstantResolved();
@@ -566,19 +575,21 @@ export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImagePro
       setHasError(false);
     }, [src, backupUrl]);
 
+    // Do NOT fall back to category illustration if there is a custom user image loading or present
+    const isCustom = src && (src.startsWith("data:") || src.startsWith("idb://") || src.startsWith("/uploads") || src.startsWith("uploads/"));
+
     const finalSrc = hasError
-      ? (backupUrl || getCategoryPlaceholder(category))
-      : (resolved || getCategoryPlaceholder(category));
+      ? (backupUrl || (isCustom ? "" : getCategoryPlaceholder(category)))
+      : (resolved || (isCustom ? "" : getCategoryPlaceholder(category)));
 
     return React.createElement("img", {
       ref,
-      src: finalSrc,
+      src: finalSrc || undefined,
       onError: (e: any) => {
         if (!hasError) {
           setHasError(true);
         } else {
-          // If fallback fails as well, use a guaranteed Unsplash placeholder to prevent infinite loops
-          e.target.src = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80";
+          // If fallback fails, keep finalSrc/backupUrl if custom, avoiding generic Unsplash default
         }
       },
       ...props

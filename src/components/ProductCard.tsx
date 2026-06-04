@@ -49,13 +49,14 @@ export default function ProductCard({
   const [showVideoModal, setShowVideoModal] = useState(false);
   const mediaList = product?.media || [];
   
-  // Filter out image assets only for high-speed, zero-flicker background card scrolling
+  // Prioritize image assets for card display, but allow fallback to video backup posters instead of forcing a default placeholder
   const imageMediaList = mediaList.filter(item => item && item.type === "image");
   
-  // Fallback to initial display category placeholder if no custom images exist
   const displayMediaList = imageMediaList.length > 0
     ? imageMediaList
-    : [{ type: "image", url: getCategoryPlaceholder(product?.category), backupUrl: undefined }];
+    : (mediaList.length > 0
+        ? mediaList
+        : [{ type: "image", url: getCategoryPlaceholder(product?.category), backupUrl: undefined }]);
 
   const activeMedia = displayMediaList[mediaIndex] || displayMediaList[0] || { type: "image", url: getCategoryPlaceholder(product?.category), backupUrl: undefined };
   const hasMultipleMedia = displayMediaList.length > 1;
@@ -133,7 +134,7 @@ export default function ProductCard({
           (product.basePrice >= 50000 || (product.beforePrice && product.beforePrice > listPrice)) ? "pt-[76px]" : "pt-2"
         } pb-2`}>
           <ResolvedImage
-            src={activeMedia.url}
+            src={activeMedia.type === "video" ? (activeMedia.backupUrl || activeMedia.url) : activeMedia.url}
             backupUrl={activeMedia.backupUrl}
             category={product.category}
             alt={product.title}

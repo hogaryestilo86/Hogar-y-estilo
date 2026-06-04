@@ -25,7 +25,24 @@ export function resolveImageUrl(url: string | undefined): string {
   if (url.startsWith("/api/image-proxy?url=")) {
     return decodeURIComponent(url.replace("/api/image-proxy?url=", ""));
   }
-  return url;
+  let resolvedUrl = url;
+  if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://")) {
+    resolvedUrl = "/" + resolvedUrl;
+  }
+  return resolvedUrl;
+}
+
+// Global slugify helper to produce clean friendly URLs
+export function slugify(text: string): string {
+  if (!text) return "";
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/[^a-z0-0-9\s-]/g, "") // remove all non-alphanumeric chars except space/hyphen
+    .trim()
+    .replace(/\s+/g, "-") // spaces to -
+    .replace(/-+/g, "-"); // merge multiple -
 }
 
 // Robust cleaner helper to completely purge old mock/trial assets from localStorage/state so only user's custom designs are loaded
@@ -391,12 +408,97 @@ export default function App() {
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [pendingProductId, setPendingProductId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"shop" | "admin" | "tracker">("shop");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Synchronize browser URL history with high-performance popstate router events
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const path = window.location.pathname;
+      if (path.startsWith("/producto/")) {
+        const segment = path.replace("/producto/", "");
+        if (!segment) {
+          setSelectedProduct(null);
+          return;
+        }
+        
+        // Parts will decompose slug-productID (e.g. "set-de-bazar-3" -> "3")
+        const parts = segment.split("-");
+        const possibleId = parts[parts.length - 1];
+        
+        // Find by exact segment ID, by parsed ID, or name slug matches matching existing products
+        const found = products.find(p => 
+          p && (
+            String(p.id) === segment || 
+            String(p.id) === possibleId || 
+            slugify(p.title) === segment ||
+            `${slugify(p.title)}-${p.id}` === segment
+          )
+        );
+        
+        if (found) {
+          setSelectedProduct(found);
+          setPendingProductId(null);
+        } else {
+          // Store pending product ID so that once cloud/indexedDB catalog loads, it is autoselected
+          setPendingProductId(segment);
+        }
+      } else {
+        setSelectedProduct(null);
+      }
+    };
+
+    if (hasLoadedInitial && products.length > 0) {
+      handleLocationChange();
+    }
+
+    window.addEventListener("popstate", handleLocationChange);
+    return () => {
+      window.removeEventListener("popstate", handleLocationChange);
+    };
+  }, [products, hasLoadedInitial]);
+
+  // Sync selectedProduct state back to window history and active URL path
+  useEffect(() => {
+    if (!hasLoadedInitial) return;
+
+    if (selectedProduct) {
+      const slug = slugify(selectedProduct.title);
+      const friendlyPath = `/producto/${slug}-${selectedProduct.id}`;
+      if (window.location.pathname !== friendlyPath) {
+        window.history.pushState({ productId: selectedProduct.id }, "", friendlyPath);
+      }
+    } else {
+      if (window.location.pathname.startsWith("/producto/")) {
+        window.history.pushState(null, "", "/");
+      }
+    }
+  }, [selectedProduct, hasLoadedInitial]);
+
+  // Handle lazy loading trigger for pending product on initial asynchronous hydration
+  useEffect(() => {
+    if (pendingProductId && products.length > 0) {
+      const parts = pendingProductId.split("-");
+      const possibleId = parts[parts.length - 1];
+      const found = products.find(p => 
+        p && (
+          String(p.id) === pendingProductId || 
+          String(p.id) === possibleId || 
+          slugify(p.title) === pendingProductId ||
+          `${slugify(p.title)}-${p.id}` === pendingProductId
+        )
+      );
+      if (found) {
+        setSelectedProduct(found);
+        setPendingProductId(null);
+      }
+    }
+  }, [products, pendingProductId]);
 
   // Elegant floating toast state for non-blocking notifications
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
