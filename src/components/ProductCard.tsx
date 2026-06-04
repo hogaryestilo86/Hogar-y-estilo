@@ -289,7 +289,7 @@ export default function ProductCard({
         </div>
 
         {/* Dynamic CTAs - Unified Consultation and Instant Purchase blocks to guarantee conversion */}
-        <div className="space-y-2 mt-3.5">
+        <div className="space-y-1.5 mt-2.5">
           {/* Social direct messaging query styled as a smaller, non-invasive Instagram gradient button */}
           <div className="flex justify-center">
             <a
@@ -300,23 +300,23 @@ export default function ProductCard({
               onClick={(e) => {
                 e.stopPropagation();
               }}
-              className="inline-flex max-w-max mx-auto bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:brightness-110 text-white font-black text-[8.5px] tracking-wider uppercase py-1 px-2.5 rounded-md items-center justify-center gap-1 transition-all text-center cursor-pointer shadow-2xs transform active:scale-95 border-0"
+              className="inline-flex max-w-max mx-auto bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:brightness-110 text-white font-black text-[7.5px] scale-95 tracking-wider uppercase py-0.5 px-2 rounded items-center justify-center gap-1 transition-all text-center cursor-pointer shadow-3xs transform active:scale-95 border-0"
               title="Consultar Stock del producto por Instagram"
             >
-              <Instagram className="w-3 h-3 text-white" />
-              <span>Consultar Stock por Instagram 📱</span>
+              <Instagram className="w-2.5 h-2.5 text-white" />
+              <span>Consultar Stock 📱</span>
             </a>
           </div>
 
           {/* Standard instant purchase hooks - Free of barriers (thin & full width stacked layout) */}
-          <div className="flex flex-col gap-1.5 pt-0.5">
+          <div className="flex flex-col gap-1 pt-0.5">
             <button
               id={`btn-buynow-${product.id}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onBuyNow(product);
               }}
-              className="w-full bg-pink-500 hover:bg-pink-600 text-white font-black text-[11px] tracking-wider uppercase py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-xs"
+              className="w-full bg-pink-400 hover:bg-pink-500 text-white font-black text-[11px] tracking-wider uppercase py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-2xs"
             >
               <span>Comprar ahora 🛍️</span>
             </button>
@@ -328,7 +328,7 @@ export default function ProductCard({
                 e.stopPropagation();
                 onAddToCart(product);
               }}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] tracking-wider uppercase py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-xs"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-[10.5px] tracking-wide uppercase py-1 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-2xs border-0"
             >
               <span>Agregar al Carrito 🛒</span>
             </button>

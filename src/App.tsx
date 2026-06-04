@@ -31,29 +31,8 @@ export function resolveImageUrl(url: string | undefined): string {
 // Robust cleaner helper to completely purge old mock/trial assets from localStorage/state so only user's custom designs are loaded
 const filterOutDemoProducts = (list: any[]): Product[] => {
   if (!Array.isArray(list)) return [];
-  const demoIds = [
-    "prod-contadora-billetes",
-    "prod-reflector-solar",
-    "prod-bolso-carrito-compras",
-    "prod-set-juegos-mesa",
-    "prod-lampara-mesa-rgb",
-    "prod-set-accesorios-bano",
-    "prod-cafetera-expreso-vintage",
-    "prod-set-almohada-cobertor",
-    "prod-alba-aura",
-    "prod-utensilios-bambu",
-    "prod-sillon-boucle",
-    "prod-serum-rosa",
-    "prod-organizador-negro",
-    "prod-bloques-madera",
-    "prod-doudou-conejito"
-  ];
-  return list.filter((p) => {
-    if (!p || !p.id || !p.title) return false;
-    // Keep of all custom or modified products, reject only old mock template/demo designs
-    if (demoIds.includes(p.id)) return false;
-    return true;
-  });
+  // Return list as is to preserve all custom modifications, edits, and deletions without resetting them to default shapes!
+  return list.filter((p) => p && p.id && p.title);
 };
 
 let isFirestoreQuotaExceeded = false;
@@ -1184,36 +1163,41 @@ export default function App() {
 
             {/* Quality USP Grid */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 sm:p-8 rounded-2xl border border-brand-200 shadow-xs">
-                <div className="flex items-start gap-4">
-                  <div className="bg-brand-100 p-3 rounded-xl text-brand-800">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Carta 1: Calidad Garantizada */}
+                <div className="flex items-start gap-4 bg-amber-50/90 border border-amber-200 p-5 rounded-2xl shadow-xs">
+                  <div className="bg-amber-100 p-3 rounded-xl text-amber-800 shrink-0">
                     <ShieldCheck className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="font-serif font-bold text-brand-900 text-sm">Calidad Garantizada</h4>
-                    <p className="text-xs text-brand-600 mt-1 font-light leading-relaxed">
+                    <h4 className="font-serif font-black text-amber-950 text-sm">Calidad Garantizada</h4>
+                    <p className="text-xs text-amber-900 mt-1 font-semibold leading-relaxed">
                       Calidad garantizada de nuestros productos o le devolvemos su dinero de forma directa y sin complicaciones.
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-4 border-y md:border-y-0 md:border-x border-amber-300 py-4 md:py-2 md:px-6 bg-amber-50/45 rounded-xl">
-                  <div className="bg-amber-100 p-3 rounded-xl text-amber-800 shrink-0">
-                    <Star className="w-6 h-6 fill-amber-400 text-amber-600 animate-pulse" />
+
+                {/* Carta 2: Estilo Único */}
+                <div className="flex items-start gap-4 bg-amber-100/75 border border-amber-300 p-5 rounded-2xl shadow-xs">
+                  <div className="bg-amber-200/80 p-3 rounded-xl text-amber-900 shrink-0">
+                    <Star className="w-6 h-6 fill-amber-400 text-amber-700 animate-pulse" />
                   </div>
                   <div>
-                    <h4 className="font-serif font-bold text-amber-950 text-sm">Calidad y Estilo Único ✨</h4>
-                    <p className="text-xs text-amber-900 mt-1 font-medium leading-relaxed">
+                    <h4 className="font-serif font-black text-amber-950 text-sm">Estilo Único ✨</h4>
+                    <p className="text-xs text-amber-950 mt-1 font-semibold leading-relaxed">
                       Seleccionamos los mejores productos de decoración, bazar y organización para lograr un hogar cálido, ordenado y con personalidad.
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-4">
-                  <div className="bg-brand-100 p-3 rounded-xl text-brand-800">
+
+                {/* Carta 3: Beneficio de Transferencia */}
+                <div className="flex items-start gap-4 bg-amber-50/90 border border-amber-200 p-5 rounded-2xl shadow-xs">
+                  <div className="bg-amber-100 p-3 rounded-xl text-amber-800 shrink-0">
                     <Landmark className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="font-serif font-bold text-brand-900 text-sm">15% Off de Transferencia</h4>
-                    <p className="text-xs text-green-700 mt-1 font-semibold leading-relaxed">
+                    <h4 className="font-serif font-black text-amber-950 text-sm">15% Off por Transferencia</h4>
+                    <p className="text-xs text-amber-900 mt-1 font-semibold leading-relaxed border-l-2 border-emerald-500 pl-2">
                       Mantenemos la tasa impositiva baja. Pagando directamente por transferencia se bonifica un 15% inmediato.
                     </p>
                   </div>
@@ -1561,43 +1545,43 @@ export default function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left max-w-5xl mx-auto">
                   {/* Step 1 */}
-                  <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
-                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">01</div>
-                    <div className="p-3 bg-gradient-to-r from-purple-600 via-pink-650 to-orange-500 text-white rounded-xl inline-block">
+                  <div className="bg-amber-50/90 p-6 rounded-2xl border border-amber-300 space-y-4 shadow-sm relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
+                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-amber-950">01</div>
+                    <div className="p-3 bg-amber-900 text-amber-50 rounded-xl inline-block">
                       <Instagram className="w-5 h-5 text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <h4 className="font-serif text-base font-bold text-brand-950">Consultá Stock por Instagram</h4>
-                      <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Hacé clic en el botón de <strong>Consultar Stock</strong> en cualquiera de tus artículos deseados. Te confirmamos disponibilidad de forma inmediata para evitar cualquier inconveniente antes de tu pago.
+                      <h4 className="font-serif text-base font-black text-amber-950">Elegí tus Productos</h4>
+                      <p className="text-xs text-amber-950 font-semibold leading-relaxed">
+                        Navegá por nuestro catálogo y seleccioná los artículos de bazar, bazar premium y decoración que más te gusten para renovar tu hogar.
                       </p>
                     </div>
                   </div>
 
                   {/* Step 2 */}
-                  <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
-                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">02</div>
-                    <div className="p-3 bg-brand-900 text-brand-100 rounded-xl inline-block">
+                  <div className="bg-pink-50/90 p-6 rounded-2xl border border-pink-300 space-y-4 shadow-sm relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
+                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-pink-950">02</div>
+                    <div className="p-3 bg-pink-600 text-pink-100 rounded-xl inline-block">
                       <ShoppingCart className="w-5 h-5 text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <h4 className="font-serif text-base font-bold text-brand-950">Elegí y Agregá al Carrito</h4>
-                      <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Agregá productos al carrito para continuar comprando varios artículos juntos, o tocá el botón de <strong>Comprar ahora</strong> para iniciar tu pedido de forma directa e inmediata.
+                      <h4 className="font-serif text-base font-black text-pink-950">Agregá al Carrito</h4>
+                      <p className="text-xs text-pink-950 font-semibold leading-relaxed">
+                        Agregá productos al carrito para seguir comprando varios productos juntos, o tocá el botón de <strong>Comprar ahora</strong> para iniciar tu pedido de forma directa e inmediata.
                       </p>
                     </div>
                   </div>
 
                   {/* Step 3 */}
-                  <div className="bg-brand-50/50 p-6 rounded-2xl border border-brand-100 space-y-4 shadow-xs relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
-                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-brand-900">03</div>
-                    <div className="p-3 bg-brand-900 text-brand-100 rounded-xl inline-block">
+                  <div className="bg-emerald-50/95 p-6 rounded-2xl border border-emerald-300 space-y-4 shadow-sm relative transition-all hover:translate-y-[-2px] hover:shadow-xs">
+                    <div className="absolute top-4 right-4 text-3xl font-black font-serif text-emerald-950">03</div>
+                    <div className="p-3 bg-emerald-600 text-emerald-100 rounded-xl inline-block">
                       <Truck className="w-5 h-5 text-white" />
                     </div>
                     <div className="space-y-1.5">
-                      <h4 className="font-serif text-base font-bold text-brand-950">Completá Pago y Despacho</h4>
-                      <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Aprovechá el beneficio de pagar por transferencia para obtener un <strong>15% de descuento inmediato</strong> de bonificación, o pagá cómodamente en hasta <strong>3 cuotas sin interés</strong> con tarjeta de crédito. ¡Despachamos rápidamente!
+                      <h4 className="font-serif text-base font-black text-emerald-950">Elegí tu Forma de Pago</h4>
+                      <p className="text-xs text-emerald-950 font-semibold leading-relaxed">
+                        Aprovechá el beneficio de pagar por transferencia para obtener un <strong>15% de descuento inmediato</strong>, o pagá hasta en <strong>3 cuotas sin interés</strong> con tarjeta de crédito.
                       </p>
                     </div>
                   </div>
