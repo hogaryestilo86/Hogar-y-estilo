@@ -214,13 +214,13 @@ export default function App() {
         if (loadedCloud.length > 0) {
           const mergedMap = new Map<string, Product>();
 
-          // Start with cloud/server products
-          loadedCloud.forEach((p) => {
+          // Start with local browser products as basic background baseline
+          loadedLocal.forEach((p) => {
             if (p && p.id) mergedMap.set(p.id, p);
           });
 
-          // Override or append with local browser products
-          loadedLocal.forEach((p) => {
+          // Overwrite with prestigious, authoritative database cloud products (so cloud status/processed URLs always overwrite legacy IDB references!)
+          loadedCloud.forEach((p) => {
             if (p && p.id) {
               mergedMap.set(p.id, p);
             }
@@ -1190,19 +1190,19 @@ export default function App() {
                     <ShieldCheck className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="font-serif font-bold text-brand-900 text-sm">Garantía Asegurada</h4>
+                    <h4 className="font-serif font-bold text-brand-900 text-sm">Calidad Garantizada</h4>
                     <p className="text-xs text-brand-600 mt-1 font-light leading-relaxed">
-                      Si el producto llega dañado u oxidado por el transporte, enviamos un repuesto de forma gratuita en 48hs hábiles.
+                      Calidad garantizada de nuestros productos o le devolvemos su dinero de forma directa y sin complicaciones.
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-4 border-y md:border-y-0 md:border-x border-brand-100 py-4 md:py-0 md:px-6">
-                  <div className="bg-brand-100 p-3 rounded-xl text-brand-800">
-                    <Star className="w-6 h-6" />
+                <div className="flex items-start gap-4 border-y md:border-y-0 md:border-x border-amber-300 py-4 md:py-2 md:px-6 bg-amber-50/45 rounded-xl">
+                  <div className="bg-amber-100 p-3 rounded-xl text-amber-800 shrink-0">
+                    <Star className="w-6 h-6 fill-amber-400 text-amber-600 animate-pulse" />
                   </div>
                   <div>
-                    <h4 className="font-serif font-bold text-brand-900 text-sm">Calidad y Estilo Únicos</h4>
-                    <p className="text-xs text-brand-600 mt-1 font-light leading-relaxed">
+                    <h4 className="font-serif font-bold text-amber-950 text-sm">Calidad y Estilo Único ✨</h4>
+                    <p className="text-xs text-amber-900 mt-1 font-medium leading-relaxed">
                       Seleccionamos los mejores productos de decoración, bazar y organización para lograr un hogar cálido, ordenado y con personalidad.
                     </p>
                   </div>
@@ -1283,7 +1283,7 @@ export default function App() {
                       <div className="border-l-4 border-amber-500 pl-4 py-1">
                         <span className="text-[10px] font-mono text-amber-600 uppercase tracking-widest font-bold">Selección Destacada</span>
                         <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">✨ Productos Estrella</h3>
-                        <p className="text-xs text-brand-500 font-light mt-0.5">Los favoritos de nuestros clientes, seleccionados por su estilo y funcionalidad.</p>
+                        <p className="text-xs text-brand-850 font-bold mt-0.5">Los favoritos de nuestros clientes, seleccionados por su estilo y funcionalidad.</p>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 font-sans">
                         {filteredProducts.filter(p => p.featured).map((product) => (
@@ -1307,7 +1307,7 @@ export default function App() {
                           <div className="border-l-4 border-brand-800 pl-4 py-1">
                             <span className="text-[10px] font-mono text-brand-650 uppercase tracking-widest font-bold">Oportunidades</span>
                             <h3 className="font-serif text-2xl font-bold text-brand-900 tracking-tight">🏡 Ofertas y Destacados</h3>
-                            <p className="text-xs text-brand-500 font-light mt-0.5">Explorá nuestra cuidada selección esencial en promoción para tus ambientes cotidianos.</p>
+                            <p className="text-xs text-brand-800 font-medium mt-0.5">Explorá nuestra cuidada selección esencial en promoción para tus ambientes cotidianos.</p>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 font-sans">
                             {filteredProducts.filter(p => !p.featured).slice(0, 8).map((product) => (
@@ -1583,7 +1583,7 @@ export default function App() {
                     <div className="space-y-1.5">
                       <h4 className="font-serif text-base font-bold text-brand-950">Elegí y Agregá al Carrito</h4>
                       <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Elegí tus favoritos y agregalos al carrito. No pusimos ningún bloqueo para que no sea un impedimento comprar, pero te sugerimos consultarnos por las dudas.
+                        Agregá productos al carrito para continuar comprando varios artículos juntos, o tocá el botón de <strong>Comprar ahora</strong> para iniciar tu pedido de forma directa e inmediata.
                       </p>
                     </div>
                   </div>
@@ -1597,7 +1597,7 @@ export default function App() {
                     <div className="space-y-1.5">
                       <h4 className="font-serif text-base font-bold text-brand-950">Completá Pago y Despacho</h4>
                       <p className="text-xs text-brand-600 font-light leading-relaxed">
-                        Cargá tus datos de entrega, seleccioná opción de pago (¡aprovechá el <strong>15% OFF por transferencia</strong> adjuntando tu comprobante!) y finalizá tu orden. Se despacha en el día si el pago se confirma rápido.
+                        Aprovechá el beneficio de pagar por transferencia para obtener un <strong>15% de descuento inmediato</strong> de bonificación, o pagá cómodamente en hasta <strong>3 cuotas sin interés</strong> con tarjeta de crédito. ¡Despachamos rápidamente!
                       </p>
                     </div>
                   </div>

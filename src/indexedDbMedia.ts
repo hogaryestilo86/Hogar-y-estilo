@@ -277,6 +277,48 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
             try {
               const blob = await getMedia(key);
               if (blob) {
+                // EXTREMELY POWERFUL SELF-HEALING: Try to upload directly to server static directory first!
+                try {
+                  const dataUrl = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      if (typeof reader.result === "string") resolve(reader.result);
+                      else reject(new Error("Empty string"));
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                  });
+                  const base64Data = dataUrl.split(",")[1];
+                  
+                  const uploadRes = await fetch("/api/upload-media", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                      filename: key,
+                      mimeType: blob.type,
+                      base64: base64Data
+                    })
+                  });
+
+                  if (uploadRes.ok) {
+                    const uploadData = await uploadRes.json();
+                    if (uploadData && uploadData.url) {
+                      console.log("[IndexedDB Self-Healing] Successfully migrated local IDB media to server static link:", uploadData.url);
+                      prodChanged = true;
+                      changed = true;
+                      return {
+                        ...item,
+                        url: uploadData.url,
+                        backupUrl: dataUrl
+                      };
+                    }
+                  }
+                } catch (uploadErr) {
+                  console.warn("[IndexedDB Self-Healing] Server upload failed. Falling back to base64 conversions:", uploadErr);
+                }
+
                 // EXTREMELY IMPORTANT SAFEGUARD: Avoid converting videos to heavy base64 strings!
                 // Video files are very large and converting them to base64 completely blocks the React state,
                 // triggers Firestore quota warnings and causes GitHub API 422 errors due to massive JSON payloads.

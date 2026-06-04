@@ -289,35 +289,36 @@ export default function ProductCard({
         </div>
 
         {/* Dynamic CTAs - Unified Consultation and Instant Purchase blocks to guarantee conversion */}
-        <div className="space-y-2 mt-4">
-          {/* Social direct messaging query styled as a highly prominent Instagram gradient button */}
-          <a
-            id={`btn-stock-instagram-${product.id}`}
-            href={`https://instagram.com/deco.home.rosario`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            className="w-full bg-gradient-to-r from-purple-600 via-pink-650 to-orange-500 hover:from-purple-700 hover:via-pink-700 hover:to-orange-600 text-white font-black text-[11px] tracking-widest uppercase py-3.5 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all text-center cursor-pointer shadow-md transform hover:scale-[1.01] active:scale-95 border-0"
-            title="Consultar Stock del producto por Instagram"
-          >
-            <Instagram className="w-4 h-4 text-white animate-pulse" />
-            <span>Consultar Stock 📱</span>
-          </a>
+        <div className="space-y-2 mt-3.5">
+          {/* Social direct messaging query styled as a smaller, non-invasive Instagram gradient button */}
+          <div className="flex justify-center">
+            <a
+              id={`btn-stock-instagram-${product.id}`}
+              href={`https://instagram.com/deco.home.rosario`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:from-purple-600 hover:via-pink-600 hover:to-orange-500 text-white font-extrabold text-[10px] tracking-wide uppercase py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 transition-all text-center cursor-pointer shadow-xs transform active:scale-95 border-0"
+              title="Consultar Stock del producto por Instagram"
+            >
+              <Instagram className="w-3.5 h-3.5 text-white" />
+              <span>Consultar Stock por Instagram 📱</span>
+            </a>
+          </div>
 
-          {/* Standard instant purchase hooks - Free of barriers */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Standard instant purchase hooks - Free of barriers (thin & full width stacked layout) */}
+          <div className="flex flex-col gap-1.5 pt-0.5">
             <button
               id={`btn-buynow-${product.id}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onBuyNow(product);
               }}
-              className="bg-pink-600 hover:bg-pink-700 text-white font-bold text-[10px] tracking-wider uppercase py-2.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all transform active:scale-95 cursor-pointer shadow-xs"
+              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black text-[11px] tracking-wider uppercase py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-xs"
             >
-              <Sparkles className="w-3 h-3 text-amber-300 animate-pulse" />
-              <span>Comprar</span>
+              <span>Comprar ahora 🛍️</span>
             </button>
             
             <button
@@ -327,10 +328,9 @@ export default function ProductCard({
                 e.stopPropagation();
                 onAddToCart(product);
               }}
-              className="bg-[#fdf2f5] hover:bg-[#fce7ec] text-pink-700 border border-pink-300 font-extrabold text-[10px] tracking-wider uppercase py-2.5 px-2 rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer shadow-3xs"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] tracking-wider uppercase py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-xs"
             >
-              <ShoppingCart className="w-3 h-3 text-pink-600" />
-              <span>+ Carrito</span>
+              <span>Agregar al Carrito 🛒</span>
             </button>
           </div>
         </div>

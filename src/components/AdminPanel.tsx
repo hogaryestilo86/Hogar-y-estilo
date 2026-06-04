@@ -1101,34 +1101,79 @@ export default function AdminPanel({
       }
 
       try {
-        if (isPhoto) {
-          // Guardar imagen en IndexedDB para máxima resolución y evitar cuota de LocalStorage
-          const idbUrl = await storeMedia(file);
-          updatedMedia.push({
-            type: "image",
-            url: idbUrl,
-          });
-        } else {
-          // Guardar video en IndexedDB para que persista entre sesiones de forma óptima sin inflar el catálogo con Base64
-          const idbUrl = await storeMediaAsIdbReference(file);
-          updatedMedia.push({
-            type: "video",
-            url: idbUrl,
-          });
+        // Try uploading to server-side static media folder directly first
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (typeof reader.result === "string") {
+              const b64 = reader.result.split(",")[1];
+              resolve(b64);
+            } else {
+              reject(new Error("No se pudo codificar el archivo"));
+            }
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+
+        const base64Data = await base64Promise;
+        const uploadRes = await fetch("/api/upload-media", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            filename: file.name,
+            mimeType: file.type,
+            base64: base64Data
+          })
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData && uploadData.url) {
+            console.log("[Media Instant-Upload] Saved successfully on physical server disk:", uploadData.url);
+            updatedMedia.push({
+              type: isPhoto ? "image" : "video",
+              url: uploadData.url,
+              backupUrl: `data:${file.type};base64,${base64Data}`
+            });
+            continue; // uploaded correctly, bypass IndexedDB
+          }
         }
-      } catch (error) {
-        console.warn("IndexedDB storage failed, using dynamic local fallback URL for this session:", error);
+        throw new Error("El servidor falló al almacenar el archivo");
+      } catch (uploadErr) {
+        console.warn("[Media Instant-Upload] Direct server upload failed, failing back to local IndexedDB model:", uploadErr);
         try {
-          const fallbackUrl = URL.createObjectURL(file);
-          const fallbackKey = `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          inMemoryFallbackCache[fallbackKey] = fallbackUrl;
-          updatedMedia.push({
-            type: isPhoto ? "image" : "video",
-            url: `idb://${fallbackKey}`,
-          });
-        } catch (fallbackError) {
-          console.error("Local object URL creation also failed:", fallbackError);
-          notify(`No se pudo procesar el archivo "${file.name}".`, "error");
+          if (isPhoto) {
+            // Guardar imagen en IndexedDB para máxima resolución y evitar cuota de LocalStorage
+            const idbUrl = await storeMedia(file);
+            updatedMedia.push({
+              type: "image",
+              url: idbUrl,
+            });
+          } else {
+            // Guardar video en IndexedDB para que persista entre sesiones de forma óptima sin inflar el catálogo con Base64
+            const idbUrl = await storeMediaAsIdbReference(file);
+            updatedMedia.push({
+              type: "video",
+              url: idbUrl,
+            });
+          }
+        } catch (error) {
+          console.warn("IndexedDB storage failed, using dynamic local fallback URL for this session:", error);
+          try {
+            const fallbackUrl = URL.createObjectURL(file);
+            const fallbackKey = `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            inMemoryFallbackCache[fallbackKey] = fallbackUrl;
+            updatedMedia.push({
+              type: isPhoto ? "image" : "video",
+              url: `idb://${fallbackKey}`,
+            });
+          } catch (fallbackError) {
+            console.error("Local object URL creation also failed:", fallbackError);
+            notify(`No se pudo procesar el archivo "${file.name}".`, "error");
+          }
         }
       }
     }

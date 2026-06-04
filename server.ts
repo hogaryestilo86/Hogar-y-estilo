@@ -198,6 +198,48 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     }
   });
 
+  // API Endpoint: Direct upload of media file (base64) to alleviate IndexedDB desynchronizations
+  app.post("/api/upload-media", async (req, res) => {
+    try {
+      const { filename, mimeType, base64 } = req.body;
+      if (!base64) {
+        return res.status(400).json({ error: "Faltan los datos base64 para la subida." });
+      }
+
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      // Safeguard filename structure
+      let ext = "jpg";
+      if (mimeType) {
+        if (mimeType.includes("video/mp4")) ext = "mp4";
+        else if (mimeType.includes("video/webm")) ext = "webm";
+        else if (mimeType.includes("video/quicktime")) ext = "mov";
+        else if (mimeType.includes("image/png")) ext = "png";
+        else if (mimeType.includes("image/webp")) ext = "webp";
+        else if (mimeType.includes("image/gif")) ext = "gif";
+      } else if (filename && filename.includes(".")) {
+        ext = filename.split(".").pop() || "jpg";
+      }
+
+      const cleanFilename = `media_${Date.now()}_${Math.floor(Math.random() * 100000)}.${ext}`;
+      const filepath = path.join(uploadsDir, cleanFilename);
+
+      fs.writeFileSync(filepath, Buffer.from(base64, "base64"));
+      console.log(`[Media Direct Upload] Saved: /uploads/${cleanFilename} (${mimeType || ext})`);
+
+      res.json({
+        success: true,
+        url: `/uploads/${cleanFilename}`
+      });
+    } catch (err: any) {
+      console.error("Error inside upload-media endpoint:", err);
+      res.status(500).json({ error: "Fallo al procesar la subida multimedia en el servidor.", details: err.message });
+    }
+  });
+
   // API Endpoint: Proxy images to bypass hotlinking and CORS restrictions from MercadoLibre CDN
   app.get("/api/image-proxy", async (req, res) => {
     try {
