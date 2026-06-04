@@ -508,9 +508,11 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
       finalBackup = "/" + finalBackup;
     }
 
-    if (!url) return finalBackup;
-    if (url.startsWith("data:video/") || url.startsWith("data:image/")) {
-      return url.startsWith("data:video/") ? base64ToBlobUrl(url) : url;
+    if (!url) {
+      return finalBackup.startsWith("data:") ? base64ToBlobUrl(finalBackup) : finalBackup;
+    }
+    if (url.startsWith("data:")) {
+      return base64ToBlobUrl(url);
     }
     if (!isIdbUrl) {
       let resolvedUrl = url;
@@ -518,7 +520,7 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
         resolvedUrl = "/" + resolvedUrl;
       }
       if ((resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/")) && finalBackup) {
-        return finalBackup;
+        return finalBackup.startsWith("data:") ? base64ToBlobUrl(finalBackup) : finalBackup;
       }
       return resolvedUrl;
     }
