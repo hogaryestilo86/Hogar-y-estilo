@@ -300,10 +300,10 @@ export default function ProductCard({
               onClick={(e) => {
                 e.stopPropagation();
               }}
-              className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:from-purple-600 hover:via-pink-600 hover:to-orange-500 text-white font-extrabold text-[10px] tracking-wide uppercase py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 transition-all text-center cursor-pointer shadow-xs transform active:scale-95 border-0"
+              className="inline-flex max-w-max mx-auto bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:brightness-110 text-white font-black text-[8.5px] tracking-wider uppercase py-1 px-2.5 rounded-md items-center justify-center gap-1 transition-all text-center cursor-pointer shadow-2xs transform active:scale-95 border-0"
               title="Consultar Stock del producto por Instagram"
             >
-              <Instagram className="w-3.5 h-3.5 text-white" />
+              <Instagram className="w-3 h-3 text-white" />
               <span>Consultar Stock por Instagram 📱</span>
             </a>
           </div>
@@ -316,7 +316,7 @@ export default function ProductCard({
                 e.stopPropagation();
                 onBuyNow(product);
               }}
-              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black text-[11px] tracking-wider uppercase py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-xs"
+              className="w-full bg-pink-500 hover:bg-pink-600 text-white font-black text-[11px] tracking-wider uppercase py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-xs"
             >
               <span>Comprar ahora 🛍️</span>
             </button>
@@ -328,7 +328,7 @@ export default function ProductCard({
                 e.stopPropagation();
                 onAddToCart(product);
               }}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] tracking-wider uppercase py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-xs"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] tracking-wider uppercase py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all transform active:scale-95 cursor-pointer shadow-xs"
             >
               <span>Agregar al Carrito 🛒</span>
             </button>

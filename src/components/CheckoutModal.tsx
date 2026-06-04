@@ -203,6 +203,18 @@ export default function CheckoutModal({
   const transferTotal = Math.round(subtotal * 0.85) + shipping;
   const installmentAmount = Math.round(finalListTotal / 3);
 
+  const getCreditTotalAndFee = (inst: number) => {
+    let surchargeFactor = 1.0;
+    if (inst === 6) surchargeFactor = 1 + (19.10 * 1.21 / 100); // 1.23111
+    else if (inst === 9) surchargeFactor = 1 + (27.30 * 1.21 / 100); // 1.33033
+    else if (inst === 12) surchargeFactor = 1 + (32.30 * 1.21 / 100); // 1.39083
+    else if (inst === 18) surchargeFactor = 1 + (41.60 * 1.21 / 100); // 1.50336
+
+    const total = Math.round(finalListTotal * surchargeFactor);
+    const fee = Math.round(total / inst);
+    return { total, fee };
+  };
+
   const formDataRef = useRef(formData);
   const cartItemsRef = useRef(cartItems);
   const shippingRef = useRef(shipping);
@@ -321,7 +333,7 @@ export default function CheckoutModal({
           // 5. Build settings and mount
           const settings = {
             initialization: {
-              amount: finalListTotal,
+              amount: getCreditTotalAndFee(formDataRef.current.installments || 3).total,
               payer: {
                 email: formDataRef.current.email || "correo@ejemplo.com",
                 firstName: formDataRef.current.fullName.split(" ")[0] || "Cliente",
@@ -332,7 +344,7 @@ export default function CheckoutModal({
               paymentMethods: {
                 creditCard: "all",
                 debitCard: "all",
-                maxInstallments: 3,
+                maxInstallments: formDataRef.current.installments || 3,
                 types: {
                   excluded: ["ticket", "bank_transfer"]
                 }
@@ -477,7 +489,7 @@ export default function CheckoutModal({
         }
       };
     }
-  }, [isOpen, step, formData.paymentMethod]);
+  }, [isOpen, step, formData.paymentMethod, formData.installments]);
 
   if (!isOpen) return null;
 
@@ -949,10 +961,26 @@ export default function CheckoutModal({
                     </p>
                   </div>
                   <div className={`text-right mt-4 pt-2 border-t ${formData.paymentMethod === "credit" ? "border-blue-900/60" : "border-brand-100"}`}>
-                    <span className={`text-[9px] block ${formData.paymentMethod === "credit" ? "text-blue-300" : "text-brand-500"}`}>3 cuotas fijas de:</span>
-                    <p className={`text-base font-bold font-serif ${formData.paymentMethod === "credit" ? "text-white" : "text-brand-900"}`}>
-                      {formatCurrency(installmentAmount)}
-                    </p>
+                    {formData.paymentMethod === "credit" ? (
+                      (() => {
+                        const { total, fee } = getCreditTotalAndFee(formData.installments || 3);
+                        return (
+                          <>
+                            <span className="text-[9px] block text-blue-300">{(formData.installments || 3)} cuotas fijas de:</span>
+                            <p className="text-base font-bold font-serif text-white">
+                              {formatCurrency(fee)}
+                            </p>
+                          </>
+                        );
+                      })()
+                    ) : (
+                      <>
+                        <span className="text-[9px] block text-brand-500">3 cuotas fijas de:</span>
+                        <p className="text-base font-bold font-serif text-[#001b33]">
+                          {formatCurrency(installmentAmount)}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1037,16 +1065,22 @@ export default function CheckoutModal({
                       </div>
                     </>
                   ) : formData.paymentMethod === "credit" ? (
-                    <>
-                      <div className="flex justify-between text-blue-700 font-semibold bg-blue-50 p-1 px-2 rounded border border-blue-200/45 text-[11px] animate-in slide-in-from-top-1 duration-200">
-                        <span>Financiación:</span>
-                        <span>3 cuotas fijas de {formatCurrency(installmentAmount)}</span>
-                      </div>
-                      <div className="border-t border-brand-200 pt-2 flex justify-between font-bold text-sm text-brand-900">
-                        <span>Total de productos + Envío:</span>
-                        <span>{formatCurrency(finalListTotal)}</span>
-                      </div>
-                    </>
+                    (() => {
+                      const { total, fee } = getCreditTotalAndFee(formData.installments || 3);
+                      const inst = formData.installments || 3;
+                      return (
+                        <>
+                          <div className="flex justify-between text-blue-700 font-semibold bg-blue-50 p-1 px-2 rounded border border-blue-200/45 text-[11px] animate-in slide-in-from-top-1 duration-200">
+                            <span>Financiación elegida:</span>
+                            <span>{inst} {inst === 3 ? "cuotas sin interés" : "cuotas fijas"} de {formatCurrency(fee)}</span>
+                          </div>
+                          <div className="border-t border-brand-200 pt-2 flex justify-between font-bold text-sm text-brand-900">
+                            <span>Total con Tarjeta:</span>
+                            <span>{formatCurrency(total)}</span>
+                          </div>
+                        </>
+                      );
+                    })()
                   ) : (
                     <div className="border-t border-brand-200 pt-2 flex justify-between font-bold text-sm text-brand-900">
                       <span>Total estimado:</span>
@@ -1223,6 +1257,44 @@ export default function CheckoutModal({
                       Pagá de forma segura con tu tarjeta de crédito o tarjeta de débito utilizando la pasarela oficial integrada.
                     </p>
 
+                    {/* Elegante Selector de Cuotas para intereses calculados */}
+                    <div className="bg-[#00284d] p-4 rounded-xl border border-[#009ee3]/30 space-y-3">
+                      <span className="block text-[10px] text-blue-300 uppercase tracking-widest font-extrabold">Seleccioná tu plan de financiación preferido:</span>
+                      
+                      <div className="grid grid-cols-1 gap-2">
+                        {[3, 6, 9, 12, 18].map((inst) => {
+                          const { total, fee } = getCreditTotalAndFee(inst);
+                          const isSelected = (formData.installments || 3) === inst;
+                          return (
+                            <button
+                              key={inst}
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, ...formData, installments: inst }));
+                              }}
+                              className={`flex items-center justify-between p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                                isSelected
+                                  ? "border-emerald-500 bg-[#001b33] text-white shadow-sm ring-1 ring-emerald-500"
+                                  : "border-[#009ee3]/20 bg-[#002f54]/40 hover:bg-[#002f54]/70 text-blue-100 hover:text-white"
+                              }`}
+                            >
+                              <div>
+                                <span className="font-bold text-xs sm:text-sm block">
+                                  {inst} {inst === 3 ? "Cuotas Sin Interés ✨" : "Cuotas Fijas"}
+                                </span>
+                                <span className={`text-[10px] block ${isSelected ? "text-emerald-400 font-semibold" : "text-blue-300"}`}>
+                                  Total con tarjeta: {formatCurrency(total)}
+                                </span>
+                              </div>
+                              <span className="text-sm font-black font-serif text-emerald-400">
+                                {inst}x {formatCurrency(fee)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {mpError && (
                       <div className="p-4 bg-red-950/70 border border-red-500 rounded-xl mb-4">
                         <p className="text-xs text-red-200 font-medium">{mpError}</p>
@@ -1306,10 +1378,10 @@ export default function CheckoutModal({
 
           {step === "success" && (() => {
             const isTransfer = formData.paymentMethod === "transfer";
-            const toPay = isTransfer ? transferTotal : finalListTotal;
+            const toPay = isTransfer ? transferTotal : getCreditTotalAndFee(formData.installments || 3).total;
             
             const buildOrderSummaryText = () => {
-              let methodText = "Tarjeta de Crédito (3 cuotas sin interés)";
+              let methodText = `Tarjeta de Crédito / Débito (${formData.installments || 3} cuotas)`;
               if (isTransfer) methodText = "Transferencia Bancaria (-15% OFF)";
               
               let text = `📦 NUEVO COMPROBANTE DE COMPRA - HOGAR & ESTILO\n\n`;
