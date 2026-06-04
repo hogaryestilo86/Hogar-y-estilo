@@ -2342,9 +2342,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                             {/* Media render */}
                             <div className="w-full h-full relative">
                               {item.type === "video" ? (
-                                <ResolvedVideo src={item.url} className="w-full h-full object-cover" muted category={category} />
+                                <ResolvedVideo src={item.url} backupUrl={item.backupUrl} className="w-full h-full object-cover" muted category={category} />
                               ) : (
-                                <ResolvedImage src={item.url} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" category={category} />
+                                <ResolvedImage src={item.url} backupUrl={item.backupUrl} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" category={category} />
                               )}
                             </div>
 

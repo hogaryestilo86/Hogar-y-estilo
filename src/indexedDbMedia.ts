@@ -576,11 +576,9 @@ export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImagePro
     }, [src, backupUrl]);
 
     // Do NOT fall back to category illustration if there is a custom user image loading or present
-    const isCustom = src && (src.startsWith("data:") || src.startsWith("idb://") || src.startsWith("/uploads") || src.startsWith("uploads/"));
-
-    const finalSrc = hasError
-      ? (backupUrl || (isCustom ? "" : getCategoryPlaceholder(category)))
-      : (resolved || (isCustom ? "" : getCategoryPlaceholder(category)));
+    const finalSrc = src 
+      ? (hasError ? (backupUrl || resolved || src) : (resolved || src))
+      : getCategoryPlaceholder(category);
 
     return React.createElement("img", {
       ref,
@@ -588,8 +586,6 @@ export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImagePro
       onError: (e: any) => {
         if (!hasError) {
           setHasError(true);
-        } else {
-          // If fallback fails, keep finalSrc/backupUrl if custom, avoiding generic Unsplash default
         }
       },
       ...props
@@ -623,16 +619,19 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
              (backupUrl && url === backupUrl && !url.match(/\.(mp4|webm|ogg|mov)/i));
     };
 
-    const finalSource = resolved || backupUrl || getCategoryPlaceholder(category);
+    const finalSource = resolved || backupUrl || (src ? src : getCategoryPlaceholder(category));
 
     if (!resolved || isImage(finalSource) || hasError) {
       return React.createElement("img", {
-        src: backupUrl || resolved || getCategoryPlaceholder(category),
+        src: backupUrl || resolved || (src ? src : getCategoryPlaceholder(category)),
         className: props.className,
         style: props.style,
         referrerPolicy: "no-referrer",
         onError: (e: any) => {
-          e.target.src = getCategoryPlaceholder(category);
+          // If fallback fails, preserve src/backupUrl if custom, avoiding generic category placeholder override
+          if (!src) {
+            e.target.src = getCategoryPlaceholder(category);
+          }
         }
       });
     }
