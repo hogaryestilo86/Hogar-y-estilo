@@ -134,6 +134,7 @@ export default function ProductCard({
           (product.basePrice >= 50000 || (product.beforePrice && product.beforePrice > listPrice)) ? "pt-[76px]" : "pt-2"
         } pb-2`}>
           <ResolvedImage
+            productId={product.id}
             src={activeMedia.type === "video" ? (activeMedia.backupUrl || activeMedia.url) : activeMedia.url}
             backupUrl={activeMedia.backupUrl}
             category={product.category}

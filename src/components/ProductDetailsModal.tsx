@@ -161,6 +161,7 @@ export default function ProductDetailsModal({
               </div>
             ) : (
               <ResolvedImage
+                productId={product?.id}
                 src={activeMediaList[activeMediaIndex]?.url || getCategoryPlaceholder(product?.category)}
                 backupUrl={activeMediaList[activeMediaIndex]?.backupUrl}
                 category={product?.category}

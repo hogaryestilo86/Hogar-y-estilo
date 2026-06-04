@@ -15,6 +15,7 @@ interface ShowcasePhoto {
   title: string;
   desc: string;
   category?: string;
+  productId?: string;
 }
 
 interface HeroSliderProps {
@@ -106,6 +107,7 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
               <div className="relative h-[220px] overflow-hidden bg-[#e8e4d9] flex items-center justify-center border-b border-[#d6d0bf]">
                 {isVideo ? (
                   <ResolvedVideo
+                    productId={item.productId}
                     src={resolvedUrl}
                     backupUrl={item.backupUrl}
                     category={item.category}
@@ -117,13 +119,11 @@ export default function HeroSlider({ showcasePhotos, onSelectCategory }: HeroSli
                   />
                 ) : (
                   <ResolvedImage
+                    productId={item.productId}
                     src={resolvedUrl}
                     backupUrl={item.backupUrl}
                     category={item.category}
                     alt={item.title}
-                    onError={(e) => {
-                      e.currentTarget.src = getCategoryPlaceholder(item.category);
-                    }}
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     loading="lazy"
                     referrerPolicy="no-referrer"

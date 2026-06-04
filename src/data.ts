@@ -1,4 +1,5 @@
 import { Product } from "./types";
+import rawProducts from "../products.json";
 
 export const PRESET_REVIEWS = [
   {
@@ -24,4 +25,4 @@ export const PRESET_REVIEWS = [
   }
 ];
 
-export const INITIAL_PRODUCTS: Product[] = [];
+export const INITIAL_PRODUCTS: Product[] = rawProducts as Product[];

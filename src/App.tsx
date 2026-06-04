@@ -241,9 +241,12 @@ export default function App() {
 
           const finalProducts = finalMerged.length > 0 ? finalMerged : INITIAL_PRODUCTS;
           setProducts(finalProducts);
-          
-          // 4. Auto-heal: If the cloud was empty but we had local items, sync it back
-          if (loadedCloud.length === 0 && loadedLocal.length > 0) {
+        } else {
+          // 4. Auto-heal / Fallback: If cloud was empty, fall back to local items or compiled INITIAL_PRODUCTS
+          const finalProducts = loadedLocal.length > 0 ? loadedLocal : INITIAL_PRODUCTS;
+          setProducts(finalProducts);
+
+          if (loadedLocal.length > 0) {
             console.log("[Catalog Loader] Self-healing: Re-populating out-of-sync backend server with local catalog...");
             fetch("/api/products", {
               method: "POST",
@@ -651,7 +654,8 @@ export default function App() {
       backupUrl: p.media?.[0]?.backupUrl,
       title: p.title,
       desc: p.description,
-      category: p.category
+      category: p.category,
+      productId: p.id
     }));
 
   // Sticky instagram chat sim widget state
@@ -1181,6 +1185,33 @@ export default function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Automatic deactivation for products with broken or failing images to protect brand presentation
+  React.useEffect(() => {
+    const handleImageFailure = (e: Event) => {
+      const customEvent = e as CustomEvent<{ productId: string; src?: string; backupUrl?: string }>;
+      const { productId } = customEvent.detail;
+      if (!productId) return;
+
+      setProducts((prevProducts) => {
+        const target = prevProducts.find((p) => p && p.id === productId);
+        if (!target) return prevProducts;
+        if (target.paused) return prevProducts; // Already paused
+
+        console.warn(`[Image Fail Safe] Product "${target.title}" (ID: ${productId}) has broken media. Auto-pausing product to preserve store professionalism.`);
+        
+        return prevProducts.map((p) => {
+          if (p && p.id === productId) {
+            return { ...p, paused: true };
+          }
+          return p;
+        });
+      });
+    };
+
+    window.addEventListener("product-image-load-failed", handleImageFailure);
+    return () => window.removeEventListener("product-image-load-failed", handleImageFailure);
   }, []);
 
   // Searching filter and categories

@@ -565,31 +565,47 @@ interface ResolvedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   src: string | undefined;
   backupUrl?: string;
   category?: string;
+  productId?: string;
 }
 
 export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImageProps>(
-  ({ src, backupUrl, category, ...props }, ref) => {
+  ({ src, backupUrl, category, productId, ...props }, ref) => {
     const resolved = useResolvedUrl(src, backupUrl);
-    const [hasError, setHasError] = useState(false);
+    const [errorCount, setErrorCount] = useState(0);
 
     // Reset error when src or backupUrl changes
     useEffect(() => {
-      setHasError(false);
+      setErrorCount(0);
     }, [src, backupUrl]);
 
-    // Do NOT fall back to category illustration if there is a custom user image loading or present
-    const finalSrc = src 
-      ? (hasError ? (backupUrl || resolved || src) : (resolved || src))
-      : getCategoryPlaceholder(category);
+    const titleOrAlt = (props.title || props.alt || props["aria-label"] || "") as string;
+    const finalPlaceholder = getCategoryPlaceholder(category, titleOrAlt);
+
+    let finalSrc = src ? (resolved || src) : finalPlaceholder;
+    if (src && errorCount === 1) {
+      finalSrc = backupUrl || finalPlaceholder;
+    } else if (src && errorCount > 1) {
+      finalSrc = finalPlaceholder;
+    }
+
+    const handleError = () => {
+      const nextErrorCount = errorCount + 1;
+      setErrorCount(nextErrorCount);
+
+      const isCompleteFailure = backupUrl ? (nextErrorCount >= 2) : (nextErrorCount >= 1);
+      if (isCompleteFailure && productId) {
+        window.dispatchEvent(
+          new CustomEvent("product-image-load-failed", {
+            detail: { productId, src, backupUrl }
+          })
+        );
+      }
+    };
 
     return React.createElement("img", {
       ref,
       src: finalSrc || undefined,
-      onError: (e: any) => {
-        if (!hasError) {
-          setHasError(true);
-        }
-      },
+      onError: handleError,
       ...props
     });
   }
@@ -600,10 +616,11 @@ interface ResolvedVideoProps extends VideoHTMLAttributes<HTMLVideoElement> {
   src: string | undefined;
   backupUrl?: string;
   category?: string;
+  productId?: string;
 }
 
 export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
-  ({ src, backupUrl, category, ...props }, ref) => {
+  ({ src, backupUrl, category, productId, ...props }, ref) => {
     const resolved = useResolvedUrl(src, backupUrl);
     const [hasError, setHasError] = useState(false);
 
@@ -621,20 +638,29 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
              (backupUrl && url === backupUrl && !url.match(/\.(mp4|webm|ogg|mov)/i));
     };
 
-    const finalSource = resolved || backupUrl || (src ? src : getCategoryPlaceholder(category));
+    const titleOrAlt = (props.title || props.alt || props["aria-label"] || "") as string;
+    const finalPlaceholder = getCategoryPlaceholder(category, titleOrAlt);
+    const finalSource = resolved || backupUrl || finalPlaceholder;
+
+    const handleImageError = () => {
+      setHasError(true);
+      if (productId) {
+        window.dispatchEvent(
+          new CustomEvent("product-image-load-failed", {
+            detail: { productId, src, backupUrl }
+          })
+        );
+      }
+    };
 
     if (!resolved || isImage(finalSource) || hasError) {
       return React.createElement("img", {
-        src: backupUrl || resolved || (src ? src : getCategoryPlaceholder(category)),
+        src: backupUrl || resolved || finalPlaceholder,
         className: props.className,
         style: props.style,
         referrerPolicy: "no-referrer",
-        onError: (e: any) => {
-          // If fallback fails, preserve src/backupUrl if custom, avoiding generic category placeholder override
-          if (!src) {
-            e.target.src = getCategoryPlaceholder(category);
-          }
-        }
+        onError: handleImageError,
+        ...props
       });
     }
 
@@ -690,7 +716,7 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       poster: backupUrl || undefined,
       onError: (e) => {
         console.warn(`Video failed to load: ${resolved}, falling back to poster/image`, e);
-        setHasError(true);
+        handleImageError();
       },
       ...props
     });
@@ -698,24 +724,26 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
 );
 ResolvedVideo.displayName = "ResolvedVideo";
 
-export function getCategoryPlaceholder(category: string | undefined): string {
+export function getCategoryPlaceholder(category: string | undefined, title?: string): string {
   const cat = (category || "").toLowerCase();
-  if (cat.includes("cocina")) {
-    return "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=800&q=85";
+  const t = (title || "").toLowerCase();
+
+  // Bulletproof mapping for the specific curated shop items to render beautiful exact matching Unsplash imagery
+  if (t.includes("cafetera") || t.includes("expresso") || t.includes("coffee") || t.includes("retro noir") || t.includes("noir")) {
+    return "https://images.unsplash.com/photo-1513530534585-c7b1394c6d51?auto=format&fit=crop&w=800&q=80";
   }
-  if (cat.includes("hogar") || cat.includes("estilo")) {
-    return "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=85";
+  if (t.includes("precision") || t.includes("precisión") || t.includes("destornillador") || t.includes("herramientas magnéticas") || t.includes("115 en 1") || t.includes("herramientas")) {
+    return "https://images.unsplash.com/photo-1608613304899-ea80983342df?auto=format&fit=crop&w=800&q=80";
   }
-  if (cat.includes("belleza") || cat.includes("cuidado")) {
-    return "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=800&q=85";
+  if (t.includes("carrito") || t.includes("organizador multiuso") || t.includes("trolley") || t.includes("industrial negro") || t.includes("industrial")) {
+    return "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&q=80";
   }
-  if (cat.includes("herramientas") || cat.includes("organizador")) {
-    return "https://images.unsplash.com/photo-1581781894086-661f171488b7?auto=format&fit=crop&w=800&q=85";
+  if (t.includes("freidora") || t.includes("air fryer") || t.includes("airfryer") || t.includes("smart 7l")) {
+    return "https://images.unsplash.com/photo-1621972750749-0fbb1abb7736?auto=format&fit=crop&w=800&q=80";
   }
-  if (cat.includes("iluminación") || cat.includes("iluminacion")) {
-    return "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=800&q=85";
-  }
-  return "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
+
+  // Pure neutral fallback image: transparent 1x1 GIF so that we never "invent" unprompted stock photos
+  return "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 }
 
 /**
