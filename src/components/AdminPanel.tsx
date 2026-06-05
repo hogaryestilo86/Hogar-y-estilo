@@ -1105,9 +1105,13 @@ export default function AdminPanel({
         continue;
       }
 
-      if (isVideo && fileSizeInMB > 30) {
-        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera los 30MB recomendados. Para evitar demoras, lentitud, o errores de sincronización con la nube, te sugerimos recortar el video para que ocupe menos, o bien subirlo a YouTube o Google Drive y pegar el enlace directo abajo.`, "error");
+      if (isVideo && fileSizeInMB > 100) {
+        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera el límite de 100MB. Por favor, reduce la resolución o peso de tu video, o súbelo a YouTube/Drive y pega el enlace para que cargue inmediatamente.`, "error");
         continue;
+      }
+
+      if (isVideo && fileSizeInMB > 30) {
+        console.warn(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) es algo pesado pero se intentará procesar.`);
       }
 
       try {
