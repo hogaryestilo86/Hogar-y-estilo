@@ -1154,7 +1154,7 @@ export default function AdminPanel({
                 }
               }
 
-              // Update the matching temporary URL with the official server URL in state
+              // Update the matching temporary URL with the official server URL in local form state
               setMediaList((prev) => 
                 prev.map((item) => 
                   item.url === blobUrl 
@@ -1162,6 +1162,32 @@ export default function AdminPanel({
                     : item
                 )
               );
+
+              // IMPORTANT: Also update the parent products list in case the form has already been saved and closed!
+              if (onSetProducts) {
+                const updater = onSetProducts as any;
+                try {
+                  updater((prevProducts: any[]) => {
+                    return prevProducts.map((prod) => {
+                      if (prod && prod.media && Array.isArray(prod.media)) {
+                        const hasBlobUrl = prod.media.some((m) => m.url === blobUrl);
+                        if (hasBlobUrl) {
+                          const updatedMedia = prod.media.map((m) => 
+                            m.url === blobUrl 
+                              ? { ...m, url: uploadData.url, backupUrl } 
+                              : m
+                          );
+                          console.log(`[Media AsynSync] Automatically replaced blobUrl in saved product "${prod.title}" with server URL:`, uploadData.url);
+                          return { ...prod, media: updatedMedia };
+                        }
+                      }
+                      return prod;
+                    });
+                  });
+                } catch (pe) {
+                  console.warn("Could not auto-sync parent list functional update:", pe);
+                }
+              }
               return; // Completed upload successfully!
             }
           }
@@ -1183,6 +1209,31 @@ export default function AdminPanel({
                   : item
               )
             );
+
+            // Also update parent list fallback
+            if (onSetProducts) {
+              const updater = onSetProducts as any;
+              try {
+                updater((prevProducts: any[]) => {
+                  return prevProducts.map((prod) => {
+                    if (prod && prod.media && Array.isArray(prod.media)) {
+                      const hasBlobUrl = prod.media.some((m) => m.url === blobUrl);
+                      if (hasBlobUrl) {
+                        const updatedMedia = prod.media.map((m) => 
+                          m.url === blobUrl 
+                            ? { ...m, url: idbUrl } 
+                            : m
+                        );
+                        return { ...prod, media: updatedMedia };
+                      }
+                    }
+                    return prod;
+                  });
+                });
+              } catch (pe) {
+                console.warn(pe);
+              }
+            }
           } catch (idbErr) {
             console.error("IndexedDB background write also failed, fallback to local cache objectUrl:", idbErr);
             try {
@@ -1195,6 +1246,31 @@ export default function AdminPanel({
                     : item
                 )
               );
+
+              // Replicate in parent too
+              if (onSetProducts) {
+                const updater = onSetProducts as any;
+                try {
+                  updater((prevProducts: any[]) => {
+                    return prevProducts.map((prod) => {
+                      if (prod && prod.media && Array.isArray(prod.media)) {
+                        const hasBlobUrl = prod.media.some((m) => m.url === blobUrl);
+                        if (hasBlobUrl) {
+                          const updatedMedia = prod.media.map((m) => 
+                            m.url === blobUrl 
+                              ? { ...m, url: `idb://${fallbackKey}` } 
+                              : m
+                          );
+                          return { ...prod, media: updatedMedia };
+                        }
+                      }
+                      return prod;
+                    });
+                  });
+                } catch (pe) {
+                  console.warn(pe);
+                }
+              }
             } catch (fallbackError) {
               console.error("Local fallback cache binding failed:", fallbackError);
               notify(`No se pudo procesar el archivo "${file.name}".`, "error");
@@ -2683,26 +2759,18 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   <span>Descargar products.json</span>
                 </button>
 
+                {uploadingCount > 0 && (
+                  <span className="text-[11px] text-amber-700 italic font-bold animate-pulse text-center md:text-left self-center max-w-xs leading-tight">
+                    ⚡ Se están subiendo videos en segundo plano. Podés guardar ahora mismo, la carga se finalizará sola sin demoras.
+                  </span>
+                )}
+
                 <button
                   type="submit"
-                  disabled={uploadingCount > 0}
-                  className={`font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-transform active:scale-95 cursor-pointer flex-1 md:flex-none ${
-                    uploadingCount > 0 
-                      ? "bg-brand-300 text-brand-600 cursor-not-allowed" 
-                      : "bg-brand-900 hover:bg-black text-brand-100"
-                  }`}
+                  className="bg-brand-900 hover:bg-black text-brand-100 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-transform active:scale-95 cursor-pointer flex-1 md:flex-none"
                 >
-                  {uploadingCount > 0 ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
-                      <span>Subiendo multimedia ({uploadingCount})...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      <span>{editingProductId ? "Guardar Cambios de Producto" : "Publicar e Incorporar Producto"}</span>
-                    </>
-                  )}
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{editingProductId ? "Guardar Cambios de Producto" : "Publicar e Incorporar Producto"}</span>
                 </button>
               </div>
             </form>

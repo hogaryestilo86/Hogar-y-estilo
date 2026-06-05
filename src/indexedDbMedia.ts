@@ -505,7 +505,7 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
   
   const getInstantResolved = () => {
     let finalBackup = backupUrl || "";
-    if (finalBackup && !finalBackup.startsWith("/") && !finalBackup.startsWith("http") && !finalBackup.startsWith("data:") && !finalBackup.startsWith("idb://")) {
+    if (finalBackup && !finalBackup.startsWith("/") && !finalBackup.startsWith("http") && !finalBackup.startsWith("data:") && !finalBackup.startsWith("idb://") && !finalBackup.startsWith("blob:")) {
       finalBackup = "/" + finalBackup;
     }
 
@@ -517,7 +517,7 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
     }
     if (!isIdbUrl) {
       let resolvedUrl = url;
-      if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://")) {
+      if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://") && !resolvedUrl.startsWith("blob:")) {
         resolvedUrl = "/" + resolvedUrl;
       }
       if ((resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/")) && finalBackup) {

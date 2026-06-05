@@ -26,7 +26,7 @@ export function resolveImageUrl(url: string | undefined): string {
     return decodeURIComponent(url.replace("/api/image-proxy?url=", ""));
   }
   let resolvedUrl = url;
-  if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://")) {
+  if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://") && !resolvedUrl.startsWith("blob:")) {
     resolvedUrl = "/" + resolvedUrl;
   }
   return resolvedUrl;
