@@ -277,6 +277,15 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
             try {
               const blob = await getMedia(key);
               if (blob) {
+                // EXTREMELY IMPORTANT SAFEGUARD: Avoid converting videos to heavy base64 strings!
+                // Video files are very large and converting them to base64 completely blocks the React state,
+                // triggers Firestore quota warnings and causes GitHub API 422 errors due to massive JSON payloads.
+                // We keep them as IDB references locally, and sync them as independent physical files to GitHub uploads.
+                if (blob.type && blob.type.startsWith("video/")) {
+                  console.log("[convertProductsIdbToBase64] Safe skip of base64 conversion for video:", key);
+                  return item;
+                }
+
                 // EXTREMELY POWERFUL SELF-HEALING: Try to upload directly to server static directory first!
                 try {
                   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -317,14 +326,6 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
                   }
                 } catch (uploadErr) {
                   console.warn("[IndexedDB Self-Healing] Server upload failed. Falling back to base64 conversions:", uploadErr);
-                }
-
-                // EXTREMELY IMPORTANT SAFEGUARD: Avoid converting videos to heavy base64 strings!
-                // Video files are very large and converting them to base64 completely blocks the React state,
-                // triggers Firestore quota warnings and causes GitHub API 422 errors due to massive JSON payloads.
-                // We keep them as IDB references locally, and sync them as independent physical files to GitHub uploads.
-                if (blob.type && blob.type.startsWith("video/")) {
-                  return item;
                 }
 
                 const dataUrl = await new Promise<string>((resolve, reject) => {

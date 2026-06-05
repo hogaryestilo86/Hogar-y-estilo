@@ -994,6 +994,7 @@ export default function AdminPanel({
   // Local media previews state
   const [mediaList, setMediaList] = useState<ProductMedia[]>([]);
   const [processingMedia, setProcessingMedia] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
   
   // Gemini AI optimization states
   const [optimizing, setOptimizing] = useState(false);
@@ -1081,12 +1082,11 @@ export default function AdminPanel({
     });
   };
 
-  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     setProcessingMedia(true);
-    const updatedMedia: ProductMedia[] = [...mediaList];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -1111,84 +1111,102 @@ export default function AdminPanel({
       }
 
       if (isVideo && fileSizeInMB > 30) {
-        console.warn(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) es algo pesado pero se intentará procesar.`);
+        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera los 30MB recomendados. Se procesará en segundo plano, pero te aconsejamos recortarlo para mejorar la carga de tus clientes.`, "info");
       }
 
-      try {
-        // Direct stream upload (zero lag, no thread block, extremely efficient!)
-        const uploadRes = await fetch("/api/upload-media", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/octet-stream",
-            "X-Filename": encodeURIComponent(file.name),
-            "X-MimeType": file.type
-          },
-          body: file // Direct connection stream
-        });
+      // Generate instant local blob URL for instant preview (zero delay!)
+      const blobUrl = URL.createObjectURL(file);
+      const tempItem: ProductMedia = {
+        type: isPhoto ? "image" : "video",
+        url: blobUrl,
+        backupUrl: "" 
+      };
 
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          if (uploadData && uploadData.url) {
-            console.log("[Media Instant-Upload] Saved successfully on physical server disk:", uploadData.url);
-            
-            let backupUrl = "";
-            if (isPhoto) {
-              // Lightweight background compression for image backupUrl
-              try {
-                backupUrl = await compressImage(file);
-              } catch (e) {
-                console.warn("Could not generate compressed backupUrl for image:", e);
-                backupUrl = "";
-              }
-            }
+      // Add to preview list immediately: zero thread lock!
+      setMediaList((prev) => [...prev, tempItem]);
+      setUploadingCount((prev) => prev + 1);
 
-            updatedMedia.push({
-              type: isPhoto ? "image" : "video",
-              url: uploadData.url,
-              backupUrl: backupUrl // NEVER store large uncompressed base64 raw strings in products state!
-            });
-            continue; // uploaded correctly, bypass IndexedDB
-          }
-        }
-        throw new Error("El servidor falló al almacenar el archivo");
-      } catch (uploadErr) {
-        console.warn("[Media Instant-Upload] Direct server upload failed, failing back to local IndexedDB model:", uploadErr);
+      // Start asynchronous non-blocking upload in background
+      (async () => {
         try {
-          if (isPhoto) {
-            // Guardar imagen en IndexedDB para máxima resolución y evitar cuota de LocalStorage
-            const idbUrl = await storeMedia(file);
-            updatedMedia.push({
-              type: "image",
-              url: idbUrl,
-            });
-          } else {
-            // Guardar video en IndexedDB para que persista entre sesiones de forma óptima sin inflar el catálogo con Base64
-            const idbUrl = await storeMediaAsIdbReference(file);
-            updatedMedia.push({
-              type: "video",
-              url: idbUrl,
-            });
+          // Direct stream upload (zero lag, no thread block, extremely efficient!)
+          const uploadRes = await fetch("/api/upload-media", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/octet-stream",
+              "X-Filename": encodeURIComponent(file.name),
+              "X-MimeType": file.type
+            },
+            body: file // Direct connection stream
+          });
+
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            if (uploadData && uploadData.url) {
+              console.log("[Media Instant-Upload] Saved successfully on physical server disk:", uploadData.url);
+              
+              let backupUrl = "";
+              if (isPhoto) {
+                try {
+                  backupUrl = await compressImage(file);
+                } catch (ce) {
+                  console.warn("Could not generate compressed backupUrl for image background:", ce);
+                }
+              }
+
+              // Update the matching temporary URL with the official server URL in state
+              setMediaList((prev) => 
+                prev.map((item) => 
+                  item.url === blobUrl 
+                    ? { ...item, url: uploadData.url, backupUrl } 
+                    : item
+                )
+              );
+              return; // Completed upload successfully!
+            }
           }
-        } catch (error) {
-          console.warn("IndexedDB storage failed, using dynamic local fallback URL for this session:", error);
+          throw new Error("Respuesta del servidor incorrecta");
+        } catch (uploadErr) {
+          console.warn("[Media Instant-Upload] Background server upload failed, falling back to local IndexedDB:", uploadErr);
           try {
-            const fallbackUrl = URL.createObjectURL(file);
-            const fallbackKey = `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            inMemoryFallbackCache[fallbackKey] = fallbackUrl;
-            updatedMedia.push({
-              type: isPhoto ? "image" : "video",
-              url: `idb://${fallbackKey}`,
-            });
-          } catch (fallbackError) {
-            console.error("Local object URL creation also failed:", fallbackError);
-            notify(`No se pudo procesar el archivo "${file.name}".`, "error");
+            let idbUrl = "";
+            if (isPhoto) {
+              idbUrl = await storeMedia(file);
+            } else {
+              idbUrl = await storeMediaAsIdbReference(file);
+            }
+            // Replace local blob URL with idb URL reference
+            setMediaList((prev) => 
+              prev.map((item) => 
+                item.url === blobUrl 
+                  ? { ...item, url: idbUrl } 
+                  : item
+              )
+            );
+          } catch (idbErr) {
+            console.error("IndexedDB background write also failed, fallback to local cache objectUrl:", idbErr);
+            try {
+              const fallbackKey = `fallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              inMemoryFallbackCache[fallbackKey] = blobUrl;
+              setMediaList((prev) => 
+                prev.map((item) => 
+                  item.url === blobUrl 
+                    ? { ...item, url: `idb://${fallbackKey}` } 
+                    : item
+                )
+              );
+            } catch (fallbackError) {
+              console.error("Local fallback cache binding failed:", fallbackError);
+              notify(`No se pudo procesar el archivo "${file.name}".`, "error");
+            }
           }
+        } finally {
+          setUploadingCount((prev) => Math.max(0, prev - 1));
+          setProcessingMedia(false);
         }
-      }
+      })();
     }
 
-    setMediaList(updatedMedia);
-    setProcessingMedia(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (videoFileInputRef.current) videoFileInputRef.current.value = "";
   };
@@ -2355,6 +2373,14 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                               ) : (
                                 <ResolvedImage src={item.url} backupUrl={item.backupUrl} alt="Vista previa" className="w-full h-full object-cover" referrerPolicy="no-referrer" category={category} />
                               )}
+
+                              {/* Uploading Status Overlay */}
+                              {item.url && item.url.startsWith("blob:") && (
+                                <div className="absolute inset-0 bg-brand-950/70 backdrop-blur-[2.5px] flex flex-col items-center justify-center text-white z-10 select-none pointer-events-none animate-fadeIn">
+                                  <div className="w-5 h-5 border-2 border-brand-200 border-t-transparent rounded-full animate-spin"></div>
+                                  <span className="text-[9px] font-bold tracking-widest uppercase mt-1.5 animate-pulse text-brand-100">Cargando...</span>
+                                </div>
+                              )}
                             </div>
 
                             {/* Delete button */}
@@ -2659,10 +2685,24 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
                 <button
                   type="submit"
-                  className="bg-brand-900 hover:bg-black text-brand-100 font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-transform active:scale-95 cursor-pointer flex-1 md:flex-none"
+                  disabled={uploadingCount > 0}
+                  className={`font-bold text-xs sm:text-sm tracking-wider uppercase py-3 px-6 rounded-lg flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-transform active:scale-95 cursor-pointer flex-1 md:flex-none ${
+                    uploadingCount > 0 
+                      ? "bg-brand-300 text-brand-600 cursor-not-allowed" 
+                      : "bg-brand-900 hover:bg-black text-brand-100"
+                  }`}
                 >
-                  <CheckCircle className="w-4 h-4" />
-                  <span>{editingProductId ? "Guardar Cambios de Producto" : "Publicar e Incorporar Producto"}</span>
+                  {uploadingCount > 0 ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Subiendo multimedia ({uploadingCount})...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>{editingProductId ? "Guardar Cambios de Producto" : "Publicar e Incorporar Producto"}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
