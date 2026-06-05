@@ -742,8 +742,8 @@ export function getCategoryPlaceholder(category: string | undefined, title?: str
     return "https://images.unsplash.com/photo-1621972750749-0fbb1abb7736?auto=format&fit=crop&w=800&q=80";
   }
 
-  // Pure neutral fallback image: transparent 1x1 GIF so that we never "invent" unprompted stock photos
-  return "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  // Pure neutral fallback image: elegant SVG placeholder so that we never "invent" unprompted stock photos, nor leave high-contrast layout gaps
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" fill="none"><rect width="800" height="800" fill="%23f3f2ee"/><text x="50%" y="46%" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="600" fill="%23a39f93" text-anchor="middle">Imagen en mantenimiento</text><text x="50%" y="52%" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="%23bfbaa9" text-anchor="middle">Se cargará nuevamente pronto</text></svg>`;
 }
 
 /**

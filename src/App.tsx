@@ -96,6 +96,7 @@ function handleFirestoreError(error: any, context: string) {
 export default function App() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+  const [brokenImageProductIds, setBrokenImageProductIds] = useState<string[]>([]);
 
   // Automatic client redirect from Vercel preview/branch URLs to the official custom production domain
   useEffect(() => {
@@ -647,7 +648,7 @@ export default function App() {
 
   // Calculamos los productos destacados dinámicamente para la vitrina deslizable manualmente
   const showcasePhotos = products
-    .filter(p => p && p.featured && !p.paused)
+    .filter(p => p && p.featured && !p.paused && !brokenImageProductIds.includes(p.id))
     .map(p => ({
       url: p.media?.[0]?.url || "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85",
       type: p.media?.[0]?.type || "image",
@@ -1187,26 +1188,17 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Automatic deactivation for products with broken or failing images to protect brand presentation
+  // Temporary client-side runtime collection for broken images to hide them on the screen, without saving to database.
   React.useEffect(() => {
     const handleImageFailure = (e: Event) => {
       const customEvent = e as CustomEvent<{ productId: string; src?: string; backupUrl?: string }>;
       const { productId } = customEvent.detail;
       if (!productId) return;
 
-      setProducts((prevProducts) => {
-        const target = prevProducts.find((p) => p && p.id === productId);
-        if (!target) return prevProducts;
-        if (target.paused) return prevProducts; // Already paused
-
-        console.warn(`[Image Fail Safe] Product "${target.title}" (ID: ${productId}) has broken media. Auto-pausing product to preserve store professionalism.`);
-        
-        return prevProducts.map((p) => {
-          if (p && p.id === productId) {
-            return { ...p, paused: true };
-          }
-          return p;
-        });
+      setBrokenImageProductIds((prev) => {
+        if (prev.includes(productId)) return prev;
+        console.warn(`[Image Fail Safe] Product (ID: ${productId}) has broken media. Visually pausing product in client-side runtime to preserve store professionalism.`);
+        return [...prev, productId];
       });
     };
 
@@ -1214,10 +1206,15 @@ export default function App() {
     return () => window.removeEventListener("product-image-load-failed", handleImageFailure);
   }, []);
 
+  // Reset broken image list whenever the overall products array is updated by the admin (automatic retry for any edited details)
+  React.useEffect(() => {
+    setBrokenImageProductIds([]);
+  }, [products]);
+
   // Searching filter and categories
   const filteredProducts = (products || []).filter((p) => {
     if (!p) return false;
-    if (p.paused) return false; // Skip paused/out-of-stock items for clients
+    if (p.paused || brokenImageProductIds.includes(p.id)) return false; // Skip paused/out-of-stock and broken media items for clients
     const titleStr = p.title || "";
     const categoryStr = p.category || "";
     const descStr = p.description || "";
