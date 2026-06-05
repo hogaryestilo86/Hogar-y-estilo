@@ -198,12 +198,40 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     }
   });
 
-  // API Endpoint: Direct upload of media file (base64) to alleviate IndexedDB desynchronizations
+  // API Endpoint: Direct upload of media file (base64 or binary stream) to alleviate IndexedDB desynchronizations
   app.post("/api/upload-media", async (req, res) => {
     try {
-      const { filename, mimeType, base64 } = req.body;
-      if (!base64) {
-        return res.status(400).json({ error: "Faltan los datos base64 para la subida." });
+      let filename: string | undefined;
+      let mimeType: string | undefined;
+      let fileBuffer: Buffer;
+
+      const isBinaryStream = req.headers["x-filename"] !== undefined;
+
+      if (isBinaryStream) {
+        // Direct stream upload (highly efficient, zero base64 conversion overhead)
+        filename = decodeURIComponent(req.headers["x-filename"] as string);
+        mimeType = req.headers["x-mimetype"] as string;
+
+        const chunks: Buffer[] = [];
+        const readStreamPromise = new Promise<Buffer>((resolve, reject) => {
+          req.on("data", (chunk) => chunks.push(chunk));
+          req.on("end", () => resolve(Buffer.concat(chunks)));
+          req.on("error", (err) => reject(err));
+        });
+        fileBuffer = await readStreamPromise;
+      } else {
+        // Fallback to legacy base64 in JSON payload
+        const { filename: jsonFilename, mimeType: jsonMimeType, base64 } = req.body || {};
+        if (!base64) {
+          return res.status(400).json({ error: "Faltan los datos base64 o binarios para la subida." });
+        }
+        filename = jsonFilename;
+        mimeType = jsonMimeType;
+        fileBuffer = Buffer.from(base64, "base64");
+      }
+
+      if (!filename) {
+        return res.status(400).json({ error: "Falta el nombre del archivo en la solicitud." });
       }
 
       const uploadsDir = path.join(process.cwd(), "public", "uploads");
@@ -227,8 +255,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       const cleanFilename = `media_${Date.now()}_${Math.floor(Math.random() * 100000)}.${ext}`;
       const filepath = path.join(uploadsDir, cleanFilename);
 
-      fs.writeFileSync(filepath, Buffer.from(base64, "base64"));
-      console.log(`[Media Direct Upload] Saved: /uploads/${cleanFilename} (${mimeType || ext})`);
+      fs.writeFileSync(filepath, fileBuffer);
+      console.log(`[Media Direct Upload] Saved: /uploads/${cleanFilename} (${mimeType || ext}) - Method: ${isBinaryStream ? "BinaryStream" : "Base64"}`);
 
       res.json({
         success: true,

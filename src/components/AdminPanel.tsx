@@ -543,9 +543,19 @@ export default function AdminPanel({
                 mediaItem.backupUrl = mediaItem.url;
                 mediaItem.url = `/uploads/${filenameToUse}`;
               } else {
+                const isVid = mediaItem.type === "video";
+                const errorAlert = isVid 
+                  ? `El video "${filenameToUse}" del producto "${prod.title || ""}" es demasiado pesado para sincronizar con GitHub (Error ${putRes.status}). Para evitar fallas o que se borre en vivo, te recomendamos recortarlo a menos de 10 segundos o subirlo a YouTube o Google Drive y pegar el enlace.`
+                  : `La imagen "${filenameToUse}" del producto "${prod.title || ""}" no se pudo subir a GitHub (Error ${putRes.status}).`;
+                notify(errorAlert, "error");
                 console.warn(`La subida de ${filenameToUse} a GitHub falló con estado:`, putRes.status);
               }
-            } catch (upErr) {
+            } catch (upErr: any) {
+              const isVid = mediaItem.type === "video";
+              const errorAlert = isVid 
+                ? `Fallo de red al subir el video del producto "${prod.title || ""}" a GitHub. Es posible que el archivo sea demasiado pesado. Te recomendamos usar un enlace de YouTube o Google Drive.`
+                : `Error de conexión al subir "${filenameToUse}" a GitHub.`;
+              notify(errorAlert, "error");
               console.warn(`Error de red al subir el archivo ${filenameToUse} a la API de contenidos de GitHub:`, upErr);
             }
           }
@@ -1095,48 +1105,43 @@ export default function AdminPanel({
         continue;
       }
 
-      if (isVideo && fileSizeInMB > 100) {
-        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera el límite de 100MB de carga. Por favor, reduce la resolución o peso de tu video, o súbelo a YouTube/Drive y pega el enlace abajo para que tu sitio cargue al instante.`, "error");
+      if (isVideo && fileSizeInMB > 30) {
+        notify(`El video "${file.name}" (${fileSizeInMB.toFixed(2)}MB) supera los 30MB recomendados. Para evitar demoras, lentitud, o errores de sincronización con la nube, te sugerimos recortar el video para que ocupe menos, o bien subirlo a YouTube o Google Drive y pegar el enlace directo abajo.`, "error");
         continue;
       }
 
       try {
-        // Try uploading to server-side static media folder directly first
-        const base64Promise = new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (typeof reader.result === "string") {
-              const b64 = reader.result.split(",")[1];
-              resolve(b64);
-            } else {
-              reject(new Error("No se pudo codificar el archivo"));
-            }
-          };
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
-
-        const base64Data = await base64Promise;
+        // Direct stream upload (zero lag, no thread block, extremely efficient!)
         const uploadRes = await fetch("/api/upload-media", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/octet-stream",
+            "X-Filename": encodeURIComponent(file.name),
+            "X-MimeType": file.type
           },
-          body: JSON.stringify({
-            filename: file.name,
-            mimeType: file.type,
-            base64: base64Data
-          })
+          body: file // Direct connection stream
         });
 
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
           if (uploadData && uploadData.url) {
             console.log("[Media Instant-Upload] Saved successfully on physical server disk:", uploadData.url);
+            
+            let backupUrl = "";
+            if (isPhoto) {
+              // Lightweight background compression for image backupUrl
+              try {
+                backupUrl = await compressImage(file);
+              } catch (e) {
+                console.warn("Could not generate compressed backupUrl for image:", e);
+                backupUrl = "";
+              }
+            }
+
             updatedMedia.push({
               type: isPhoto ? "image" : "video",
               url: uploadData.url,
-              backupUrl: `data:${file.type};base64,${base64Data}`
+              backupUrl: backupUrl // NEVER store large uncompressed base64 raw strings in products state!
             });
             continue; // uploaded correctly, bypass IndexedDB
           }
