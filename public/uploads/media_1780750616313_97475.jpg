@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hogar y Estilo | Decoración y Productos para tu Hogar</title>
+    <meta name="description" content="Hogar y Estilo - Tienda exclusiva de decoración, bazar, organización y productos para el hogar. Encontrá elementos de diseño pensados para tus espacios cotidianos con envíos a todo el país." />
+    
+    <!-- Preload Mercado Pago SDK for blazing-fast checkout experience -->
+    <script src="https://sdk.mercadopago.com/js/v2" defer></script>
+    
+    <!-- Open Graph SEO Metatags -->
+    <meta property="og:title" content="Hogar y Estilo | Decoración y Productos para tu Hogar" />
+    <meta property="og:description" content="Encontrá los mejores productos de decoración, bazar y organización para lograr un hogar cálido, ordenado y con personalidad." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Hogar y Estilo" />
+
+    <!-- Soportes para renombrado automático en guardados en celular (español/inglés) -->
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/estilo.css" />
+    <link rel="stylesheet" href="/Estilo.css" />
+    <link rel="stylesheet" href="/src/estilo.css" />
+    <link rel="stylesheet" href="/src/Estilo.css" />
+    <script type="module" crossorigin src="/assets/index-sqlVvPmp.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DdQjLI41.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+
