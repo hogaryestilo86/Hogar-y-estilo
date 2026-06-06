@@ -116,7 +116,7 @@ function handleFirestoreError(error: any, context: string) {
 export default function App() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     try {
-      return localStorage.getItem("is_admin_mode") === "true";
+      return sessionStorage.getItem("is_admin_mode") === "true";
     } catch (_) {
       return false;
     }
@@ -301,7 +301,7 @@ export default function App() {
           setProducts(finalProducts);
 
           // ONLY trigger self-healing if the user is authenticated as the admin!
-          const isCurrentlyAdmin = localStorage.getItem("is_admin_mode") === "true";
+          const isCurrentlyAdmin = sessionStorage.getItem("is_admin_mode") === "true";
           if (loadedLocal.length > 0 && isCurrentlyAdmin) {
             console.log("[Catalog Loader] Self-healing: Re-populating out-of-sync backend server with local catalog...");
             fetch("/api/products", {
@@ -920,7 +920,7 @@ export default function App() {
         }
 
         // Only increment view count if this is a real buyer/visitor (not an admin)
-        const isCurrentlyAdmin = localStorage.getItem("is_admin_mode") === "true";
+        const isCurrentlyAdmin = sessionStorage.getItem("is_admin_mode") === "true";
         if (!isCurrentlyAdmin) {
           views += 1;
           await setDoc(analyticsRef, {
@@ -951,9 +951,9 @@ export default function App() {
     loadAndIncrementViews();
   }, []);
 
-  // Sync admin authentication state with localStorage to distinguish admin views
+  // Sync admin authentication state with sessionStorage to distinguish admin views
   useEffect(() => {
-    localStorage.setItem("is_admin_mode", isAdminAuthenticated ? "true" : "false");
+    sessionStorage.setItem("is_admin_mode", isAdminAuthenticated ? "true" : "false");
   }, [isAdminAuthenticated]);
 
   // Categories query set (Herramientas, Iluminación, Destacados, etc.)
