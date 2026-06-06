@@ -33,15 +33,19 @@ export function resolveImageUrl(url: string | undefined): string {
   if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
     const filename = resolvedUrl.split("/").pop();
     if (filename) {
-      const isVercelLive = window.location.hostname.endsWith(".vercel.app") || window.location.hostname === "hogar-y-estilo.vercel.app";
-      const gConfig = (window as any).__GITHUB_CONFIG__;
-      if (isVercelLive && gConfig) {
-        if (gConfig.repo) {
+      const isLocalOrPreview = window.location.hostname.includes("run.app") || 
+                               window.location.hostname.includes("localhost") || 
+                               window.location.hostname.includes("127.0.0.1");
+      
+      if (!isLocalOrPreview) {
+        const gConfig = (window as any).__GITHUB_CONFIG__;
+        const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
+        const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+        
+        if (gConfig && gConfig.repo) {
           return `https://raw.githubusercontent.com/${gConfig.repo}/${gConfig.branch || "main"}/public/uploads/${filename}`;
         }
-        if (gConfig.backendUrl) {
-          return `${gConfig.backendUrl}/uploads/${filename}`;
-        }
+        return `${backend}/uploads/${filename}`;
       }
     }
   }
@@ -144,10 +148,10 @@ export default function App() {
         const configSnap = await getDoc(doc(db, "settings", "github_config"));
         if (configSnap.exists()) {
           const configData = configSnap.data();
-          if (configData && configData.repo) {
+          if (configData) {
             console.log("⚡ [Config Sync] Loaded master GitHub and server URL settings:", configData);
             (window as any).__GITHUB_CONFIG__ = {
-              repo: configData.repo,
+              repo: configData.repo || "",
               branch: configData.branch || "main",
               backendUrl: configData.backendUrl || ""
             };
@@ -159,6 +163,34 @@ export default function App() {
       }
     }
     fetchGithubConfig();
+  }, []);
+
+  // Automatically register the preview server's current backend URL in Firestore
+  // so that public users on Vercel or Instagram can load images from this active container!
+  useEffect(() => {
+    async function registerLiveBackendUrl() {
+      const isCloudRun = window.location.hostname.includes("run.app") || window.location.hostname.includes("localhost");
+      if (isCloudRun && db) {
+        try {
+          const docRef = doc(db, "settings", "github_config");
+          const snap = await getDoc(docRef);
+          const currentData = snap.exists() ? snap.data() : {};
+          if (currentData.backendUrl !== window.location.origin) {
+            console.log("🔄 [App Sync] Registering active server backend URL in Firestore:", window.location.origin);
+            await setDoc(docRef, {
+              ...currentData,
+              backendUrl: window.location.origin
+            }, { merge: true });
+          }
+        } catch (err) {
+          console.warn("Could not register live backend URL:", err);
+        }
+      }
+    }
+    const timer = setTimeout(() => {
+      registerLiveBackendUrl();
+    }, 3000);
+    return () => clearTimeout(timer);
   }, []);
 
   // Background media preloader to ensure zero-latency video/image visual styling is ready on mount!

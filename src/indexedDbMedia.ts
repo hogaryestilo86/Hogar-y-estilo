@@ -535,19 +535,23 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
       resolvedUrl = "/" + resolvedUrl;
     }
     
-    // Rewrite relative /uploads/ URLs to ultra-fast CDN or Cloud Run server when loaded from Vercel
+    // Rewrite relative /uploads/ URLs to ultra-fast CDN or Cloud Run server when loaded from Vercel/Instagram
     if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
       const filename = resolvedUrl.split("/").pop();
       if (filename) {
-        const isVercelLive = window.location.hostname.endsWith(".vercel.app") || window.location.hostname === "hogar-y-estilo.vercel.app";
-        const gConfig = (window as any).__GITHUB_CONFIG__;
-        if (isVercelLive && gConfig) {
-          if (gConfig.repo) {
+        const isLocalOrPreview = window.location.hostname.includes("run.app") || 
+                                 window.location.hostname.includes("localhost") || 
+                                 window.location.hostname.includes("127.0.0.1");
+        
+        if (!isLocalOrPreview) {
+          const gConfig = (window as any).__GITHUB_CONFIG__;
+          const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
+          const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+          
+          if (gConfig && gConfig.repo) {
             return `https://raw.githubusercontent.com/${gConfig.repo}/${gConfig.branch || "main"}/public/uploads/${filename}`;
           }
-          if (gConfig.backendUrl) {
-            return `${gConfig.backendUrl}/uploads/${filename}`;
-          }
+          return `${backend}/uploads/${filename}`;
         }
       }
     }
