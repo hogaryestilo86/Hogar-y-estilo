@@ -19,7 +19,10 @@ if (typeof window !== "undefined" && typeof (window as any).MercadoPago === "und
   script.id = "mp-sdk-script";
   script.src = "https://sdk.mercadopago.com/js/v2";
   script.async = true;
-  document.body.appendChild(script);
+  const targetParent = document.body || document.head || document.documentElement;
+  if (targetParent) {
+    targetParent.appendChild(script);
+  }
 }
 
 interface CheckoutModalProps {
