@@ -572,7 +572,7 @@ export default function AdminPanel({
           } else if (mediaItem.url.startsWith("idb://")) {
             // Referencia a un archivo en IndexedDB local. ¡Lo subimos directamente a GitHub!
             const key = mediaItem.url.replace("idb://", "");
-            const ext = mediaItem.type === "video" ? "mp4" : "jpg";
+            const ext: string = mediaItem.type === "video" ? "mp4" : "jpg";
             const filenameToUpload = key.includes(".") ? key : `${key}.${ext}`;
             filenameToUse = filenameToUpload;
 
