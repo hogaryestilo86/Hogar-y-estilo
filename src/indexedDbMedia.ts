@@ -500,8 +500,10 @@ export function base64ToBlobUrl(dataUrl: string): string {
  * Incorporates backupUrl to enable offline fallback and zero-broken-image delivery.
  */
 export function useResolvedUrl(url: string | undefined, backupUrl?: string): string {
-  const isIdbUrl = url ? url.startsWith("idb://") : false;
-  const idbKey = isIdbUrl && url ? url.replace("idb://", "") : "";
+  const isIdbUrl = !!((url && url.startsWith("idb://")) || (backupUrl && backupUrl.startsWith("idb://")));
+  const idbKey = (url && url.startsWith("idb://"))
+    ? url.replace("idb://", "")
+    : (backupUrl && backupUrl.startsWith("idb://") ? backupUrl.replace("idb://", "") : "");
   
   const getInstantResolved = () => {
     let finalBackup = backupUrl || "";
@@ -510,46 +512,56 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
     }
 
     if (!url) {
+      if (finalBackup.startsWith("idb://")) {
+        const key = finalBackup.replace("idb://", "");
+        if (globalResolvedCache[key]) return globalResolvedCache[key];
+        if (inMemoryFallbackCache[key]) return inMemoryFallbackCache[key];
+        return "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
+      }
       return finalBackup.startsWith("data:") ? base64ToBlobUrl(finalBackup) : finalBackup;
     }
     if (url.startsWith("data:")) {
       return base64ToBlobUrl(url);
     }
-    if (!isIdbUrl) {
-      let resolvedUrl = url;
-      if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://") && !resolvedUrl.startsWith("blob:")) {
-        resolvedUrl = "/" + resolvedUrl;
-      }
-      
-      // Rewrite relative /uploads/ URLs to ultra-fast CDN or Cloud Run server when loaded from Vercel
-      if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
-        const filename = resolvedUrl.split("/").pop();
-        if (filename) {
-          const isVercelLive = window.location.hostname.endsWith(".vercel.app") || window.location.hostname === "hogar-y-estilo.vercel.app";
-          const gConfig = (window as any).__GITHUB_CONFIG__;
-          if (isVercelLive && gConfig) {
-            if (gConfig.repo) {
-              return `https://cdn.jsdelivr.net/gh/${gConfig.repo}@${gConfig.branch || "main"}/public/uploads/${filename}`;
-            }
-            if (gConfig.backendUrl) {
-              return `${gConfig.backendUrl}/uploads/${filename}`;
-            }
+    if (url.startsWith("idb://")) {
+      const key = url.replace("idb://", "");
+      if (globalResolvedCache[key]) return globalResolvedCache[key];
+      if (inMemoryFallbackCache[key]) return inMemoryFallbackCache[key];
+      return "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=82";
+    }
+
+    let resolvedUrl = url;
+    if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://") && !resolvedUrl.startsWith("blob:")) {
+      resolvedUrl = "/" + resolvedUrl;
+    }
+    
+    // Rewrite relative /uploads/ URLs to ultra-fast CDN or Cloud Run server when loaded from Vercel
+    if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
+      const filename = resolvedUrl.split("/").pop();
+      if (filename) {
+        const isVercelLive = window.location.hostname.endsWith(".vercel.app") || window.location.hostname === "hogar-y-estilo.vercel.app";
+        const gConfig = (window as any).__GITHUB_CONFIG__;
+        if (isVercelLive && gConfig) {
+          if (gConfig.repo) {
+            return `https://cdn.jsdelivr.net/gh/${gConfig.repo}@${gConfig.branch || "main"}/public/uploads/${filename}`;
+          }
+          if (gConfig.backendUrl) {
+            return `${gConfig.backendUrl}/uploads/${filename}`;
           }
         }
       }
+    }
 
-      if ((resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/")) && finalBackup) {
+    if ((resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/")) && finalBackup) {
+      if (finalBackup.startsWith("idb://")) {
+        const key = finalBackup.replace("idb://", "");
+        if (globalResolvedCache[key]) return globalResolvedCache[key];
+        if (inMemoryFallbackCache[key]) return inMemoryFallbackCache[key];
+      } else {
         return finalBackup.startsWith("data:") ? base64ToBlobUrl(finalBackup) : finalBackup;
       }
-      return resolvedUrl;
     }
-    if (idbKey && globalResolvedCache[idbKey]) {
-      return globalResolvedCache[idbKey];
-    }
-    if (idbKey && inMemoryFallbackCache[idbKey]) {
-      return inMemoryFallbackCache[idbKey];
-    }
-    return finalBackup;
+    return resolvedUrl;
   };
 
   const instantValue = getInstantResolved();
@@ -569,7 +581,10 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
 
   useEffect(() => {
     if (!isIdbUrl || !idbKey) return;
-    if (globalResolvedCache[idbKey] || inMemoryFallbackCache[idbKey]) return;
+    if (globalResolvedCache[idbKey] || inMemoryFallbackCache[idbKey]) {
+      setResolved(getInstantResolved());
+      return;
+    }
 
     let active = true;
     getMedia(idbKey).then((blob) => {
@@ -583,7 +598,7 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
     return () => {
       active = false;
     };
-  }, [url]);
+  }, [url, backupUrl, isIdbUrl, idbKey]);
 
   return resolved;
 }

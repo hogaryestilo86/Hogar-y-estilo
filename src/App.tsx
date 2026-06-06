@@ -694,7 +694,7 @@ export default function App() {
 
   // Calculamos los productos destacados dinámicamente para la vitrina deslizable manualmente
   const showcasePhotos = products
-    .filter(p => p && p.featured && !p.paused && !brokenImageProductIds.includes(p.id))
+    .filter(p => p && p.featured && !p.paused && (!brokenImageProductIds.includes(p.id) || isAdminAuthenticated))
     .map(p => ({
       url: p.media?.[0]?.url || "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=800&q=85",
       type: p.media?.[0]?.type || "image",
@@ -1275,7 +1275,9 @@ export default function App() {
   // Searching filter and categories
   const filteredProducts = (products || []).filter((p) => {
     if (!p) return false;
-    if (p.paused || brokenImageProductIds.includes(p.id)) return false; // Skip paused/out-of-stock and broken media items for clients
+    if (p.paused) return false;
+    // Hide broken media items for regular customers, but KEEP them visible for the authenticated store admin (with warning badges) so they don't think products were deleted!
+    if (brokenImageProductIds.includes(p.id) && !isAdminAuthenticated) return false;
     const titleStr = p.title || "";
     const categoryStr = p.category || "";
     const descStr = p.description || "";
