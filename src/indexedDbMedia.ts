@@ -543,7 +543,7 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
         const gConfig = (window as any).__GITHUB_CONFIG__;
         if (isVercelLive && gConfig) {
           if (gConfig.repo) {
-            return `https://cdn.jsdelivr.net/gh/${gConfig.repo}@${gConfig.branch || "main"}/public/uploads/${filename}`;
+            return `https://raw.githubusercontent.com/${gConfig.repo}/${gConfig.branch || "main"}/public/uploads/${filename}`;
           }
           if (gConfig.backendUrl) {
             return `${gConfig.backendUrl}/uploads/${filename}`;

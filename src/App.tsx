@@ -37,7 +37,7 @@ export function resolveImageUrl(url: string | undefined): string {
       const gConfig = (window as any).__GITHUB_CONFIG__;
       if (isVercelLive && gConfig) {
         if (gConfig.repo) {
-          return `https://cdn.jsdelivr.net/gh/${gConfig.repo}@${gConfig.branch || "main"}/public/uploads/${filename}`;
+          return `https://raw.githubusercontent.com/${gConfig.repo}/${gConfig.branch || "main"}/public/uploads/${filename}`;
         }
         if (gConfig.backendUrl) {
           return `${gConfig.backendUrl}/uploads/${filename}`;
@@ -114,6 +114,13 @@ function handleFirestoreError(error: any, context: string) {
 }
 
 export default function App() {
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("is_admin_mode") === "true";
+    } catch (_) {
+      return false;
+    }
+  });
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
   const [brokenImageProductIds, setBrokenImageProductIds] = useState<string[]>([]);
@@ -293,7 +300,9 @@ export default function App() {
           const finalProducts = loadedLocal.length > 0 ? loadedLocal : INITIAL_PRODUCTS;
           setProducts(finalProducts);
 
-          if (loadedLocal.length > 0) {
+          // ONLY trigger self-healing if the user is authenticated as the admin!
+          const isCurrentlyAdmin = localStorage.getItem("is_admin_mode") === "true";
+          if (loadedLocal.length > 0 && isCurrentlyAdmin) {
             console.log("[Catalog Loader] Self-healing: Re-populating out-of-sync backend server with local catalog...");
             fetch("/api/products", {
               method: "POST",
@@ -348,6 +357,13 @@ export default function App() {
         localStorage.setItem("store_products_list", JSON.stringify(products));
       } catch (e) {
         console.warn("No se pudo persistir la lista de productos en localStorage (es posible que exceda la cuota por las imágenes base64, pero se guardó con éxito en IndexedDB):", e);
+      }
+
+      // GUARD: Only authenticated admin can sync or write changes back to the cloud/backup databases.
+      // This prevents customers' browsers from accidentally overwriting or cleaning up the authoritative database catalog!
+      if (!isAdminAuthenticated) {
+        console.log("[Sync Loop] Customer view detected. Bypassing cloud Firestore & backup server write operations.");
+        return;
       }
 
       // 4. DEBOUNCE the heavy and slow cloud database network transactions by 2.5 seconds!
@@ -454,7 +470,7 @@ export default function App() {
         clearTimeout(syncTimer);
       }
     };
-  }, [products, hasLoadedInitial]);
+  }, [products, hasLoadedInitial, isAdminAuthenticated]);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -756,7 +772,6 @@ export default function App() {
   };
 
   // Admin access control states
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
   const [adminLoginError, setAdminLoginError] = useState("");
 
@@ -1276,8 +1291,8 @@ export default function App() {
   const filteredProducts = (products || []).filter((p) => {
     if (!p) return false;
     if (p.paused) return false;
-    // Hide broken media items for regular customers, but KEEP them visible for the authenticated store admin (with warning badges) so they don't think products were deleted!
-    if (brokenImageProductIds.includes(p.id) && !isAdminAuthenticated) return false;
+    // Keep products visible even if there is a transient file-system or network loading delay, letting our robust fallback image engine show a stylized category badge.
+    const isBrokenImage = brokenImageProductIds.includes(p.id);
     const titleStr = p.title || "";
     const categoryStr = p.category || "";
     const descStr = p.description || "";

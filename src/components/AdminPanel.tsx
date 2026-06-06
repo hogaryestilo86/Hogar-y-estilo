@@ -424,11 +424,21 @@ export default function AdminPanel({
 
     if (!tokenToUse) {
       notify("Por favor, introduce tu Token de Acceso Personal de GitHub en la configuración.", "error");
+      setSyncProgress([
+        "Iniciando proceso de sincronización...",
+        "❌ ERROR: No se ingresó el Token de Acceso Personal de GitHub.",
+        "💡 Solución: Abre la configuración de GitHub arriba, pega tu token de acceso (Token Classic con alcance 'repo' o Fine-grained con permisos 'Contents: Read/Write') y haz clic de nuevo en Sincronizar."
+      ]);
       setShowGithubSettings(true);
       return;
     }
     if (!repoToUse) {
       notify("Por favor, introduce tu repositorio de GitHub (ejemplo: tadeobeltran1986/rep-name).", "error");
+      setSyncProgress([
+        "Iniciando proceso de sincronización...",
+        "❌ ERROR: No se especificó el repositorio de destino.",
+        "💡 Solución: Abre la configuración de GitHub arriba, escribe tu usuario y nombre del repositorio (ejemplo: usuario/nombre-tienda) y haz clic de nuevo en Sincronizar."
+      ]);
       setShowGithubSettings(true);
       return;
     }
@@ -567,11 +577,18 @@ export default function AdminPanel({
             filenameToUse = filenameToUpload;
 
             try {
+              // Filtrar y omitir videos en el respaldo de GitHub para evitar bloqueos por peso y memoria RAM móvil
+              const isVideo = mediaItem.type === "video" || ext === "mp4" || ext === "webm" || ext === "mov" || key.toLowerCase().endsWith(".mp4") || key.toLowerCase().endsWith(".mov") || key.toLowerCase().endsWith(".webm");
+              if (isVideo) {
+                addProgressMsg(`ℹ️ Omitiendo video "${prod.title || 'Multimedia'}" de GitHub para mantener una alta velocidad de sincronización de tu tienda.`);
+                continue;
+              }
+
               // Obtener la media para medir el tamaño antes de cualquier fetch a GitHub o conversión pesada
               const blob = await getMedia(key);
               if (blob) {
-                if (blob.size > 15 * 1024 * 1024) { // Límite de 15MB
-                  addProgressMsg(`⚠️ Omitido por peso (>15MB): ${filenameToUpload}`);
+                if (blob.size > 4.5 * 1024 * 1024) { // Límite seguro de 4.5MB
+                  addProgressMsg(`⚠️ Omitida imagen por peso (>4.5MB) para evitar lentitud de red: ${filenameToUpload}`);
                   base64ToUpload = null;
                   filenameToUse = null;
                   continue; // Pasar al siguiente archivo multimedia sin trabar la sincronización
@@ -581,7 +598,7 @@ export default function AdminPanel({
                 const alreadyExists = existingUploads.has(filenameToUpload.toLowerCase());
                 
                 if (!alreadyExists) {
-                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Procesando archivo local: ${filenameToUpload}...`);
+                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Procesando foto local: ${filenameToUpload}...`);
                   const reader = new FileReader();
                   const base64Promise = new Promise<string>((resolve, reject) => {
                     reader.onloadend = () => {
@@ -611,16 +628,23 @@ export default function AdminPanel({
             const filename = mediaItem.url.split("/").pop();
             if (filename) {
               try {
+                const ext = filename.split(".").pop() || "jpg";
+                const isVideo = mediaItem.type === "video" || ext === "mp4" || ext === "webm" || ext === "mov" || filename.toLowerCase().endsWith(".mp4") || filename.toLowerCase().endsWith(".mov") || filename.toLowerCase().endsWith(".webm");
+                if (isVideo) {
+                  addProgressMsg(`ℹ️ Omitiendo video guardado "${prod.title || 'Multimedia'}" de la carga a GitHub.`);
+                  continue;
+                }
+
                 const alreadyExists = existingUploads.has(filename.toLowerCase());
                 
                 if (!alreadyExists) {
                   // ¡No está en Git todavía! Lo descargamos del servidor local para subirlo
-                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Obteniendo de catálogo local: ${filename}...`);
+                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Obteniendo foto del servidor: ${filename}...`);
                   const fileRes = await fetchWithTimeout(mediaItem.url, {}, 15000);
                   if (fileRes.ok) {
                     const blob = await fileRes.blob();
-                    if (blob.size > 15 * 1024 * 1024) {
-                      addProgressMsg(`⚠️ Omitiendo archivo pesado: ${filename}`);
+                    if (blob.size > 4.5 * 1024 * 1024) {
+                      addProgressMsg(`⚠️ Omitida imagen pesada (>4.5MB): ${filename}`);
                       base64ToUpload = null;
                       filenameToUse = null;
                       continue;
@@ -644,7 +668,7 @@ export default function AdminPanel({
                     filenameToUse = filename;
                   }
                 } else if (alreadyExists) {
-                  addProgressMsg(`✓ Respaldado anteriormente: ${filename}`);
+                  addProgressMsg(`✓ Respaldado anteriormente en la nube: ${filename}`);
                 }
               } catch (gitCheckErr) {
                 console.warn(`Error al verificar/subir el archivo ${filename} desde el servidor:`, gitCheckErr);

@@ -25,5 +25,17 @@ service cloud.firestore {
           && request.resource.data.category.size() <= 100
         );
     }
+
+    // Config settings for GitHub repo / branch / fallback URL
+    match /settings/github_config {
+      allow read: if true;
+      allow write: if true; // Allowed for admin save in AdminPanel
+    }
+
+    // Global site and performance analytics
+    match /analytics/global {
+      allow read: if true;
+      allow write: if true; // Both buyers incrementing view count & admin can sync
+    }
   }
 }
