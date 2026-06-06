@@ -520,6 +520,24 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
       if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://") && !resolvedUrl.startsWith("blob:")) {
         resolvedUrl = "/" + resolvedUrl;
       }
+      
+      // Rewrite relative /uploads/ URLs to ultra-fast CDN or Cloud Run server when loaded from Vercel
+      if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
+        const filename = resolvedUrl.split("/").pop();
+        if (filename) {
+          const isVercelLive = window.location.hostname.endsWith(".vercel.app") || window.location.hostname === "hogar-y-estilo.vercel.app";
+          const gConfig = (window as any).__GITHUB_CONFIG__;
+          if (isVercelLive && gConfig) {
+            if (gConfig.repo) {
+              return `https://cdn.jsdelivr.net/gh/${gConfig.repo}@${gConfig.branch || "main"}/public/uploads/${filename}`;
+            }
+            if (gConfig.backendUrl) {
+              return `${gConfig.backendUrl}/uploads/${filename}`;
+            }
+          }
+        }
+      }
+
       if ((resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/")) && finalBackup) {
         return finalBackup.startsWith("data:") ? base64ToBlobUrl(finalBackup) : finalBackup;
       }
@@ -539,6 +557,14 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
 
   useEffect(() => {
     setResolved(getInstantResolved());
+
+    const handleConfigLoaded = () => {
+      setResolved(getInstantResolved());
+    };
+    window.addEventListener("github-config-loaded", handleConfigLoaded);
+    return () => {
+      window.removeEventListener("github-config-loaded", handleConfigLoaded);
+    };
   }, [url, backupUrl]);
 
   useEffect(() => {

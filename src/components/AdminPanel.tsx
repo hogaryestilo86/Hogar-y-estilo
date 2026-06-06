@@ -8,6 +8,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
 import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image } from "../indexedDbMedia";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 interface AdminPanelProps {
   products: Product[];
@@ -281,6 +283,16 @@ export default function AdminPanel({
   const [confirmWipe, setConfirmWipe] = useState(false);
   const [importJsonInput, setImportJsonInput] = useState("");
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [confirmEmptyBin, setConfirmEmptyBin] = useState(false);
+  const [recycleBin, setRecycleBin] = useState<Product[]>(() => {
+    try {
+      const binStr = localStorage.getItem("recycle_bin_products");
+      return binStr ? JSON.parse(binStr) : [];
+    } catch (_) {
+      return [];
+    }
+  });
   const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [copiedJsonValue, setCopiedJsonValue] = useState<string | null>(null);
@@ -291,9 +303,33 @@ export default function AdminPanel({
   const [githubBranch, setGithubBranch] = useState(() => localStorage.getItem("github_sync_branch") || "main");
   const [githubPath, setGithubPath] = useState(() => localStorage.getItem("github_sync_path") || "products.json");
   const [isSyncingGithub, setIsSyncingGithub] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<string[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [showGithubSettings, setShowGithubSettings] = useState(true);
   const [lastSyncTime, setLastSyncTime] = useState(() => localStorage.getItem("github_last_sync_time") || "");
+
+  // Synchronously auto-save current local admin credentials to Firestore
+  // so client devices (on Instagram/Vercel) automatically have active CDN parameters!
+  React.useEffect(() => {
+    const cachedRepo = localStorage.getItem("github_sync_repo") || "";
+    const cachedBranch = localStorage.getItem("github_sync_branch") || "main";
+    if (cachedRepo) {
+      try {
+        const docRef = doc(db, "settings", "github_config");
+        setDoc(docRef, {
+          repo: cachedRepo,
+          branch: cachedBranch,
+          backendUrl: window.location.origin
+        }).then(() => {
+          console.log("[Admin Auto-register] Automatically synchronized local session settings to Firestore database.");
+        }).catch(err => {
+          console.warn("[Admin Auto-register] Error doing background save of session config:", err);
+        });
+      } catch (err) {
+        console.warn("[Admin Auto-register] Error creating reference to github_config:", err);
+      }
+    }
+  }, []);
 
   const handleOptimizeDatabase = async () => {
     if (!onSetProducts) {
@@ -356,11 +392,35 @@ export default function AdminPanel({
   };
 
   const handleSyncToGithub = async (catalogToSync?: Product[]) => {
+    // Helper to prevent fetch requests from hanging indefinitely on slow mobile networks or heavy payloads
+    const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 25000): Promise<Response> => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal
+        });
+        clearTimeout(id);
+        return response;
+      } catch (error) {
+        clearTimeout(id);
+        throw error;
+      }
+    };
+
     const tokenToUse = githubToken.trim();
     const repoToUse = githubRepo.trim();
     const branchToUse = githubBranch.trim() || "main";
     const pathToUse = githubPath.trim() || "products.json";
     const dataToSave = catalogToSync || products;
+
+    const addProgressMsg = (msg: string) => {
+      console.log(`[Sync Github] ${msg}`);
+      setSyncProgress(prev => [...prev, msg].slice(-25)); // Mantiene los últimos 25 mensajes en pantalla
+    };
+
+    setSyncProgress(["Iniciando proceso de sincronización..."]);
 
     if (!tokenToUse) {
       notify("Por favor, introduce tu Token de Acceso Personal de GitHub en la configuración.", "error");
@@ -395,16 +455,75 @@ export default function AdminPanel({
       localStorage.setItem("github_sync_branch", branchToUse);
       localStorage.setItem("github_sync_path", pathToUse);
 
-      notify("Asegurando que todas las fotos y videos del catálogo estén respaldados en GitHub...", "info");
-      
+      // Guardar también la configuración en Firestore de forma no bloqueante para evitar bloqueos si las cuotas están agotadas
+      try {
+        const docRef = doc(db, "settings", "github_config");
+        setDoc(docRef, {
+          repo: cleanRepo,
+          branch: branchToUse,
+          backendUrl: window.location.origin
+        }).then(() => {
+          console.log("[Firestore Sync] Successfully persisted github_config to Firestore.");
+        }).catch((fsErr) => {
+          console.warn("Could not save GitHub config settings to Firestore (handled bg error):", fsErr);
+        });
+      } catch (fsErr) {
+        console.warn("Could not save GitHub config settings to Firestore (outer):", fsErr);
+      }
+
+      notify("Iniciando respaldo de fotos/videos en GitHub...", "info");
+      addProgressMsg("Conectando con GitHub para revisar archivos existentes...");
+
+      // 1. Obtener la lista entera de archivos existentes en public/uploads en una sola llamada rest
+      const existingUploads = new Set<string>();
+      try {
+        const getUploadsUrl = `https://api.github.com/repos/${cleanRepo}/contents/public/uploads?ref=${branchToUse}&_t=${Date.now()}`;
+        const getUploadsRes = await fetchWithTimeout(getUploadsUrl, {
+          headers: {
+            "Authorization": `token ${tokenToUse}`,
+            "Accept": "application/vnd.github.v3+json"
+          }
+        }, 15000);
+
+        if (getUploadsRes.ok) {
+          const filesList = await getUploadsRes.json();
+          if (Array.isArray(filesList)) {
+            filesList.forEach((file: any) => {
+              if (file && file.name) {
+                existingUploads.add(file.name.toLowerCase());
+              }
+            });
+            addProgressMsg(`✓ Confirmados ${existingUploads.size} archivos multimedia guardados en GitHub.`);
+          }
+        } else {
+          addProgressMsg("Creando nuevo directorio para archivos en GitHub...");
+        }
+      } catch (err) {
+        console.warn("No se pudo obtener la lista de uploads existentes (puede no existir aún):", err);
+        addProgressMsg("Directorio de imágenes listo para inicializar.");
+      }
+
       // Realizar copia profunda para evitar efectos colaterales en la interfaz activa mientras subimos
       const updatedCatalog = JSON.parse(JSON.stringify(dataToSave));
       
+      let mediaCount = 0;
+      let uploadCount = 0;
+      let totalMediaToProcess = 0;
+      
+      for (const prod of updatedCatalog) {
+        if (prod && prod.media && Array.isArray(prod.media)) {
+          totalMediaToProcess += prod.media.length;
+        }
+      }
+
+      addProgressMsg(`Revisando ${totalMediaToProcess} elementos multimedia del catálogo...`);
+
       for (const prod of updatedCatalog) {
         if (!prod || !prod.media || !Array.isArray(prod.media)) continue;
         
         for (const mediaItem of prod.media) {
           if (!mediaItem || !mediaItem.url) continue;
+          mediaCount++;
           
           let base64ToUpload: string | null = null;
           let filenameToUse: string | null = null;
@@ -418,6 +537,15 @@ export default function AdminPanel({
                 const mimeType = matches[1];
                 const base64Data = matches[2];
                 base64ToUpload = base64Data;
+                
+                // Verificar que no sea demasiado pesado (límite de 15MB prudencial para Web/REST APIs)
+                const approxSize = base64Data.length * 0.75;
+                if (approxSize > 15 * 1024 * 1024) {
+                  addProgressMsg(`⚠️ Omitido por peso (>15MB): "${prod.title}"`);
+                  base64ToUpload = null;
+                  filenameToUse = null;
+                  continue;
+                }
                 
                 let ext = "jpg";
                 if (mimeType.includes("video/mp4")) ext = "mp4";
@@ -438,18 +566,22 @@ export default function AdminPanel({
             const filenameToUpload = key.includes(".") ? key : `${key}.${ext}`;
             filenameToUse = filenameToUpload;
 
-            const gitCheckUrl = `https://api.github.com/repos/${cleanRepo}/contents/public/uploads/${filenameToUpload}?ref=${branchToUse}`;
             try {
-              const checkRes = await fetch(gitCheckUrl, {
-                headers: {
-                  "Authorization": `token ${tokenToUse}`
+              // Obtener la media para medir el tamaño antes de cualquier fetch a GitHub o conversión pesada
+              const blob = await getMedia(key);
+              if (blob) {
+                if (blob.size > 15 * 1024 * 1024) { // Límite de 15MB
+                  addProgressMsg(`⚠️ Omitido por peso (>15MB): ${filenameToUpload}`);
+                  base64ToUpload = null;
+                  filenameToUse = null;
+                  continue; // Pasar al siguiente archivo multimedia sin trabar la sincronización
                 }
-              });
-              
-              if (checkRes.status === 404) {
-                notify(`Subiendo foto o video local a tu GitHub: ${filenameToUpload}...`, "info");
-                const blob = await getMedia(key);
-                if (blob) {
+
+                // Si tiene un tamaño razonable, verificar si ya está en GitHub usando nuestro Set local
+                const alreadyExists = existingUploads.has(filenameToUpload.toLowerCase());
+                
+                if (!alreadyExists) {
+                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Procesando archivo local: ${filenameToUpload}...`);
                   const reader = new FileReader();
                   const base64Promise = new Promise<string>((resolve, reject) => {
                     reader.onloadend = () => {
@@ -465,11 +597,11 @@ export default function AdminPanel({
                   reader.readAsDataURL(blob);
                   
                   base64ToUpload = await base64Promise;
+                } else if (alreadyExists) {
+                  addProgressMsg(`✓ Confirmado en la nube: ${filenameToUpload}`);
+                  mediaItem.backupUrl = mediaItem.url;
+                  mediaItem.url = `/uploads/${filenameToUpload}`;
                 }
-              } else if (checkRes.ok) {
-                console.log(`El archivo local ${filenameToUpload} ya está registrado en GitHub. Omitiendo.`);
-                mediaItem.backupUrl = mediaItem.url;
-                mediaItem.url = `/uploads/${filenameToUpload}`;
               }
             } catch (gitCheckErr) {
               console.warn(`Error al verificar/subir el archivo local ${filenameToUpload}:`, gitCheckErr);
@@ -478,20 +610,22 @@ export default function AdminPanel({
             // Referencia a un archivo en el servidor local. ¡Veamos si ya existe en GitHub!
             const filename = mediaItem.url.split("/").pop();
             if (filename) {
-              const gitCheckUrl = `https://api.github.com/repos/${cleanRepo}/contents/public/uploads/${filename}?ref=${branchToUse}`;
               try {
-                const checkRes = await fetch(gitCheckUrl, {
-                  headers: {
-                    "Authorization": `token ${tokenToUse}`
-                  }
-                });
+                const alreadyExists = existingUploads.has(filename.toLowerCase());
                 
-                if (checkRes.status === 404) {
+                if (!alreadyExists) {
                   // ¡No está en Git todavía! Lo descargamos del servidor local para subirlo
-                  notify(`Subiendo foto o video de producto a tu GitHub: ${filename}...`, "info");
-                  const fileRes = await fetch(mediaItem.url);
+                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Obteniendo de catálogo local: ${filename}...`);
+                  const fileRes = await fetchWithTimeout(mediaItem.url, {}, 15000);
                   if (fileRes.ok) {
                     const blob = await fileRes.blob();
+                    if (blob.size > 15 * 1024 * 1024) {
+                      addProgressMsg(`⚠️ Omitiendo archivo pesado: ${filename}`);
+                      base64ToUpload = null;
+                      filenameToUse = null;
+                      continue;
+                    }
+
                     const reader = new FileReader();
                     const base64Promise = new Promise<string>((resolve, reject) => {
                       reader.onloadend = () => {
@@ -509,8 +643,8 @@ export default function AdminPanel({
                     base64ToUpload = await base64Promise;
                     filenameToUse = filename;
                   }
-                } else if (checkRes.ok) {
-                  console.log(`El archivo ${filename} ya está presente en GitHub. Omitiendo duplicación.`);
+                } else if (alreadyExists) {
+                  addProgressMsg(`✓ Respaldado anteriormente: ${filename}`);
                 }
               } catch (gitCheckErr) {
                 console.warn(`Error al verificar/subir el archivo ${filename} desde el servidor:`, gitCheckErr);
@@ -521,6 +655,8 @@ export default function AdminPanel({
           // Si tenemos datos listos para subir a GitHub
           if (base64ToUpload && filenameToUse) {
             try {
+              uploadCount++;
+              addProgressMsg(`» Subiendo multimedia [${uploadCount}]: ${filenameToUse}...`);
               const uploadUrl = `https://api.github.com/repos/${cleanRepo}/contents/public/uploads/${filenameToUse}`;
               const putBody = {
                 message: `Subir multimedia de producto: ${filenameToUse} 📸🎬`,
@@ -528,7 +664,7 @@ export default function AdminPanel({
                 branch: branchToUse
               };
               
-              const putRes = await fetch(uploadUrl, {
+              const putRes = await fetchWithTimeout(uploadUrl, {
                 method: "PUT",
                 headers: {
                   "Content-Type": "application/json",
@@ -536,34 +672,73 @@ export default function AdminPanel({
                   "Authorization": `token ${tokenToUse}`
                 },
                 body: JSON.stringify(putBody)
-              });
+              }, 45000); // 45s timeout for individual uploads to avoid hanging
               
               if (putRes.ok) {
-                console.log(`¡Archivo ${filenameToUse} subido exitosamente al repositorio GitHub!`);
+                addProgressMsg(`✓ Guardado con éxito en la nube: ${filenameToUse}`);
                 mediaItem.backupUrl = mediaItem.url;
                 mediaItem.url = `/uploads/${filenameToUse}`;
+                existingUploads.add(filenameToUse.toLowerCase());
               } else {
-                const isVid = mediaItem.type === "video";
-                const errorAlert = isVid 
-                  ? `El video "${filenameToUse}" del producto "${prod.title || ""}" es demasiado pesado para sincronizar con GitHub (Error ${putRes.status}). Para evitar fallas o que se borre en vivo, te recomendamos recortarlo a menos de 10 segundos o subirlo a YouTube o Google Drive y pegar el enlace.`
-                  : `La imagen "${filenameToUse}" del producto "${prod.title || ""}" no se pudo subir a GitHub (Error ${putRes.status}).`;
-                notify(errorAlert, "error");
-                console.warn(`La subida de ${filenameToUse} a GitHub falló con estado:`, putRes.status);
+                addProgressMsg(`⚠️ No se pudo guardar ${filenameToUse} (Estado: ${putRes.status})`);
               }
             } catch (upErr: any) {
-              const isVid = mediaItem.type === "video";
-              const errorAlert = isVid 
-                ? `Fallo de red al subir el video del producto "${prod.title || ""}" a GitHub. Es posible que el archivo sea demasiado pesado. Te recomendamos usar un enlace de YouTube o Google Drive.`
-                : `Error de conexión al subir "${filenameToUse}" a GitHub.`;
-              notify(errorAlert, "error");
-              console.warn(`Error de red al subir el archivo ${filenameToUse} a la API de contenidos de GitHub:`, upErr);
+              addProgressMsg(`❌ Error de conexión al sincronizar ${filenameToUse}`);
+              console.warn(`Error de red al subir el archivo ${filenameToUse}:`, upErr);
             }
           }
         }
       }
 
-      notify("Optimizando imágenes para asegurar una sincronización ultrarrápida...", "info");
-      const compressedCatalog = await compressAllProductsBase64(updatedCatalog);
+      // Optimización de imágenes secuencial súper robusta
+      addProgressMsg("Iniciando optimización de imágenes para velocidad de carga...");
+      const compressedCatalog: Product[] = [];
+      let compressedCount = 0;
+      for (const prod of updatedCatalog) {
+        compressedCount++;
+        if (prod && prod.media && prod.media.some((m: any) => m.url && m.url.startsWith("data:"))) {
+          addProgressMsg(`Optimizando imágenes de: ${prod.title || "producto"} (${compressedCount}/${updatedCatalog.length})...`);
+        }
+        
+        if (!prod || !prod.media || !Array.isArray(prod.media)) {
+          compressedCatalog.push(prod);
+          continue;
+        }
+
+        const updatedMedia = [];
+        for (const item of prod.media) {
+          if (!item) continue;
+          let finalUrl = item.url || "";
+          let finalBackupUrl = item.backupUrl || "";
+
+          if (finalUrl.startsWith("data:image/")) {
+            try {
+              finalUrl = await compressBase64Image(finalUrl, 800, 0.65);
+            } catch (err) {
+              console.warn("Fallo local al comprimir url principal:", err);
+            }
+          }
+
+          if (finalBackupUrl.startsWith("data:image/")) {
+            try {
+              finalBackupUrl = await compressBase64Image(finalBackupUrl, 800, 0.65);
+            } catch (err) {
+              console.warn("Fallo local al comprimir backupUrl:", err);
+            }
+          }
+
+          updatedMedia.push({
+            ...item,
+            url: finalUrl,
+            backupUrl: finalBackupUrl
+          });
+        }
+
+        compressedCatalog.push({
+          ...prod,
+          media: updatedMedia
+        });
+      }
       
       // Actualizar estado local si es necesario para mantener sincronía
       try {
@@ -577,6 +752,7 @@ export default function AdminPanel({
       // Strip massive backupUrl base64 fields from the JSON catalog pushed to GitHub.
       // Since individual static images are uploaded separately under public/uploads/ and compiled during Vercel builds,
       // having backupUrls inside products.json is redundant and balloons the file size, causing 422 Payload Too Large errors.
+      addProgressMsg("Preparando archivo products.json depurado (sin redundancias)...");
       const githubCatalog = cleanProductsForExport(compressedCatalog);
 
       const jsonStr = JSON.stringify(githubCatalog, null, 2);
@@ -596,23 +772,24 @@ export default function AdminPanel({
 
       // Función auxiliar para obtener el SHA del commit padre de la rama de forma asíncrona
       const getLatestBranchCommitSha = async (): Promise<string> => {
+        addProgressMsg("Obteniendo commit padre más reciente de la rama...");
         let refUrl = `https://api.github.com/repos/${cleanRepo}/git/ref/heads/${branchToUse}?_t=${Date.now()}`;
-        let refResponse = await fetch(refUrl, {
+        let refResponse = await fetchWithTimeout(refUrl, {
           cache: "no-store",
           headers: {
             "Accept": "application/vnd.github.v3+json",
             "Authorization": `token ${tokenToUse}`
           }
-        });
+        }, 15000);
         if (!refResponse.ok) {
           refUrl = `https://api.github.com/repos/${cleanRepo}/git/refs/heads/${branchToUse}?_t=${Date.now()}`;
-          refResponse = await fetch(refUrl, {
+          refResponse = await fetchWithTimeout(refUrl, {
             cache: "no-store",
             headers: {
               "Accept": "application/vnd.github.v3+json",
               "Authorization": `token ${tokenToUse}`
             }
-          });
+          }, 15000);
         }
         if (!refResponse.ok) {
           if (refResponse.status === 401) {
@@ -634,10 +811,11 @@ export default function AdminPanel({
 
       // Canal de guardado masivo usando la API de Base de Datos Git (Soporta archivos de cualquier tamaño y es inmune a desajustes de SHA)
       const syncWithGitDatabaseApi = async (parentCommitSha: string) => {
-        console.log("Iniciando fusión robusta via Git Database API con parent commit:", parentCommitSha);
+        addProgressMsg("Fusión anti-conflictos vía Git Database API...");
         
         // A. Crear Blob de datos
-        const blobResp = await fetch(`https://api.github.com/repos/${cleanRepo}/git/blobs`, {
+        addProgressMsg("Creando nuevo Blob de datos en base64...");
+        const blobResp = await fetchWithTimeout(`https://api.github.com/repos/${cleanRepo}/git/blobs`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -648,7 +826,7 @@ export default function AdminPanel({
             content: base64Content,
             encoding: "base64"
           })
-        });
+        }, 30000);
         if (!blobResp.ok) {
           if (blobResp.status === 401) throw new Error("CREDENTIALS_INVALID_TOKEN");
           if (blobResp.status === 403) throw new Error("CREDENTIALS_FORBIDDEN_OR_SCOPE");
@@ -658,7 +836,8 @@ export default function AdminPanel({
         const newBlobSha = blobData.sha;
 
         // B. Crear árbol con el archivo
-        const treeResp = await fetch(`https://api.github.com/repos/${cleanRepo}/git/trees`, {
+        addProgressMsg("Construyendo nuevo árbol Git...");
+        const treeResp = await fetchWithTimeout(`https://api.github.com/repos/${cleanRepo}/git/trees`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -676,7 +855,7 @@ export default function AdminPanel({
               }
             ]
           })
-        });
+        }, 25000);
         if (!treeResp.ok) {
           throw new Error(`Creación de Árbol de Git fallida (${treeResp.status})`);
         }
@@ -684,7 +863,8 @@ export default function AdminPanel({
         const newTreeSha = treeData.sha;
 
         // C. Crear un commit
-        const commitResp = await fetch(`https://api.github.com/repos/${cleanRepo}/git/commits`, {
+        addProgressMsg("Realizando transacción de Commit seguro...");
+        const commitResp = await fetchWithTimeout(`https://api.github.com/repos/${cleanRepo}/git/commits`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -692,20 +872,21 @@ export default function AdminPanel({
             "Authorization": `token ${tokenToUse}`
           },
           body: JSON.stringify({
-            message: "Actualizar productos.json - Sincronización robusta anti-conflictos de versión 💎📦",
+            message: "Actualizar products.json - Sincronización robusta anti-conflictos de versión 💎📦",
             tree: newTreeSha,
             parents: [parentCommitSha]
           })
-        });
+        }, 25000);
         if (!commitResp.ok) {
           throw new Error(`Creación de Commit fallida (${commitResp.status})`);
         }
-        const commitData = await commitResp.json();
+         const commitData = await commitResp.json();
         const newCommitSha = commitData.sha;
 
         // D. Actualizar puntero de la rama de la cabecera (HEAD) con forzado habilitado
+        addProgressMsg("Confirmando cambios y actualizando HEAD...");
         const refUrl = `https://api.github.com/repos/${cleanRepo}/git/refs/heads/${branchToUse}`;
-        const refResp = await fetch(refUrl, {
+        const refResp = await fetchWithTimeout(refUrl, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
@@ -716,7 +897,7 @@ export default function AdminPanel({
             sha: newCommitSha,
             force: true
           })
-        });
+        }, 25000);
         if (!refResp.ok) {
           throw new Error(`Actualización del puntero de rama fallida (${refResp.status})`);
         }
@@ -728,8 +909,9 @@ export default function AdminPanel({
 
       // Intento A: API estándar de Contenidos (Máximo 1MB)
       try {
+        addProgressMsg("Consultando versión actual del catálogo (Intento A: Contenidos)...");
         const fileUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}?ref=${branchToUse}&_t=${Date.now()}`;
-        const getResponse = await fetch(fileUrl, {
+        const getResponse = await fetchWithTimeout(fileUrl, {
           cache: "no-store",
           headers: {
             "Accept": "application/vnd.github.v3+json",
@@ -737,18 +919,20 @@ export default function AdminPanel({
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache"
           }
-        });
+        }, 15000);
 
         if (getResponse.ok) {
           const fileData = await getResponse.json();
           if (fileData && fileData.sha) {
             sha = fileData.sha;
             shaFetched = true;
+            addProgressMsg("✓ SHA fresco recuperado (Intento A).");
             console.log("SHA fresco recuperado usando API de Contenidos:", sha);
           }
         } else if (getResponse.status === 401) {
           throw new Error("CREDENTIALS_INVALID_TOKEN");
         } else if (getResponse.status === 404) {
+          addProgressMsg("Confirmado: Creando archivo de catálogo nuevo en GitHub.");
           console.log("El archivo no existe todavía en GitHub. Retornando SHA undefined para creación.");
           shaFetched = true;
         } else if (getResponse.status === 403) {
@@ -764,8 +948,9 @@ export default function AdminPanel({
       // Intento B: API de Árboles de Git (Trees API - Robusta ante archivos de tamaño mediano/grande)
       if (!shaFetched) {
         try {
+          addProgressMsg("Consultando versión actual del catálogo (Intento B: Árboles)...");
           const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${branchToUse}?recursive=1&_t=${Date.now()}`;
-          const treeResponse = await fetch(treeUrl, {
+          const treeResponse = await fetchWithTimeout(treeUrl, {
             cache: "no-store",
             headers: {
               "Accept": "application/vnd.github.v3+json",
@@ -773,7 +958,7 @@ export default function AdminPanel({
               "Cache-Control": "no-cache, no-store, must-revalidate",
               "Pragma": "no-cache"
             }
-          });
+          }, 15000);
 
           if (treeResponse.ok) {
             const treeData = await treeResponse.json();
@@ -784,6 +969,7 @@ export default function AdminPanel({
               );
               if (match) {
                 sha = match.sha;
+                addProgressMsg("✓ SHA fresco recuperado (Intento B).");
                 console.log("SHA fresco recuperado usando API de Árboles:", sha);
                 shaFetched = true;
               }
@@ -806,28 +992,29 @@ export default function AdminPanel({
       // Intento C: Obtener el SHA directamente desde el árbol del último commit de la rama (Inmune a límites de tamaño y recursividad)
       if (!shaFetched) {
         try {
+          addProgressMsg("Consultando versión actual del catálogo (Intento C: Commits)...");
           console.log("Intentando recuperar el SHA de products.json usando el árbol del último commit (Intento C)...");
           const parentSha = await getLatestBranchCommitSha();
           const commitUrl = `https://api.github.com/repos/${cleanRepo}/git/commits/${parentSha}`;
-          const commitResponse = await fetch(commitUrl, {
+          const commitResponse = await fetchWithTimeout(commitUrl, {
             cache: "no-store",
             headers: {
               "Accept": "application/vnd.github.v3+json",
               "Authorization": `token ${tokenToUse}`
             }
-          });
+          }, 15000);
           if (commitResponse.ok) {
             const commitData = await commitResponse.json();
             const treeSha = commitData.tree?.sha;
             if (treeSha) {
               const treeUrl = `https://api.github.com/repos/${cleanRepo}/git/trees/${treeSha}`;
-              const treeResponse = await fetch(treeUrl, {
+              const treeResponse = await fetchWithTimeout(treeUrl, {
                 cache: "no-store",
                 headers: {
                   "Accept": "application/vnd.github.v3+json",
                   "Authorization": `token ${tokenToUse}`
                 }
-              });
+              }, 15000);
               if (treeResponse.ok) {
                 const treeData = await treeResponse.json();
                 if (treeData && Array.isArray(treeData.tree)) {
@@ -837,8 +1024,10 @@ export default function AdminPanel({
                   );
                   if (match) {
                     sha = match.sha;
+                    addProgressMsg("✓ SHA fresco recuperado (Intento C).");
                     console.log("SHA fresco recuperado usando API de Árbol del Último Commit (Intento C):", sha);
                   } else {
+                    addProgressMsg("Se asume archivo nuevo en el ramal.");
                     console.log("El archivo no se encontró en el árbol (Intento C). Se asume que es una creación.");
                   }
                   shaFetched = true;
@@ -851,8 +1040,8 @@ export default function AdminPanel({
         }
       }
 
-      // 2. Intentar subir el archivo utilizando la API estándar de Contenidos
-      notify("Cargando catálogo en el servidor seguro de GitHub...", "info");
+       // 2. Intentar subir el archivo utilizando la API estándar de Contenidos
+      addProgressMsg("Iniciando envío del catálogo products.json a GitHub...");
       
       const doPutFile = async (shaToUse: string | undefined) => {
         const putUrl = `https://api.github.com/repos/${cleanRepo}/contents/${pathToUse}`;
@@ -863,7 +1052,7 @@ export default function AdminPanel({
           ...(shaToUse ? { sha: shaToUse } : {})
         };
 
-        return await fetch(putUrl, {
+        return await fetchWithTimeout(putUrl, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -871,7 +1060,7 @@ export default function AdminPanel({
             "Authorization": `token ${tokenToUse}`
           },
           body: JSON.stringify(putBody)
-        });
+        }, 30000); // 30s timeout for products.json upload
       };
 
       let putResponse = await doPutFile(sha);
@@ -936,6 +1125,10 @@ export default function AdminPanel({
       notify("✨ ¡ÉXITO! Catálogo de productos guardado directamente en tu repositorio de GitHub.", "success");
       notify("⚡ Vercel ahora está regenerando tu sitio web. Estará actualizado en vivo en 30-40 segundos sin perder nada.", "info");
 
+      addProgressMsg("✓ ¡Sincronización completada con éxito extremo! 🌟");
+      addProgressMsg("📢 Repositorio e imágenes actualizadas en GitHub.");
+      addProgressMsg("🚀 Vercel está reconstruyendo el sitio en producción. Listo en ~40 seg.");
+
       const now = new Date();
       const formattedTime = now.toLocaleString("es-AR", {
         day: "2-digit",
@@ -966,6 +1159,8 @@ export default function AdminPanel({
       }
 
       notify(`❌ Error de sincronización: ${userFriendlyError}`, "error");
+      addProgressMsg(`❌ ERROR: Sincronización fallida.`);
+      addProgressMsg(`📝 DETALLE: ${userFriendlyError}`);
     } finally {
       setIsSyncingGithub(false);
     }
@@ -2907,12 +3102,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                         <button
                           type="button"
                           onClick={() => {
-                            if (editingProductId === item.id) {
-                              handleCancelEdit();
-                            }
-                            onDeleteProduct(item.id);
+                            setProductToDelete(item);
                           }}
-                          className="p-1.5 text-brand-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                          className="p-1.5 text-brand-400 hover:text-red-650 hover:bg-red-50 rounded-md transition-colors cursor-pointer active:scale-95 transition-all"
                           title="Borrar de la tienda"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -2924,6 +3116,85 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               )}
             </div>
           </div>
+
+          {/* PAPELERA DE RECICLAJE (RESTORATION CORNER) */}
+          {recycleBin.length > 0 && (
+            <div className="bg-red-50/10 rounded-2xl border border-red-200/60 p-5 shadow-xs text-left space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-red-150">
+                <h4 className="font-serif font-bold text-red-950 text-base flex items-center gap-2">
+                  <Trash2 className="w-4.5 h-4.5 text-red-600 animate-pulse" />
+                  Papelera de Reciclaje (Caché Local)
+                </h4>
+                {confirmEmptyBin ? (
+                  <div className="flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
+                    <span className="text-[10px] text-red-700 font-bold">¿Vaciar?</span>
+                    <button
+                      onClick={() => {
+                        setRecycleBin([]);
+                        localStorage.removeItem("recycle_bin_products");
+                        setConfirmEmptyBin(false);
+                        showToast("Papelera vaciada por completo", "info");
+                      }}
+                      className="px-2 py-0.5 text-[9px] uppercase font-bold bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer"
+                    >
+                      Sí
+                    </button>
+                    <button
+                      onClick={() => setConfirmEmptyBin(false)}
+                      className="px-2 py-0.5 text-[9px] uppercase font-bold bg-brand-200 text-brand-800 rounded hover:bg-brand-300 cursor-pointer"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmEmptyBin(true)}
+                    className="text-[10px] uppercase font-bold text-red-500 hover:text-red-700 transition-colors cursor-pointer"
+                  >
+                    Vaciar Todo
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-red-800 font-light leading-relaxed">
+                Aquí se guardan tus últimos productos eliminados. Si los borraste por error o tocaste sin querer, puedes recuperarlos inmediatamente para que vuelvan a aparecer en tu tienda y catálogo en vivo.
+              </p>
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                {recycleBin.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between text-xs p-2.5 bg-white border border-red-100 rounded-xl hover:shadow-2xs transition-all">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-brand-50 flex-shrink-0 overflow-hidden border border-brand-100 flex items-center justify-center">
+                        {item.media && item.media.length > 0 ? (
+                          <img src={item.media[0].url} alt={item.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-xs">📦</span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-brand-900 truncate max-w-[170px]">{item.title}</p>
+                        <p className="text-[10px] text-brand-500 font-bold">${item.price || item.basePrice || "0"}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (onSetProducts) {
+                          onSetProducts([item, ...products]);
+                          const filtered = recycleBin.filter((p) => p.id !== item.id);
+                          setRecycleBin(filtered);
+                          localStorage.setItem("recycle_bin_products", JSON.stringify(filtered));
+                          showToast(`"${item.title}" recuperado y activado del catálogo con éxito`, "success");
+                        } else {
+                          showToast("La función onSetProducts no está disponible.", "error");
+                        }
+                      }}
+                      className="px-2.5 py-1 text-[10px] uppercase font-bold bg-brand-900 hover:bg-emerald-600 hover:text-white text-white rounded-lg transition-all cursor-pointer active:scale-95"
+                    >
+                      Recuperar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* CONTROL DE RESPAldo Y SINCRONIZACIÓN EN LA NUBE */}
           <div className="bg-white rounded-2xl border border-brand-200 p-5 shadow-sm space-y-4 text-left">
@@ -3075,6 +3346,61 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   </>
                 )}
               </button>
+
+              {/* Terminal de Actividad en tiempo real de GitHub */}
+              {syncProgress.length > 0 && (
+                <div className="mt-3 p-3 bg-purple-950/95 text-purple-200 border border-purple-800 rounded-xl text-left font-mono text-[10.5px] leading-relaxed flex flex-col gap-1.5 shadow-inner">
+                  <div className="flex items-center justify-between border-b border-purple-800 pb-1.5 mb-1 text-[9px] uppercase tracking-wider text-purple-300 font-bold">
+                    <span>
+                      {isSyncingGithub 
+                        ? "🛰️ Sincronizando en vivo (No cerrar)" 
+                        : syncProgress.some(m => m.includes("ERROR") || m.includes("fallida"))
+                          ? "❌ Error en sincronización" 
+                          : "✅ Proceso completado con éxito"
+                      }
+                    </span>
+                    {isSyncingGithub ? (
+                      <span className="flex h-1.5 w-1.5 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-purple-500"></span>
+                      </span>
+                    ) : ( 
+                      <span className={`h-1.5 w-1.5 rounded-full ${syncProgress.some(m => m.includes("ERROR") || m.includes("fallida")) ? "bg-red-500 animate-pulse" : "bg-green-500"}`} />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5 max-h-[180px] overflow-y-auto pr-1">
+                    {syncProgress.slice().reverse().map((msg, idx) => {
+                      const isLatest = idx === 0;
+                      const isError = msg.includes("ERROR") || msg.includes("❌");
+                      const isSuccess = msg.includes("¡Sincronización completada") || msg.includes("✓") || msg.includes("ÉXITO") || msg.includes("excitosa");
+                      
+                      let textColor = "text-purple-200/60";
+                      if (isLatest) {
+                        textColor = isError 
+                          ? "text-red-400 font-bold animate-pulse" 
+                          : isSuccess 
+                            ? "text-emerald-400 font-bold animate-pulse" 
+                            : "text-white font-semibold animate-pulse";
+                      } else {
+                        textColor = isError 
+                          ? "text-red-300/40" 
+                          : isSuccess 
+                            ? "text-emerald-300/40" 
+                            : "text-purple-200/50";
+                      }
+
+                      return (
+                        <div 
+                          key={idx} 
+                          className={`text-[10px] break-words whitespace-pre-wrap leading-tight transition-all duration-300 ${textColor}`}
+                        >
+                          {isError ? "💀" : isSuccess ? "✨" : "⚡"} {msg}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {lastSyncTime && (
                 <div className="mt-2.5 p-2.5 bg-green-50 border border-green-200 rounded-xl text-center text-[10.5px] text-green-800 font-medium flex items-center justify-center gap-2 animate-in fade-in duration-300">
@@ -3399,6 +3725,59 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 className="px-5 py-2.5 bg-brand-900 text-white rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-black transition-colors cursor-pointer select-none"
               >
                 Cerrar Comprobante
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA SEGURIDAD AL ELIMINAR UN PRODUCTO (ACCIDENTAL CLICKS) */}
+      {productToDelete && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative max-w-sm w-full bg-white rounded-2xl overflow-hidden shadow-2xl border border-brand-200 p-6 space-y-4 text-left animate-in zoom-in-95 duration-100">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-100 text-red-700 rounded-full flex-shrink-0">
+                <AlertCircle className="w-5 h-5 animate-bounce" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-serif font-bold text-brand-950 text-base leading-snug">
+                  ¿Seguro que deseas eliminar este producto?
+                </h4>
+                <p className="text-xs text-brand-650 font-light mt-1.5 leading-relaxed">
+                  El producto <strong className="text-brand-900 font-semibold font-serif">"{productToDelete.title}"</strong> se dará de baja del catálogo. Podrás rescatarlo cuando quieras desde la <strong>Papelera de Reciclaje</strong> abajo.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setProductToDelete(null)}
+                className="flex-1 py-2.5 bg-brand-100 hover:bg-brand-200 text-brand-850 hover:text-brand-950 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer select-none text-center"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (productToDelete) {
+                    if (editingProductId === productToDelete.id) {
+                      handleCancelEdit();
+                    }
+                    onDeleteProduct(productToDelete.id);
+
+                    // Add to local recycleBin state inside AdminPanel so it reflects instantly in the UI
+                    const updatedBin = [productToDelete, ...recycleBin].slice(0, 15);
+                    setRecycleBin(updatedBin);
+                    localStorage.setItem("recycle_bin_products", JSON.stringify(updatedBin));
+
+                    setProductToDelete(null);
+                    showToast("Producto enviado a la Papelera. ¡Puedes recuperarlo abajo!", "success");
+                  }
+                }}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer select-none text-center animate-none"
+              >
+                Sí, Eliminar
               </button>
             </div>
           </div>

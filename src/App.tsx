@@ -19,7 +19,7 @@ import { collection, getDocs, setDoc, doc, deleteDoc, getDoc, onSnapshot, disabl
 import { db, cleanObjectForFirestore } from "./firebase";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
 
-// Helper to resolve image urls, stripping the local server proxy prefix if run in static hosts (Vercel, GitHub Pages)
+// Helper to resolve image urls, stripping the local server proxy prefix if run in static hosts (Vercel, GitHub Pages) and routing through high-performance CDN
 export function resolveImageUrl(url: string | undefined): string {
   if (!url) return "";
   if (url.startsWith("/api/image-proxy?url=")) {
@@ -28,6 +28,22 @@ export function resolveImageUrl(url: string | undefined): string {
   let resolvedUrl = url;
   if (resolvedUrl && !resolvedUrl.startsWith("/") && !resolvedUrl.startsWith("http") && !resolvedUrl.startsWith("data:") && !resolvedUrl.startsWith("idb://") && !resolvedUrl.startsWith("blob:")) {
     resolvedUrl = "/" + resolvedUrl;
+  }
+
+  if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
+    const filename = resolvedUrl.split("/").pop();
+    if (filename) {
+      const isVercelLive = window.location.hostname.endsWith(".vercel.app") || window.location.hostname === "hogar-y-estilo.vercel.app";
+      const gConfig = (window as any).__GITHUB_CONFIG__;
+      if (isVercelLive && gConfig) {
+        if (gConfig.repo) {
+          return `https://cdn.jsdelivr.net/gh/${gConfig.repo}@${gConfig.branch || "main"}/public/uploads/${filename}`;
+        }
+        if (gConfig.backendUrl) {
+          return `${gConfig.backendUrl}/uploads/${filename}`;
+        }
+      }
+    }
   }
   return resolvedUrl;
 }
@@ -90,6 +106,10 @@ function handleFirestoreError(error: any, context: string) {
         console.warn("[Firestore Resiliency] Error triggering disableNetwork:", e);
       }
     }
+    // Dispatch custom event to notify React component instantly
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("firestore-quota-exceeded"));
+    }
   }
 }
 
@@ -97,15 +117,41 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
   const [brokenImageProductIds, setBrokenImageProductIds] = useState<string[]>([]);
+  const [quotaExceeded, setQuotaExceeded] = useState(isFirestoreQuotaExceeded);
 
-  // Automatic client redirect from Vercel preview/branch URLs to the official custom production domain
+  // Initialize event listener for modern instant quota exhaustion reactive alerts
   useEffect(() => {
-    const hostname = window.location.hostname;
-    if (hostname.endsWith(".vercel.app") && hostname !== "hogar-y-estilo.vercel.app") {
-      const targetUrl = "https://hogar-y-estilo.vercel.app" + window.location.pathname + window.location.search + window.location.hash;
-      console.log(`[Redirect] Redirecting from Vercel preview URL (${hostname}) to official production domain: ${targetUrl}`);
-      window.location.replace(targetUrl);
+    const handleQuotaExceeded = () => {
+      setQuotaExceeded(true);
+    };
+    window.addEventListener("firestore-quota-exceeded", handleQuotaExceeded);
+    return () => {
+      window.removeEventListener("firestore-quota-exceeded", handleQuotaExceeded);
+    };
+  }, []);
+
+  // Synchronize the master GitHub and server URL config from Firestore on startup
+  useEffect(() => {
+    async function fetchGithubConfig() {
+      try {
+        const configSnap = await getDoc(doc(db, "settings", "github_config"));
+        if (configSnap.exists()) {
+          const configData = configSnap.data();
+          if (configData && configData.repo) {
+            console.log("⚡ [Config Sync] Loaded master GitHub and server URL settings:", configData);
+            (window as any).__GITHUB_CONFIG__ = {
+              repo: configData.repo,
+              branch: configData.branch || "main",
+              backendUrl: configData.backendUrl || ""
+            };
+            window.dispatchEvent(new CustomEvent("github-config-loaded"));
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load github_config from Firestore on startup", err);
+      }
     }
+    fetchGithubConfig();
   }, []);
 
   // Background media preloader to ensure zero-latency video/image visual styling is ready on mount!
@@ -1057,6 +1103,21 @@ export default function App() {
   };
 
   const handleDeleteProduct = (id: string) => {
+    // Guardar el objeto completo en la papelera de reciclaje antes de filtrarlo
+    const productToDelete = products.find((p) => p.id === id);
+    if (productToDelete) {
+      try {
+        const binStr = localStorage.getItem("recycle_bin_products") || "[]";
+        const bin = JSON.parse(binStr);
+        if (!bin.some((p: any) => p.id === id)) {
+          const updatedBin = [productToDelete, ...bin].slice(0, 15);
+          localStorage.setItem("recycle_bin_products", JSON.stringify(updatedBin));
+        }
+      } catch (e) {
+        console.warn("No se pudo guardar en la papelera", e);
+      }
+    }
+
     setProducts((prev) => prev.filter((p) => p.id !== id));
     try {
       const deletedStr = localStorage.getItem("deleted_custom_product_ids") || "[]";
@@ -1276,6 +1337,29 @@ export default function App() {
           setAdminLoginError("");
         }}
       />
+
+      {quotaExceeded && (
+        <div className="bg-amber-50 border-b border-amber-200 py-3.5 px-4 sm:px-6 lg:px-8 text-amber-800 text-xs text-center font-medium flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 shadow-inner animate-in fade-in duration-300 z-50">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <span>
+              <strong>Límite de cuota diaria de Firebase alcanzado.</strong> El catálogo se está sincronizando localmente y mediante copias de seguridad de GitHub de manera fluida.
+            </span>
+          </div>
+          <a
+            href="https://console.firebase.google.com/project/gen-lang-client-0389486781/firestore/databases/ai-studio-5293ee2d-c1df-4f53-96e9-eac0dcfa0ebb/data?openUpgradeDialog=true"
+            target="_blank"
+            referrerPolicy="no-referrer"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 bg-amber-600 hover:bg-amber-700 hover:scale-[1.02] active:scale-[0.98] text-white font-bold px-3 py-1.5 rounded-lg border-b border-amber-800 transition-all shadow-sm md:ml-2 font-mono text-[10px] uppercase tracking-wider"
+          >
+            Configurar Firebase / Habilitar Facturación
+          </a>
+        </div>
+      )}
 
       {/* Main Content Areas */}
       <main className="flex-grow">

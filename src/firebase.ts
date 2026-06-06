@@ -98,6 +98,7 @@ if (typeof window !== "undefined") {
         localStorage.setItem("firestore_quota_exceeded_date", today);
         console.warn("🔥 [Firestore Resiliency] Raw Firestore error detected. Silencing and moving connection offline.");
         disableNetwork(db).catch(() => {});
+        window.dispatchEvent(new CustomEvent("firestore-quota-exceeded"));
       } catch (_) {}
     }
   };
