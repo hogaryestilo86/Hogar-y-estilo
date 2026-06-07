@@ -659,11 +659,11 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
   ({ src, backupUrl, category, productId, ...props }, ref) => {
     const resolved = useResolvedUrl(src, backupUrl);
     const resolvedBackup = useResolvedUrl(backupUrl, undefined);
-    const [hasError, setHasError] = useState(false);
+    const [errorCount, setErrorCount] = useState(0);
 
     // Reset error whenever src or backupUrl changes
     useEffect(() => {
-      setHasError(false);
+      setErrorCount(0);
     }, [src, backupUrl]);
 
     // Detect if resolved URL is actually an image (e.g. during preloading, fallback, or image type)
@@ -677,10 +677,17 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
 
     const titleOrAlt = (props.title || props.alt || props["aria-label"] || "") as string;
     const finalPlaceholder = getCategoryPlaceholder(category, titleOrAlt);
-    const finalSource = resolved || resolvedBackup || backupUrl || finalPlaceholder;
+
+    // Choose active video source based on error count
+    let activeVideoSrc = resolved;
+    if (errorCount === 1 && (resolvedBackup || backupUrl)) {
+      activeVideoSrc = resolvedBackup || backupUrl;
+    }
+
+    const finalSource = activeVideoSrc || resolvedBackup || backupUrl || finalPlaceholder;
 
     const handleImageError = () => {
-      setHasError(true);
+      setErrorCount(2);
       if (productId) {
         window.dispatchEvent(
           new CustomEvent("product-image-load-failed", {
@@ -690,7 +697,26 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       }
     };
 
-    if (!resolved || isImage(finalSource) || hasError) {
+    const handleVideoError = (e: any) => {
+      const backupAvailable = resolvedBackup || backupUrl;
+      const isBackupDifferent = (resolvedBackup && resolvedBackup !== resolved) || (backupUrl && backupUrl !== resolved);
+      if (errorCount === 0 && backupAvailable && isBackupDifferent) {
+        console.warn(`Primary video failed to load: ${resolved}. Retrying with backupUrl: ${resolvedBackup || backupUrl}`, e);
+        setErrorCount(1);
+      } else {
+        console.warn(`Video failed to load: ${activeVideoSrc}. Switching to image/poster fallback.`, e);
+        setErrorCount(2);
+        if (productId) {
+          window.dispatchEvent(
+            new CustomEvent("product-image-load-failed", {
+              detail: { productId, src, backupUrl }
+            })
+          );
+        }
+      }
+    };
+
+    if (errorCount >= 2 || !activeVideoSrc || isImage(finalSource)) {
       return React.createElement("img", {
         src: resolvedBackup || backupUrl || resolved || finalPlaceholder,
         className: props.className,
@@ -733,7 +759,7 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       return null;
     };
 
-    const embed = getEmbed(resolved);
+    const embed = getEmbed(activeVideoSrc);
 
     if (embed) {
       return React.createElement("iframe", {
@@ -748,13 +774,10 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
 
     return React.createElement("video", {
       ref,
-      src: resolved,
+      src: activeVideoSrc,
       preload: "auto",
       poster: backupUrl || undefined,
-      onError: (e) => {
-        console.warn(`Video failed to load: ${resolved}, falling back to poster/image`, e);
-        handleImageError();
-      },
+      onError: handleVideoError,
       ...props
     });
   }

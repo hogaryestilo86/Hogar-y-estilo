@@ -119,19 +119,6 @@ export default function App() {
   const [brokenImageProductIds, setBrokenImageProductIds] = useState<string[]>([]);
   const [quotaExceeded, setQuotaExceeded] = useState(isFirestoreQuotaExceeded);
 
-  // Redirect Vercel preview branch/commit links to the production site to ensure uniform experience
-  useEffect(() => {
-    const hostname = window.location.hostname;
-    if (
-      hostname.endsWith(".vercel.app") && 
-      hostname !== "hogar-y-estilo.vercel.app"
-    ) {
-      console.log(`[Vercel Prevención] Redirigiendo preview de Vercel (${hostname}) a la tienda real: hogar-y-estilo.vercel.app`);
-      const targetUrl = "https://hogar-y-estilo.vercel.app" + window.location.pathname + window.location.search + window.location.hash;
-      window.location.replace(targetUrl);
-    }
-  }, []);
-
   // Initialize event listener for modern instant quota exhaustion reactive alerts
   useEffect(() => {
     const handleQuotaExceeded = () => {
