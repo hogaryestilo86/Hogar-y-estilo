@@ -617,6 +617,7 @@ interface ResolvedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
 export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImageProps>(
   ({ src, backupUrl, category, productId, ...props }, ref) => {
     const resolved = useResolvedUrl(src, backupUrl);
+    const resolvedBackup = useResolvedUrl(backupUrl, undefined);
     const [errorCount, setErrorCount] = useState(0);
 
     // Reset error when src or backupUrl changes
@@ -629,7 +630,7 @@ export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImagePro
 
     let finalSrc = src ? (resolved || src) : finalPlaceholder;
     if (src && errorCount === 1) {
-      finalSrc = backupUrl || finalPlaceholder;
+      finalSrc = resolvedBackup || backupUrl || finalPlaceholder;
     } else if (src && errorCount > 1) {
       finalSrc = finalPlaceholder;
     }
@@ -668,6 +669,7 @@ interface ResolvedVideoProps extends VideoHTMLAttributes<HTMLVideoElement> {
 export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
   ({ src, backupUrl, category, productId, ...props }, ref) => {
     const resolved = useResolvedUrl(src, backupUrl);
+    const resolvedBackup = useResolvedUrl(backupUrl, undefined);
     const [hasError, setHasError] = useState(false);
 
     // Reset error whenever src or backupUrl changes
@@ -686,7 +688,7 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
 
     const titleOrAlt = (props.title || props.alt || props["aria-label"] || "") as string;
     const finalPlaceholder = getCategoryPlaceholder(category, titleOrAlt);
-    const finalSource = resolved || backupUrl || finalPlaceholder;
+    const finalSource = resolved || resolvedBackup || backupUrl || finalPlaceholder;
 
     const handleImageError = () => {
       setHasError(true);
@@ -701,7 +703,7 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
 
     if (!resolved || isImage(finalSource) || hasError) {
       return React.createElement("img", {
-        src: backupUrl || resolved || finalPlaceholder,
+        src: resolvedBackup || backupUrl || resolved || finalPlaceholder,
         className: props.className,
         style: props.style,
         referrerPolicy: "no-referrer",

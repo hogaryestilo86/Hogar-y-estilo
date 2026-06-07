@@ -9,9 +9,10 @@ import dotenv from "dotenv";
 dotenv.config();
 import fs from "fs";
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, getDoc } from "firebase/firestore";
 
 let db: any = null;
+let serverFirestoreQuotaExceeded = false;
 
 try {
   const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -326,17 +327,44 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       let firestoreProducts: any[] = [];
       let dbReadSuccess = false;
 
-      // 1. Primary: Try to read from Firebase Cloud Firestore if initialized on the server
-      if (db) {
+      // 1. Primary: Try to read from Firebase Cloud Firestore if initialized on the server and under quota
+      if (db && !serverFirestoreQuotaExceeded) {
         try {
-          const querySnapshot = await getDocs(collection(db, "products"));
-          querySnapshot.forEach((docSnap) => {
-            firestoreProducts.push(docSnap.data());
-          });
-          dbReadSuccess = true;
-          console.log(`[Server Proxy] Loaded ${firestoreProducts.length} products successfully from Firestore.`);
+          // A. Fast-path: read the single-document master list (1 read operation total!)
+          const docRef = doc(db, "settings", "catalog_master");
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data && data.products && Array.isArray(data.products)) {
+              firestoreProducts = data.products;
+              dbReadSuccess = true;
+              console.log(`[Server Proxy] Loaded ${firestoreProducts.length} products successfully from single-doc catalog_master.`);
+            }
+          }
+          
+          // B. Traditional fallback: if single doc is empty, query individual collection items
+          if (!dbReadSuccess) {
+            const querySnapshot = await getDocs(collection(db, "products"));
+            querySnapshot.forEach((docSnap) => {
+              firestoreProducts.push(docSnap.data());
+            });
+            dbReadSuccess = true;
+            console.log(`[Server Proxy] Loaded ${firestoreProducts.length} products successfully from fallback FireStore collection.`);
+          }
         } catch (dbErr: any) {
-          console.error("[Server Proxy] Error reading products from Firestore, falling back to local file-system:", dbErr.message);
+          const errMsg = String(dbErr.message || dbErr || "").toLowerCase();
+          if (
+            errMsg.includes("quota") ||
+            errMsg.includes("limit exceeded") ||
+            errMsg.includes("resource-exhausted") ||
+            errMsg.includes("resource_exhausted") ||
+            errMsg.includes("exhausted")
+          ) {
+            serverFirestoreQuotaExceeded = true;
+            console.warn("[Server Proxy] Firestore quota exceeded on read query. Auto-enabling server-side offline fallback cache and logging warning.");
+          } else {
+            console.warn("[Server Proxy] Failed to read products from Firestore, falling back to local file-system:", dbErr.message);
+          }
         }
       }
 
@@ -458,33 +486,29 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       // A. Write backup in products.json file using base64-extracted clean urls
       await fs.promises.writeFile(PRODUCTS_FILE, JSON.stringify(processedProducts, null, 2), "utf-8");
 
-      // B. Write to Firestore to sync backend state (now extremely lightweight and compliant with the 1MB limit!)
-      if (db) {
+      // B. Write to Firestore to sync backend state if initialized and under quota
+      if (db && !serverFirestoreQuotaExceeded) {
         try {
-          const querySnapshot = await getDocs(collection(db, "products"));
-          const existingIds = new Set<string>();
-          querySnapshot.forEach((docSnap) => {
-            existingIds.add(docSnap.id);
-          });
+          const cleanedProducts = cleanObjectForFirestore(processedProducts);
+          const docRef = doc(db, "settings", "catalog_master");
+          await setDoc(docRef, { products: cleanedProducts }, { merge: true });
 
-          // Upload/Set core documents
-          for (const product of processedProducts) {
-            if (product && product.id) {
-              const cleanedProduct = cleanObjectForFirestore(product);
-              await setDoc(doc(db, "products", product.id), cleanedProduct);
-              existingIds.delete(product.id);
-            }
-          }
-
-          // Delete any obsolete documents
-          for (const remainingId of existingIds) {
-            await deleteDoc(doc(db, "products", remainingId));
-          }
-
-          console.log(`[Server Proxy] Successfully synchronized ${processedProducts.length} lightweight products with Cloud Firestore.`);
+          console.log(`[Server Proxy] Successfully synchronized entire catalog (${processedProducts.length} products) as single-doc master on Cloud Firestore.`);
           return res.json({ success: true, count: processedProducts.length, sync: "cloud_firestore", products: processedProducts });
         } catch (dbErr: any) {
-          console.error("[Server Proxy] Error writing products to Firestore:", dbErr.message);
+          const errMsg = String(dbErr.message || dbErr || "").toLowerCase();
+          if (
+            errMsg.includes("quota") ||
+            errMsg.includes("limit exceeded") ||
+            errMsg.includes("resource-exhausted") ||
+            errMsg.includes("resource_exhausted") ||
+            errMsg.includes("exhausted")
+          ) {
+            serverFirestoreQuotaExceeded = true;
+            console.warn("[Server Proxy] Firestore quota has been exceeded during product synchronization. Switching active Firestore sync mode OFF in the backend and using local backup catalog.");
+          } else {
+            console.warn("[Server Proxy] Failed to write products to Firestore:", dbErr.message);
+          }
           return res.json({ success: true, count: processedProducts.length, sync: "local_file_only", products: processedProducts, warning: dbErr.message });
         }
       }

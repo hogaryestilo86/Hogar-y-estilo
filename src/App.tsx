@@ -241,20 +241,40 @@ export default function App() {
         const firestorePromise = async () => {
           if (!isFirestoreQuotaExceeded) {
             try {
-              console.log("[Catalog Loader] Fetching from Cloud Firestore...");
-              const docPromise = getDocs(collection(db, "products"));
+              console.log("[Catalog Loader] Fetching master catalog from Cloud Firestore...");
+              const docPromise = getDoc(doc(db, "settings", "catalog_master"));
               const timeoutPromise = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error("Firestore timeout")), 2500)
               );
-              const querySnapshot = (await Promise.race([docPromise, timeoutPromise])) as any;
+              const docSnap = (await Promise.race([docPromise, timeoutPromise])) as any;
 
-              querySnapshot.forEach((docSnap: any) => {
-                const p = docSnap.data() as Product;
-                if (p && p.id) {
-                  cloudMap.set(p.id, p);
+              let found = false;
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data && data.products && Array.isArray(data.products)) {
+                  data.products.forEach((p: Product) => {
+                    if (p && p.id) {
+                      cloudMap.set(p.id, p);
+                    }
+                  });
+                  found = true;
+                  console.log(`[Catalog Loader] Cloud Firestore catalog_master returned ${cloudMap.size} products.`);
                 }
-              });
-              console.log(`[Catalog Loader] Cloud Firestore returned ${cloudMap.size} products.`);
+              }
+
+              // Fallback to traditional individual collection query if catalog_master does not exist
+              if (!found) {
+                console.log("[Catalog Loader] catalog_master not found, falling back to products collection...");
+                const collPromise = getDocs(collection(db, "products"));
+                const querySnapshot = (await Promise.race([collPromise, timeoutPromise])) as any;
+                querySnapshot.forEach((docSnap: any) => {
+                  const p = docSnap.data() as Product;
+                  if (p && p.id) {
+                    cloudMap.set(p.id, p);
+                  }
+                });
+                console.log(`[Catalog Loader] Fallback collection returned ${cloudMap.size} products.`);
+              }
             } catch (fbErr) {
               console.warn("[Catalog Loader] Firestore connection timed out or failed. Falling back.", fbErr);
               handleFirestoreError(fbErr, "loadCatalog");
@@ -406,35 +426,13 @@ export default function App() {
         // A. Persist directly to Firebase Cloud Firestore
         if (!isFirestoreQuotaExceeded) {
           try {
-            console.log("[Firestore Sync] Started debounced sync of products collection to Firestore...");
-            // Execute Firestore querying with a 3.5s timeout
-            const fetchDocsPromise = getDocs(collection(db, "products"));
-            const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("Firestore getDocs timed out")), 3500)
-            );
-            const querySnapshot = (await Promise.race([fetchDocsPromise, timeoutPromise])) as any;
-            
+            console.log("[Firestore Sync] Started debounced sync of master catalog to Firestore...");
             if (!active) return;
-            const existingIds = new Set<string>();
-            querySnapshot.forEach((docSnap: any) => {
-              existingIds.add(docSnap.id);
-            });
+            const cleanedProducts = cleanObjectForFirestore(products);
+            const docRef = doc(db, "settings", "catalog_master");
+            await setDoc(docRef, { products: cleanedProducts }, { merge: true });
 
-            // Insert / Update each active product
-            for (const product of products) {
-              if (product && product.id) {
-                const cleanedProduct = cleanObjectForFirestore(product);
-                await setDoc(doc(db, "products", product.id), cleanedProduct);
-                existingIds.delete(product.id);
-              }
-            }
-
-            // Clean up from firestore if any item was deleted
-            for (const remainingId of existingIds) {
-              await deleteDoc(doc(db, "products", remainingId));
-            }
-
-            console.log(`[Firestore Sync] Debounced Firestore match successful. Synchronized ${products.length} products.`);
+            console.log(`[Firestore Sync] Debounced Firestore match successful. Synchronized entire catalog of ${products.length} products inside single-doc catalog_master.`);
           } catch (fbSyncErr) {
             console.warn("[Firestore Sync] Error during Firestore sync:", fbSyncErr);
             handleFirestoreError(fbSyncErr, "syncToCloudFirestore");
