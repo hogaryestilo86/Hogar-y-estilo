@@ -539,20 +539,25 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
     if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
       const filename = resolvedUrl.split("/").pop();
       if (filename) {
+        const gConfig = (window as any).__GITHUB_CONFIG__;
+        const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
+        const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+        
+        // If they have configured GitHub, always resolve immediately to Raw GitHub CDN!
+        // This is 100% persistent, immune to container restarts, and available the split second sync succeeds!
+        if (gConfig && gConfig.repo) {
+          return `https://raw.githubusercontent.com/${gConfig.repo}/${gConfig.branch || "main"}/public/uploads/${filename}`;
+        }
+
         const isLocalOrPreview = window.location.hostname.includes("run.app") || 
                                  window.location.hostname.includes("localhost") || 
                                  window.location.hostname.includes("127.0.0.1");
         
-        if (!isLocalOrPreview) {
-          const gConfig = (window as any).__GITHUB_CONFIG__;
-          const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
-          const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
-          
-          if (gConfig && gConfig.repo) {
-            return `https://raw.githubusercontent.com/${gConfig.repo}/${gConfig.branch || "main"}/public/uploads/${filename}`;
-          }
-          return `${backend}/uploads/${filename}`;
+        if (isLocalOrPreview) {
+          return `/uploads/${filename}`;
         }
+        
+        return `${backend}/uploads/${filename}`;
       }
     }
 
