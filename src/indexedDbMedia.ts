@@ -776,22 +776,33 @@ export function getCategoryPlaceholder(category: string | undefined, title?: str
   const cat = (category || "").toLowerCase();
   const t = (title || "").toLowerCase();
 
-  // Bulletproof mapping for the specific curated shop items to render beautiful exact matching Unsplash imagery
+  // Bulletproof mapping for specific curated shop items to render beautiful exact matching Unsplash imagery
   if (t.includes("cafetera") || t.includes("expresso") || t.includes("coffee") || t.includes("retro noir") || t.includes("noir")) {
     return "https://images.unsplash.com/photo-1513530534585-c7b1394c6d51?auto=format&fit=crop&w=800&q=80";
   }
   if (t.includes("precision") || t.includes("precisión") || t.includes("destornillador") || t.includes("herramientas magnéticas") || t.includes("115 en 1") || t.includes("herramientas")) {
     return "https://images.unsplash.com/photo-1608613304899-ea80983342df?auto=format&fit=crop&w=800&q=80";
   }
-  if (t.includes("carrito") || t.includes("organizador multiuso") || t.includes("trolley") || t.includes("industrial negro") || t.includes("industrial")) {
+  if (t.includes("carrito") || t.includes("organizador multiuso") || t.includes("trolley") || t.includes("industrial negro") || t.includes("industrial") || cat.includes("organización") || cat.includes("organizacion") || t.includes("organizador")) {
     return "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&q=80";
   }
   if (t.includes("freidora") || t.includes("air fryer") || t.includes("airfryer") || t.includes("smart 7l")) {
     return "https://images.unsplash.com/photo-1621972750749-0fbb1abb7736?auto=format&fit=crop&w=800&q=80";
   }
+  
+  // Category-based high-end fallback photography instead of blank/SVGs
+  if (cat.includes("cocina") || cat.includes("bazar") || t.includes("cocina") || t.includes("olla") || t.includes("taza") || t.includes("plato")) {
+    return "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=800&q=80";
+  }
+  if (cat.includes("iluminación") || cat.includes("iluminacion") || t.includes("lámpara") || t.includes("lampara") || t.includes("foco") || t.includes("velador")) {
+    return "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=800&q=80";
+  }
+  if (cat.includes("baño") || cat.includes("banos") || t.includes("baño") || t.includes("toalla") || t.includes("jabón") || t.includes("dispensador")) {
+    return "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=80";
+  }
 
-  // Pure neutral fallback image: elegant SVG placeholder so that we never "invent" unprompted stock photos, nor leave high-contrast layout gaps
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" fill="none"><rect width="800" height="800" fill="%23f3f2ee"/><text x="50%" y="46%" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="600" fill="%23a39f93" text-anchor="middle">Imagen en mantenimiento</text><text x="50%" y="52%" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="%23bfbaa9" text-anchor="middle">Se cargará nuevamente pronto</text></svg>`;
+  // Elite home-decor ambient photography as the ultimate premium fallback (Hogar y Estilo brand signature)
+  return "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=800&q=80";
 }
 
 /**

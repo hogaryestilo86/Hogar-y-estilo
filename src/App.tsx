@@ -127,8 +127,22 @@ export default function App() {
   });
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+  const [hasUserModifiedCatalog, setHasUserModifiedCatalog] = useState<boolean>(false);
   const [brokenImageProductIds, setBrokenImageProductIds] = useState<string[]>([]);
   const [quotaExceeded, setQuotaExceeded] = useState(isFirestoreQuotaExceeded);
+
+  // Redirect Vercel preview branch/commit links to the production site to ensure uniform experience
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    if (
+      hostname.endsWith(".vercel.app") && 
+      hostname !== "hogar-y-estilo.vercel.app"
+    ) {
+      console.log(`[Vercel Prevención] Redirigiendo preview de Vercel (${hostname}) a la tienda real: hogar-y-estilo.vercel.app`);
+      const targetUrl = "https://hogar-y-estilo.vercel.app" + window.location.pathname + window.location.search + window.location.hash;
+      window.location.replace(targetUrl);
+    }
+  }, []);
 
   // Initialize event listener for modern instant quota exhaustion reactive alerts
   useEffect(() => {
@@ -385,6 +399,10 @@ export default function App() {
   // Sync state to local storage, IndexedDB, Firebase Firestore and fallback server whenever modified with 2.5s debouncing
   useEffect(() => {
     if (!hasLoadedInitial) return;
+    if (!hasUserModifiedCatalog) {
+      console.log("[Sync Loop] Bypassing automatic storage write. No modifications made yet in this session.");
+      return;
+    }
 
     let active = true;
     let syncTimer: any = null;
@@ -500,7 +518,7 @@ export default function App() {
         clearTimeout(syncTimer);
       }
     };
-  }, [products, hasLoadedInitial, isAdminAuthenticated]);
+  }, [products, hasLoadedInitial, isAdminAuthenticated, hasUserModifiedCatalog]);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -1045,6 +1063,7 @@ export default function App() {
   };
 
   const handleAddCustomProduct = (newProduct: Product) => {
+    setHasUserModifiedCatalog(true);
     setProducts((prev) => [newProduct, ...prev]);
     try {
       const deletedStr = localStorage.getItem("deleted_custom_product_ids");
@@ -1057,12 +1076,14 @@ export default function App() {
   };
 
   const handleUpdateProduct = (updatedProduct: Product) => {
+    setHasUserModifiedCatalog(true);
     setProducts((prev) =>
       prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
     );
   };
 
   const handleDeleteProduct = (id: string) => {
+    setHasUserModifiedCatalog(true);
     // Guardar el objeto completo en la papelera de reciclaje antes de filtrarlo
     const productToDelete = products.find((p) => p.id === id);
     if (productToDelete) {
@@ -1089,6 +1110,11 @@ export default function App() {
     } catch (e) {
       console.warn("No se pudo guardar la lista de eliminados:", e);
     }
+  };
+
+  const handleSetProducts = (newProductsOrUpdater: any) => {
+    setHasUserModifiedCatalog(true);
+    setProducts(newProductsOrUpdater);
   };
 
   const handleOrderComplete = (orderDetails: any, itemsInCart: any[], generatedOrderId?: string) => {
@@ -1782,7 +1808,7 @@ export default function App() {
             onAddProduct={handleAddCustomProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
-            onSetProducts={setProducts}
+            onSetProducts={handleSetProducts}
             adminEmail={adminEmail}
             onAdminEmailChange={handleAdminEmailChange}
             adminPhone={adminPhone}
