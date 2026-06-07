@@ -616,7 +616,10 @@ export default function AdminPanel({
                   base64ToUpload = await base64Promise;
                 } else if (alreadyExists) {
                   addProgressMsg(`✓ Confirmado en la nube: ${filenameToUpload}`);
-                  mediaItem.backupUrl = mediaItem.url;
+                  const backendBase = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
+                    ? "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app"
+                    : window.location.origin;
+                  mediaItem.backupUrl = `${backendBase}/uploads/${filenameToUpload}`;
                   mediaItem.url = `/uploads/${filenameToUpload}`;
                 }
               }
@@ -700,7 +703,10 @@ export default function AdminPanel({
               
               if (putRes.ok) {
                 addProgressMsg(`✓ Guardado con éxito en la nube: ${filenameToUse}`);
-                mediaItem.backupUrl = mediaItem.url;
+                const backendBase = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
+                  ? "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app"
+                  : window.location.origin;
+                mediaItem.backupUrl = `${backendBase}/uploads/${filenameToUse}`;
                 mediaItem.url = `/uploads/${filenameToUse}`;
                 existingUploads.add(filenameToUse.toLowerCase());
               } else {
