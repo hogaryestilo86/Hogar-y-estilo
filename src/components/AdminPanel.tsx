@@ -1121,6 +1121,38 @@ export default function AdminPanel({
       setImportMlError("Por favor, ingresá una URL o código de producto válido de Mercado Libre.");
       return;
     }
+
+    const lowerUrl = cleanedUrl.toLowerCase();
+    const isProfileOrAccount = 
+      lowerUrl.includes("/up/") || 
+      lowerUrl.includes("/up?") ||
+      lowerUrl.endsWith("/up") || 
+      lowerUrl.includes("/vender") || 
+      lowerUrl.includes("/mis-publicaciones") || 
+      lowerUrl.includes("/listado") ||
+      lowerUrl.includes("/navigation") ||
+      lowerUrl.includes("/resumen") ||
+      lowerUrl.includes("vender.mercadolibre");
+    
+    const isProductUrl = 
+      lowerUrl.includes("articulo.mercadolibre") || 
+      lowerUrl.includes("meli.la") || 
+      lowerUrl.includes("/p/") ||
+      /\d{8,15}/.test(lowerUrl);
+
+    if (isProfileOrAccount || !isProductUrl) {
+      setImportMlError(
+        "❌ ¡Atención! Colocaste el enlace de carga de tu cuenta o perfil de Mercado Libre (/up/).\n\n" +
+        "Este importador es para clonar CUALQUIER producto común de otros que encuentres en Mercado Libre para vender en tu tienda. No necesitás tener tus propios productos allí.\n\n" +
+        "Cómo encontrar el enlace correcto en 10 segundos:\n" +
+        "1. Entrá a www.mercadolibre.com.ar como si fueras a comprar.\n" +
+        "2. Buscá el producto que te interese vender (ej: 'Mesa de luz', 'Ventilador', etc).\n" +
+        "3. Hacé clic en el producto para ver sus imágenes y detalles.\n" +
+        "4. Copiá la dirección (URL) completa que sale arriba en tu navegador (ej: https://articulo.mercadolibre.com.ar/MLA-...) o compartí el enlace corto (meli.la).\n" +
+        "5. ¡Pegá ese enlace acá abajo y listo!"
+      );
+      return;
+    }
     
     setIsImportingMl(true);
     setImportMlError("");
@@ -3625,13 +3657,15 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               {/* Mercado Libre Import Tool */}
               {!editingProductId && (
                 <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 mb-5 text-left flex flex-col gap-3 animate-fadeIn">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-amber-100 p-1.5 rounded-lg text-amber-805">
-                      <Sparkles className="w-4 h-4 text-amber-800" />
+                  <div className="flex items-start gap-2.5">
+                    <div className="bg-amber-100 p-2 rounded-xl text-amber-805 shrink-0 mt-0.5">
+                      <Sparkles className="w-4.5 h-4.5 text-amber-800 animate-pulse" />
                     </div>
                     <div>
-                      <p className="text-[11.5px] font-bold text-amber-950 uppercase tracking-wide">Importador Express de Mercado Libre</p>
-                      <p className="text-[10px] text-amber-800 leading-tight">¿Tenés tu producto publicado en Mercado Libre? Pegá el enlace abajo para auto-completar título, precio, descripción e imágenes en 1 segundo.</p>
+                      <p className="text-xs font-extrabold text-amber-950 uppercase tracking-wide">🚀 Importar cualquier producto de Mercado Libre</p>
+                      <p className="text-[10.5px] text-amber-800 leading-relaxed font-medium mt-0.5">
+                        ¡No necesitás tener tus propios productos publicados en Mercado Libre! Podés copiar y vender <strong>cualquier artículo público</strong> que encuentres navegando en el sitio (de cualquier vendedor). El sistema clonará su título, fotos, precio original y descripción técnica de forma instantánea.
+                      </p>
                     </div>
                   </div>
 
@@ -3640,7 +3674,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       <div className="flex-1 flex gap-1.5 items-stretch">
                         <input
                           type="text"
-                          placeholder="Pegá el enlace de tu artículo de Mercado Libre acá (ej: https://articulo.mercadolibre.com.ar/...)"
+                          placeholder="Pegá el enlace de cualquier producto público de Mercado Libre (ej: https://articulo.mercadolibre.com.ar/...)"
                           value={mlImportUrl}
                           onChange={(e) => setMlImportUrl(e.target.value)}
                           className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
@@ -3744,10 +3778,10 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
                   {importMlError && (
                     <div className="bg-red-50 border border-red-200 p-2.5 rounded-xl text-left animate-fadeIn">
-                      <p className="text-[10px] text-red-700 font-semibold leading-relaxed">
-                        ⚠️ Error: {importMlError}
+                      <p className="text-[10.5px] text-red-700 font-semibold leading-relaxed whitespace-pre-line">
+                        ⚠️ Detalle: {importMlError}
                       </p>
-                      {!showHtmlBypass && (
+                      {!showHtmlBypass && !importMlError.includes("¡Atención! Colocaste el enlace") && (
                         <p className="text-[9.5px] text-red-500 mt-1 leading-normal">
                           Mercado Libre detectó la petición automática como un bot y solicitó verificación. ¡No te preocupes! Hacé clic abajo en <strong>"Usar Bypass Manual Local"</strong> para solucionarlo de inmediato sin bloqueos de red.
                         </p>
