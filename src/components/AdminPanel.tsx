@@ -584,6 +584,7 @@ export default function AdminPanel({
   const [mlSearchResults, setMlSearchResults] = useState<any[]>([]);
   const [isSearchingMl, setIsSearchingMl] = useState(false);
   const [mlImportMode, setMlImportMode] = useState<"search" | "url">("search");
+  const [mlSearchError, setMlSearchError] = useState("");
 
   // States for automated seamless GitHub catalog persistence
   const [githubToken, setGithubToken] = useState(() => localStorage.getItem("github_sync_token") || "");
@@ -1333,63 +1334,114 @@ export default function AdminPanel({
     
     setIsSearchingMl(true);
     setMlSearchResults([]);
-    setImportMlError("");
+    setMlSearchError("");
     notify(`Buscando "${mlSearchQuery}" en Mercado Libre...`, "info");
     
     try {
       let results: any[] = [];
       let success = false;
+      const targetQuery = mlSearchQuery.trim();
+      const searchUrl = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(targetQuery)}&limit=15`;
       
-      // Step A: Attempt direct browser API search first (100% bypasses cold backend sleep times & server IP blocks)
+      // Step 1: Direct fetch from browser (fastest, supports CORS natively sometimes or depending on environment)
       try {
-        console.log("[Mercado Libre Direct Client Search] Fetching from public api...");
-        const directRes = await fetch(`https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(mlSearchQuery.trim())}&limit=15`);
+        console.log("[Mercado Libre Search] Attempting direct browser fetch...");
+        const directRes = await fetch(searchUrl);
         if (directRes.ok) {
           const data = await directRes.json();
-          results = (data.results || []).map((item: any) => ({
-            id: item.id,
-            title: item.title,
-            price: item.price,
-            thumbnail: item.thumbnail ? item.thumbnail.replace("-I.jpg", "-O.jpg").replace("-V.jpg", "-O.jpg") : "",
-            permalink: item.permalink,
-            condition: item.condition
-          }));
-          success = true;
-          console.log("[Mercado Libre Direct Client Search] Found results count:", results.length);
-        } else {
-          console.warn(`Direct client search returned status ${directRes.status}, falling back to backend...`);
+          if (data.results && data.results.length > 0) {
+            results = data.results;
+            success = true;
+            console.log("[Mercado Libre Search] Direct browser fetch success!");
+          }
         }
-      } catch (directErr) {
-        console.warn("[Mercado Libre Direct Client Search] Browser fetch failed/blocked, falling back to backend proxy:", directErr);
+      } catch (e) {
+        console.warn("[Mercado Libre Search] Direct browser fetch CORS block or fail, attempting corsproxy.io...");
       }
-      
-      // Step B: Fallback to Backend Proxy search if browser-direct fetch failed
+
+      // Step 2: Use corsproxy.io (Perfect client-side bypass)
       if (!success) {
-        console.log("[Mercado Libre Search Fallback] Calling backend search proxy...");
-        const res = await fetch(getApiUrl(`/api/search-mercadolibre?q=${encodeURIComponent(mlSearchQuery.trim())}`));
-        if (!res.ok) {
-          throw new Error("No se pudo conectar al servidor de búsqueda.");
+        try {
+          const proxiedUrl = `https://corsproxy.io/?${encodeURIComponent(searchUrl)}`;
+          console.log("[Mercado Libre Search] Fetching via corsproxy.io...");
+          const proxyRes = await fetch(proxiedUrl);
+          if (proxyRes.ok) {
+            const data = await proxyRes.json();
+            if (data.results && data.results.length > 0) {
+              results = data.results;
+              success = true;
+              console.log("[Mercado Libre Search] corsproxy.io fetch success!");
+            }
+          }
+        } catch (e) {
+          console.warn("[Mercado Libre Search] corsproxy.io failed, trying allorigins...");
         }
-        const data = await res.json();
-        if (data.success && data.results) {
-          results = data.results;
-          success = true;
+      }
+
+      // Step 3: Use api.allorigins.win (Second client-side bypass)
+      if (!success) {
+        try {
+          const proxiedUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(searchUrl)}`;
+          console.log("[Mercado Libre Search] Fetching via allorigins.win...");
+          const proxyRes = await fetch(proxiedUrl);
+          if (proxyRes.ok) {
+            const data = await proxyRes.json();
+            if (data.results && data.results.length > 0) {
+              results = data.results;
+              success = true;
+              console.log("[Mercado Libre Search] allorigins.win fetch success!");
+            }
+          }
+        } catch (e) {
+          console.warn("[Mercado Libre Search] allorigins.win failed, trying backend server proxy...");
+        }
+      }
+
+      // Step 4: Fallback to Backend Proxy search
+      if (!success) {
+        console.log("[Mercado Libre Search] Calling backend search proxy...");
+        const res = await fetch(getApiUrl(`/api/search-mercadolibre?q=${encodeURIComponent(targetQuery)}`));
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.results) {
+            // Note: backend already maps the results, but let's handle it
+            setMlSearchResults(data.results);
+            if (data.results.length === 0) {
+              notify("No se encontraron productos con ese término en Mercado Libre.", "info");
+            } else {
+              notify(`Encontrados ${data.results.length} productos de Mercado Libre listos para clonar.`, "success");
+            }
+            setIsSearchingMl(false);
+            return;
+          } else {
+            throw new Error(data.error || "La búsqueda falló en el servidor.");
+          }
         } else {
-          throw new Error(data.error || "La búsqueda falló en el servidor.");
+          throw new Error(`El servidor respondió con código ${res.status}`);
         }
       }
       
-      if (success) {
-        setMlSearchResults(results);
-        if (results.length === 0) {
+      if (success && results) {
+        const mapped = results.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          price: item.price,
+          thumbnail: item.thumbnail ? item.thumbnail.replace("-I.jpg", "-O.jpg").replace("-V.jpg", "-O.jpg") : "",
+          permalink: item.permalink,
+          condition: item.condition
+        }));
+        setMlSearchResults(mapped);
+        if (mapped.length === 0) {
           notify("No se encontraron productos con ese término.", "info");
         } else {
-          notify(`Encontrados ${results.length} productos de Mercado Libre listos para clonar.`, "success");
+          notify(`Encontrados ${mapped.length} productos de Mercado Libre listos para clonar.`, "success");
         }
+      } else {
+        throw new Error("No pudimos obtener datos de Mercado Libre.");
       }
     } catch (err: any) {
       console.error("Search ML error:", err);
-      setImportMlError(err.message || "Fallo en la búsqueda de Mercado Libre.");
+      setMlSearchError("No se pudieron obtener resultados de búsqueda: " + (err.message || "Fallo de conexión."));
       notify("No se pudieron obtener resultados de búsqueda.", "error");
     } finally {
       setIsSearchingMl(false);
@@ -3825,6 +3877,17 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                               )}
                             </button>
                           </div>
+
+                          {mlSearchError && (
+                            <div className="bg-amber-50 border border-amber-200/60 p-3.5 rounded-xl text-left animate-fadeIn">
+                              <p className="text-[11px] text-amber-900 font-bold leading-relaxed">
+                                💡 Nota: {mlSearchError}
+                              </p>
+                              <p className="text-[10px] text-amber-700 mt-1 leading-normal font-light">
+                                Si experimentás saturaciones temporales de red con el buscador automático, podés usar la pestaña superior <strong className="font-bold">"🔗 Pegar Enlace URL"</strong> para clonar directamente cualquier publicación copiando su link, o bien ingresar los datos manualmente en el formulario de abajo. ¡Todas las opciones están disponibles para que no pierdas tiempo!
+                              </p>
+                            </div>
+                          )}
 
                           {/* Search Results Display List */}
                           {mlSearchResults && mlSearchResults.length > 0 && (
