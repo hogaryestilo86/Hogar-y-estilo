@@ -395,33 +395,63 @@ export default function AdminPanel({
   };
 
   const fetchFromOfficialMlApi = async (mlUrl: string) => {
-    // Extract country-based code (like MLA, MLB, MLM, MLC, etc) and digits
-    const regex = /(ML[A-Z])-?(\d{8,15})/i;
+    // Extract country-based code (like MLA, MLB, MLM, MLC, MCO, etc) and digits
+    const regex = /([A-Z]{3})-?(\d{8,15})/i;
     const match = mlUrl.match(regex);
     if (!match) return null;
     
     const itemId = `${match[1].toUpperCase()}${match[2]}`;
-    console.log(`[Official ML API] Attempting to fetch item: ${itemId}`);
+    console.log(`[Official ML API] Attempting to fetch item or product: ${itemId}`);
     
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
       
-      const [itemRes, descRes] = await Promise.all([
-        fetch(`https://api.mercadolibre.com/items/${itemId}`, { signal: controller.signal }),
-        fetch(`https://api.mercadolibre.com/items/${itemId}/description`, { signal: controller.signal }).catch(() => null)
-      ]);
-      clearTimeout(timeoutId);
+      let itemData: any = null;
+      let description = "";
+      let isProduct = false;
       
-      if (!itemRes.ok) {
-        throw new Error(`API de Mercado Libre respondió con error: ${itemRes.status}`);
+      // Attempt item fetch first
+      const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`, { signal: controller.signal });
+      if (itemRes.ok) {
+        itemData = await itemRes.json();
+        
+        // Fetch description for item
+        try {
+          const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`, { signal: controller.signal });
+          if (descRes.ok) {
+            const descData = await descRes.json();
+            description = descData.plain_text || descData.text || "";
+          }
+        } catch (descErr) {
+          console.warn("[Official ML API] Failed to fetch item description:", descErr);
+        }
+      } else {
+        // Fallback to product catalog API (handles /p/ links which denote catalog product IDs, not seller items)
+        console.log(`[Official ML API] Item not found, checking /products/${itemId}`);
+        const prodRes = await fetch(`https://api.mercadolibre.com/products/${itemId}`, { signal: controller.signal });
+        if (prodRes.ok) {
+          itemData = await prodRes.json();
+          isProduct = true;
+          
+          if (itemData.short_description) {
+            description = itemData.short_description;
+          } else if (itemData.attributes && Array.isArray(itemData.attributes)) {
+            const specLines = itemData.attributes
+              .filter((attr: any) => attr.name && attr.value_name)
+              .slice(0, 15)
+              .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
+            description = specLines.join("\n");
+          } else {
+            description = "Producto de catálogo importado dende Mercado Libre.";
+          }
+        }
       }
       
-      const itemData = await itemRes.json();
-      let description = "";
-      if (descRes && descRes.ok) {
-        const descData = await descRes.json();
-        description = descData.plain_text || descData.text || "";
+      clearTimeout(timeoutId);
+      
+      if (!itemData) {
+        throw new Error(`Código ${itemId} no se pudo encontrar en Mercado Libre.`);
       }
       
       // Parse images from itemData.pictures
@@ -434,20 +464,38 @@ export default function AdminPanel({
         });
       }
       
-      // Video mapping if present
+      // Parse videos
       const videoUrls: string[] = [];
       if (itemData.video_id) {
         videoUrls.push(`https://video.mercadolibre.com/mp4/mlstatic/${itemData.video_id}.mp4`);
       }
+      if (itemData.videos && Array.isArray(itemData.videos)) {
+        itemData.videos.forEach((v: any) => {
+          if (v.secure_url || v.url) {
+            videoUrls.push(v.secure_url || v.url);
+          }
+        });
+      }
+      
+      // Get title/name
+      const realTitle = isProduct ? (itemData.name || itemData.title) : itemData.title;
+      
+      // Get price
+      let realPrice = 0;
+      if (isProduct) {
+        realPrice = itemData.buy_box_scenario?.price || itemData.price || 0;
+      } else {
+        realPrice = itemData.price || 0;
+      }
       
       return {
         success: true,
-        title: itemData.title || "Artículo Importado",
+        title: realTitle || "Artículo Importado",
         description: description || "",
-        price: itemData.price || 0,
+        price: realPrice,
         imageUrl: imageUrls[0] || "",
         imageUrls: imageUrls.slice(0, 12),
-        videoUrls: videoUrls,
+        videoUrls: Array.from(new Set(videoUrls)),
         originalUrl: mlUrl
       };
     } catch (apiErr) {
