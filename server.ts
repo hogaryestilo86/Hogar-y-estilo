@@ -243,37 +243,50 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       // by inspecting redirect headers to avoid downloading full HTML pages that trigger bot challenges
       let resolvedUrl = mlUrl;
       try {
-        if (mlUrl.toLowerCase().includes("meli.la") || mlUrl.toLowerCase().includes("bit.ly") || mlUrl.toLowerCase().includes("tinyurl")) {
-          console.log("[Mercado Libre Importer] Resolving short redirect link manually:", mlUrl);
-          const redirectRes = await fetch(mlUrl, {
-            method: "HEAD",
-            redirect: "manual",
-            headers: {
-              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-          });
-          const loc = redirectRes.headers.get("location");
-          if (loc) {
-            resolvedUrl = loc;
-            console.log(`[Mercado Libre Importer] Manually resolved standard link redirect: ${resolvedUrl}`);
-          } else {
-            // Try GET with redirect manual
-            const getRedirectRes = await fetch(mlUrl, {
-              method: "GET",
+        const isRedirectCandidate = 
+          mlUrl.toLowerCase().includes("meli.la") || 
+          mlUrl.toLowerCase().includes("/up/s/") || 
+          mlUrl.toLowerCase().includes("/up/") || 
+          mlUrl.toLowerCase().includes("bit.ly") || 
+          mlUrl.toLowerCase().includes("tinyurl") ||
+          !/[A-Z]{3}-?\d{8,15}/i.test(mlUrl);
+
+        if (isRedirectCandidate) {
+          console.log("[Mercado Libre Importer] Redirect candidate detected:", mlUrl);
+          let currentUrl = mlUrl;
+          let depth = 0;
+          const maxDepth = 5;
+          
+          while (depth < maxDepth) {
+            console.log(`[Mercado Libre Importer] [Resolve Depth ${depth}] Fetching: ${currentUrl}`);
+            const redirectRes = await fetch(currentUrl, {
+              method: "GET", // Use GET as some intermediate redirectors block HEAD requests
               redirect: "manual",
               headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "es-AR,es;q=0.9,en;q=0.8"
               }
             });
-            const locGet = getRedirectRes.headers.get("location");
-            if (locGet) {
-              resolvedUrl = locGet;
-              console.log(`[Mercado Libre Importer] Manually resolved standard link (GET) redirect: ${resolvedUrl}`);
+            
+            const loc = redirectRes.headers.get("location");
+            if (loc) {
+              if (loc.startsWith("/")) {
+                const parsedUrl = new URL(currentUrl);
+                currentUrl = `${parsedUrl.protocol}//${parsedUrl.host}${loc}`;
+              } else {
+                currentUrl = loc;
+              }
+              depth++;
+            } else {
+              break;
             }
           }
+          resolvedUrl = currentUrl;
+          console.log(`[Mercado Libre Importer] Manually resolved standard link redirect to: ${resolvedUrl}`);
         }
       } catch (redirErr: any) {
-        console.warn("[Mercado Libre Importer] Non-fatal custom redirect resolver issue:", redirErr.message);
+        console.warn("[Mercado Libre Importer] Redirect manual resolver issue:", redirErr.message);
       }
 
       console.log(`[Mercado Libre Importer] Crawling / querying: ${resolvedUrl}`);
