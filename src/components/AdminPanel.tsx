@@ -3670,57 +3670,127 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   </div>
 
                   {!showHtmlBypass ? (
-                    <div className="flex flex-col sm:flex-row gap-2.5">
-                      <div className="flex-1 flex gap-1.5 items-stretch">
-                        <input
-                          type="text"
-                          placeholder="Pegá el enlace de cualquier producto público de Mercado Libre (ej: https://articulo.mercadolibre.com.ar/...)"
-                          value={mlImportUrl}
-                          onChange={(e) => setMlImportUrl(e.target.value)}
-                          className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
-                        />
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row gap-2.5">
+                        <div className="flex-1 flex gap-1.5 items-stretch">
+                          <input
+                            type="text"
+                            placeholder="Pegá el enlace de cualquier producto público de Mercado Libre (ej: https://articulo.mercadolibre.com.ar/...)"
+                            value={mlImportUrl}
+                            onChange={(e) => setMlImportUrl(e.target.value)}
+                            className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const text = await navigator.clipboard.readText();
+                                if (text && text.trim()) {
+                                  setMlImportUrl(text.trim());
+                                  notify("Enlace obtenido del portapapeles con éxito.", "success");
+                                } else {
+                                  notify("El portapapeles está vacío o no contiene un formato de texto válido.", "info");
+                                }
+                              } catch (err) {
+                                console.warn("Clipboard paste permission error:", err);
+                                notify("Por favor, pegá el enlace manteniendo presionado sobre la caja de texto o presioná Ctrl+V.", "info");
+                              }
+                            }}
+                            className="px-3 bg-amber-100 hover:bg-amber-250 border border-amber-305 text-amber-950 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-[10.5px] font-bold uppercase tracking-wide transition-all active:scale-95"
+                            title="Pegar enlace copiado"
+                          >
+                            <Clipboard className="w-3.5 h-3.5 shrink-0 text-amber-900" />
+                            <span>Pegar</span>
+                          </button>
+                        </div>
                         <button
                           type="button"
-                          onClick={async () => {
-                            try {
-                              const text = await navigator.clipboard.readText();
-                              if (text && text.trim()) {
-                                setMlImportUrl(text.trim());
-                                notify("Enlace obtenido del portapapeles con éxito.", "success");
-                              } else {
-                                notify("El portapapeles está vacío o no contiene un formato de texto válido.", "info");
-                              }
-                            } catch (err) {
-                              console.warn("Clipboard paste permission error:", err);
-                              notify("Por favor, pegá el enlace manteniendo presionado sobre la caja de texto (o presioná Ctrl+V para pegar manualmente).", "info");
-                            }
-                          }}
-                          className="px-3 bg-amber-100 hover:bg-amber-250 border border-amber-305 text-amber-950 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-[10.5px] font-bold uppercase tracking-wide transition-all active:scale-95"
-                          title="Pegar enlace copiado"
+                          disabled={isImportingMl || !mlImportUrl.trim()}
+                          onClick={handleImportFromMercadoLibre}
+                          className={`px-5 py-2.5 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 border border-amber-300 text-amber-900 ${
+                            isImportingMl || !mlImportUrl.trim()
+                              ? "bg-amber-100/50 text-amber-400 cursor-not-allowed"
+                              : "bg-brand-900 hover:bg-black hover:text-white border-brand-900 active:scale-95 cursor-pointer text-white"
+                          }`}
                         >
-                          <Clipboard className="w-3.5 h-3.5 shrink-0 text-amber-900" />
-                          <span>Pegar</span>
+                          {isImportingMl ? (
+                            <>
+                              <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Importando...</span>
+                            </>
+                          ) : (
+                            <span>Importar enlace</span>
+                          )}
                         </button>
                       </div>
-                      <button
-                        type="button"
-                        disabled={isImportingMl || !mlImportUrl.trim()}
-                        onClick={handleImportFromMercadoLibre}
-                        className={`px-5 py-2.5 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 border border-amber-300 text-amber-900 ${
-                          isImportingMl || !mlImportUrl.trim()
-                            ? "bg-amber-100/50 text-amber-400 cursor-not-allowed"
-                            : "bg-brand-900 hover:bg-black hover:text-white border-brand-900 active:scale-95 cursor-pointer text-white"
-                        }`}
-                      >
-                        {isImportingMl ? (
-                          <>
-                            <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Importando...</span>
-                          </>
-                        ) : (
-                          <span>Importar enlace</span>
-                        )}
-                      </button>
+
+                      {/* Clickable Real Examples to let the user understand how it works */}
+                      <div className="bg-amber-50/75 border border-amber-200/50 rounded-xl p-3 text-left">
+                        <p className="text-[10.5px] font-bold text-amber-950 flex items-center gap-1">
+                          <span>💡</span>
+                          <span>¿Querés probar cómo se importa? Hacé clic para rellenar con un ejemplo real:</span>
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1428258380-mesa-de-luz-auxiliar-travertino-nordica-moderna-_JM");
+                              notify("Ejemplo de 'Mesa Travertino' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
+                            }}
+                            className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            🪑 Mesa Travertino
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1748281982-sillon-divan-gervasoni-comodo-pana-premium-_JM");
+                              notify("Ejemplo de 'Sillón Gervasoni' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
+                            }}
+                            className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            🛋️ Sillón Gervasoni
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1393658245-ventilador-de-pared-y-pie-turbo-industrial-3-en-1-_JM");
+                              notify("Ejemplo de 'Ventilador' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
+                            }}
+                            className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            💨 Ventilador Industrial
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Visual Mobile Step by Step Guideline */}
+                      <div className="border border-brand-100 bg-white p-3.5 rounded-xl text-left space-y-2 animate-fadeIn shadow-xs">
+                        <p className="text-[11px] font-extrabold text-brand-950 uppercase tracking-wide flex items-center gap-1">
+                          <span>📱</span>
+                          <span>Guía corta: Cómo copiar el link de CUALQUIER producto desde tu celular</span>
+                        </p>
+                        <p className="text-[10px] text-brand-700 leading-relaxed font-light">
+                          No tenés que ir a "Vender" ni a tu panel de Mercado Libre personal. Podés clonar y revender cualquier producto libre del sitio:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[9.5px] text-brand-800 leading-normal">
+                          <div className="bg-brand-50/50 p-2 rounded-lg border border-brand-100/40">
+                            <strong className="text-brand-900 block font-bold mb-0.5">Opción A: Desde la App de Mercado Libre </strong>
+                            1. Buscá el producto que querés vender (ej: Sillón, Mesa de Luz, etc).<br />
+                            2. Abrí el producto y tocá el icono de **Compartir** <span className="inline-block px-1 py-0.5 bg-gray-100 border rounded">Compartir 🔗</span> arriba a la derecha.<br />
+                            3. Elegí la opción <strong className="text-brand-900">"Copiar Enlace"</strong>.<br />
+                            4. Volvé acá, dale a <strong className="text-amber-900">"Pegar"</strong> e <strong className="font-bold">"Importar enlace"</strong>.
+                          </div>
+                          <div className="bg-brand-50/50 p-2 rounded-lg border border-brand-100/40">
+                            <strong className="text-brand-900 block font-bold mb-0.5">Opción B: Desde el navegador del celular (Chrome/Safari)</strong>
+                            1. Entrá a Mercado Libre como comprador común.<br />
+                            2. Buscá y hacé clic sobre el producto que te gusta.<br />
+                            3. Mantené seleccionada la barra de internet arriba (donde dice la dirección).<br />
+                            4. Tocá en de **Copiar**.<br />
+                            5. Volvé aquí, pegalo y tocas Importar.
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2.5 bg-white border border-amber-200/60 p-3.5 rounded-xl animate-fadeIn">
