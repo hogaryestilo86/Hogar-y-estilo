@@ -248,6 +248,59 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
       console.log(`[Mercado Libre Importer] Crawling: ${mlUrl}`);
       
+      // Try official API first here too, to avoid scraper blockages entirely
+      try {
+        const regex = /(ML[A-Z])-?(\d{8,15})/i;
+        const match = mlUrl.match(regex);
+        if (match) {
+          const itemId = `${match[1].toUpperCase()}${match[2]}`;
+          console.log(`[Mercado Libre Importer] Requesting official API: ${itemId}`);
+          const apiResponse = await fetch(`https://api.mercadolibre.com/items/${itemId}`);
+          if (apiResponse.ok) {
+            const itemData: any = await apiResponse.json();
+            
+            // Get description if possible
+            let description = "";
+            try {
+              const descResponse = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`);
+              if (descResponse.ok) {
+                const descData: any = await descResponse.json();
+                description = descData.plain_text || descData.text || "";
+              }
+            } catch (descErr) {
+              console.warn(`[Mercado Libre Importer] Failed to get description:`, descErr);
+            }
+
+            const imageUrls: string[] = [];
+            if (itemData.pictures && Array.isArray(itemData.pictures)) {
+              itemData.pictures.forEach((pic: any) => {
+                if (pic.secure_url || pic.url) {
+                  imageUrls.push(pic.secure_url || pic.url);
+                }
+              });
+            }
+
+            const videoUrls: string[] = [];
+            if (itemData.video_id) {
+              videoUrls.push(`https://video.mercadolibre.com/mp4/mlstatic/${itemData.video_id}.mp4`);
+            }
+
+            return res.json({
+              success: true,
+              title: itemData.title || "Artículo Importado",
+              description: description || "",
+              price: itemData.price || 0,
+              imageUrl: imageUrls[0] || "",
+              imageUrls: imageUrls.slice(0, 12),
+              videoUrls: videoUrls,
+              originalUrl: mlUrl
+            });
+          }
+        }
+      } catch (apiErr: any) {
+        console.warn(`[Mercado Libre Importer] Official API attempt failed, reverting to scraper:`, apiErr.message);
+      }
+
       const curlResponse = await fetch(mlUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",

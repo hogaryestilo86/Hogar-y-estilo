@@ -394,7 +394,75 @@ export default function AdminPanel({
     }
   };
 
+  const fetchFromOfficialMlApi = async (mlUrl: string) => {
+    // Extract country-based code (like MLA, MLB, MLM, MLC, etc) and digits
+    const regex = /(ML[A-Z])-?(\d{8,15})/i;
+    const match = mlUrl.match(regex);
+    if (!match) return null;
+    
+    const itemId = `${match[1].toUpperCase()}${match[2]}`;
+    console.log(`[Official ML API] Attempting to fetch item: ${itemId}`);
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000); // 6s timeout
+      
+      const [itemRes, descRes] = await Promise.all([
+        fetch(`https://api.mercadolibre.com/items/${itemId}`, { signal: controller.signal }),
+        fetch(`https://api.mercadolibre.com/items/${itemId}/description`, { signal: controller.signal }).catch(() => null)
+      ]);
+      clearTimeout(timeoutId);
+      
+      if (!itemRes.ok) {
+        throw new Error(`API de Mercado Libre respondió con error: ${itemRes.status}`);
+      }
+      
+      const itemData = await itemRes.json();
+      let description = "";
+      if (descRes && descRes.ok) {
+        const descData = await descRes.json();
+        description = descData.plain_text || descData.text || "";
+      }
+      
+      // Parse images from itemData.pictures
+      const imageUrls: string[] = [];
+      if (itemData.pictures && Array.isArray(itemData.pictures)) {
+        itemData.pictures.forEach((pic: any) => {
+          if (pic.secure_url || pic.url) {
+            imageUrls.push(pic.secure_url || pic.url);
+          }
+        });
+      }
+      
+      // Video mapping if present
+      const videoUrls: string[] = [];
+      if (itemData.video_id) {
+        videoUrls.push(`https://video.mercadolibre.com/mp4/mlstatic/${itemData.video_id}.mp4`);
+      }
+      
+      return {
+        success: true,
+        title: itemData.title || "Artículo Importado",
+        description: description || "",
+        price: itemData.price || 0,
+        imageUrl: imageUrls[0] || "",
+        imageUrls: imageUrls.slice(0, 12),
+        videoUrls: videoUrls,
+        originalUrl: mlUrl
+      };
+    } catch (apiErr) {
+      console.warn("[Official ML API Error] Failed, falling back to scraped paths:", apiErr);
+      return null;
+    }
+  };
+
   const parseMercadoLibreClientSide = async (mlUrl: string) => {
+    // 1. Try official API client-side first for 100% CORS-proof, proxy-free reliability
+    const officialData = await fetchFromOfficialMlApi(mlUrl);
+    if (officialData) {
+      return officialData;
+    }
+
     // Attempt to download the raw HTML of the PDP through several free/open CORS proxies sequentially to evade ISP/AdBlock restrictions
     const proxies = [
       (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
