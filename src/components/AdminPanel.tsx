@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
-import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings } from "lucide-react";
+import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings, Clipboard } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image, getApiUrl } from "../indexedDbMedia";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -754,6 +754,13 @@ export default function AdminPanel({
         // Falls back seamlessly to direct high-res CDN pointers if the backend is authenticated/restricted!
         const processedImages = await Promise.all(
           rawImages.map(async (rawUrl: string) => {
+            if (rawUrl.startsWith("/uploads/") || rawUrl.includes("/uploads/")) {
+              return {
+                type: "image" as const,
+                url: rawUrl,
+                backupUrl: ""
+              };
+            }
             try {
               const proxyUrl = getApiUrl(`/api/proxy-media?url=${encodeURIComponent(rawUrl)}`);
               const res = await fetch(proxyUrl);
@@ -787,6 +794,13 @@ export default function AdminPanel({
         // Parse and download videos from Mercado Libre if any are hosted on melistatic CDN
         const processedVideos = await Promise.all(
           rawVideos.map(async (rawUrl: string) => {
+            if (rawUrl.startsWith("/uploads/") || rawUrl.includes("/uploads/")) {
+              return {
+                type: "video" as const,
+                url: rawUrl,
+                backupUrl: ""
+              };
+            }
             try {
               const proxyUrl = getApiUrl(`/api/proxy-media?url=${encodeURIComponent(rawUrl)}`);
               const res = await fetch(proxyUrl);
@@ -2925,22 +2939,46 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       <p className="text-[10px] text-amber-800 leading-tight">¿Tenés tu producto en Mercado Libre? Pegá el enlace abajo para auto-completar título, precio, descripción e imagen en 1 segundo.</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Pegá el enlace de tu artículo de Mercado Libre acá (ej: https://articulo.mercadolibre.com.ar/...)"
-                      value={mlImportUrl}
-                      onChange={(e) => setMlImportUrl(e.target.value)}
-                      className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
-                    />
+                  <div className="flex flex-col sm:flex-row gap-2.5">
+                    <div className="flex-1 flex gap-1.5 items-stretch">
+                      <input
+                        type="text"
+                        placeholder="Pegá el enlace de tu artículo de Mercado Libre acá (ej: https://articulo.mercadolibre.com.ar/...)"
+                        value={mlImportUrl}
+                        onChange={(e) => setMlImportUrl(e.target.value)}
+                        className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const text = await navigator.clipboard.readText();
+                            if (text && text.trim()) {
+                              setMlImportUrl(text.trim());
+                              notify("Enlace obtenido del portapapeles con éxito.", "success");
+                            } else {
+                              notify("El portapapeles está vacío o no contiene un formato de texto válido.", "info");
+                            }
+                          } catch (err) {
+                            console.warn("Clipboard paste permission error:", err);
+                            notify("Por favor, pegá el enlace manteniendo presionado sobre la caja de texto (o presioná Ctrl+V para pegar manualmente).", "info");
+                          }
+                        }}
+                        className="px-3 bg-amber-100 hover:bg-amber-250 border border-amber-305 text-amber-950 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-[10.5px] font-bold uppercase tracking-wide transition-all active:scale-95"
+                        title="Pegar enlace copiado"
+                      >
+                        <Clipboard className="w-3.5 h-3.5 shrink-0 text-amber-900" />
+                        <span>Pegar</span>
+                      </button>
+                    </div>
                     <button
                       type="button"
                       disabled={isImportingMl || !mlImportUrl.trim()}
                       onClick={handleImportFromMercadoLibre}
-                      className={`px-4 py-2 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center gap-1.5 border border-amber-300 text-amber-900 ${
+                      className={`px-5 py-2.5 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 border border-amber-300 text-amber-900 ${
                         isImportingMl || !mlImportUrl.trim()
                           ? "bg-amber-100/50 text-amber-400 cursor-not-allowed"
-                          : "bg-amber-100 hover:bg-amber-200 active:scale-95 cursor-pointer text-amber-950"
+                          : "bg-brand-900 hover:bg-black hover:text-white border-brand-900 active:scale-95 cursor-pointer text-white"
                       }`}
                     >
                       {isImportingMl ? (

@@ -250,6 +250,55 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       }
 
       console.log(`[Mercado Libre Importer] Crawling: ${mlUrl}`);
+
+      // Helper to download all images & videos to local public/uploads directory during Mercado Libre import
+      const downloadAndSaveLocalMedia = async (urls: string[], isVideo = false): Promise<string[]> => {
+        const localUrls = await Promise.all(
+          urls.map(async (mediaUrl) => {
+            if (!mediaUrl) return null;
+            try {
+              if (mediaUrl.startsWith("/uploads/") || mediaUrl.includes("/uploads/")) {
+                return mediaUrl;
+              }
+
+              const response = await fetch(mediaUrl, {
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                  "Referer": "https://www.mercadolibre.com.ar/"
+                }
+              });
+
+              if (response.ok) {
+                const uploadsDir = path.join(process.cwd(), "public", "uploads");
+                if (!fs.existsSync(uploadsDir)) {
+                  fs.mkdirSync(uploadsDir, { recursive: true });
+                }
+
+                const contentType = response.headers.get("content-type") || (isVideo ? "video/mp4" : "image/jpeg");
+                let ext = isVideo ? "mp4" : "jpg";
+                if (contentType.includes("video/mp4")) ext = "mp4";
+                else if (contentType.includes("video/webm")) ext = "webm";
+                else if (contentType.includes("image/png")) ext = "png";
+                else if (contentType.includes("image/webp")) ext = "webp";
+                else if (contentType.includes("image/gif")) ext = "gif";
+
+                const cleanFilename = `ml_media_${Date.now()}_${Math.floor(Math.random() * 100000)}.${ext}`;
+                const filepath = path.join(uploadsDir, cleanFilename);
+                
+                const arrayBuffer = await response.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                fs.writeFileSync(filepath, buffer);
+                
+                return `/uploads/${cleanFilename}`;
+              }
+            } catch (err: any) {
+              console.warn(`[Download Local ML Media Error] Failed for ${mediaUrl}:`, err.message);
+            }
+            return mediaUrl; // Fallback to original
+          })
+        );
+        return localUrls.filter((url): url is string => !!url);
+      };
       
       // Helper function to fetch from official APIs (items, search product listings) and return unified schema
       const fetchOfficialApiData = async (urlToCheck: string) => {
@@ -359,16 +408,20 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           }
           
           const realTitle = itemData.title || itemData.name || "Artículo Importado";
-          const realPrice = itemData.price || 0;
+          const realPrice = itemData.price || itemData.buy_box_scenario?.price || itemData.buy_box_scenario?.suggested_retail_price || 0;
           
+          console.log(`[Official ML API - Server] API download and save local media for: ${realTitle}`);
+          const localImages = await downloadAndSaveLocalMedia(imageUrls.slice(0, 12), false);
+          const localVideos = await downloadAndSaveLocalMedia(Array.from(new Set(videoUrls)), true);
+
           return {
             success: true,
             title: realTitle,
             description: description || "",
             price: realPrice,
-            imageUrl: imageUrls[0] || "",
-            imageUrls: imageUrls.slice(0, 12),
-            videoUrls: Array.from(new Set(videoUrls)),
+            imageUrl: localImages[0] || "",
+            imageUrls: localImages,
+            videoUrls: localVideos,
             originalUrl: urlToCheck
           };
         } catch (apiErr: any) {
@@ -524,14 +577,18 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         throw new Error("No se pudo obtener la información de Mercado Libre y el bypass oficial no pudo decodificar el ID.");
       }
 
+      console.log(`[Mercado Libre Importer] Scraper download and save local media for: ${cleanTitle}`);
+      const localImages = await downloadAndSaveLocalMedia(uniqueCleanImages, false);
+      const localVideos = await downloadAndSaveLocalMedia(videoUrls, true);
+
       res.json({
         success: true,
         title: cleanTitle || "Artículo Importado",
         description: description || "",
         price: price ? parseFloat(price) : 0,
-        imageUrl: image || "",
-        imageUrls: uniqueCleanImages,
-        videoUrls: videoUrls,
+        imageUrl: localImages[0] || "",
+        imageUrls: localImages,
+        videoUrls: localVideos,
         originalUrl: mlUrl
       });
     } catch (err: any) {
