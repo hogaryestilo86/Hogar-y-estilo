@@ -220,8 +220,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       }
 
       // Safe check to verify url is indeed a Mercado Libre link
-      if (!mlUrl.includes("mercadolibre.")) {
-        return res.status(400).json({ error: "La URL provista no pertenece a Mercado Libre." });
+      if (!mlUrl.includes("mercadolibre.") && !mlUrl.includes("meli.la")) {
+        return res.status(400).json({ error: "La URL provista no pertenece a Mercado Libre o meli.la." });
       }
 
       console.log(`[Mercado Libre Importer] Crawling: ${mlUrl}`);
@@ -264,8 +264,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       const imageUrls: string[] = [];
       const imageIds = new Set<string>();
       
-      // Matches typical ML images format: D_NQ_NP_918512-MLA74026359281_012024-F.webp (captured ID: 918512-MLA74026359281_012024)
-      const mediaCdnRegex = /D_NQ_NP_(\d+-[a-zA-Z0-9_]+)-[A-Z]\.(?:webp|jpg|jpeg|png)/gi;
+      // Ultra-resilient match for Mercado Libre CDN IDs supporting optional scaling prefixes like 2X_
+      const mediaCdnRegex = /D_NQ_NP_(?:[a-zA-Z0-9]+_)?(\d+-[a-zA-Z0-9_]+)/gi;
       let imgMatch;
       while ((imgMatch = mediaCdnRegex.exec(html)) !== null) {
         if (imgMatch[1]) {

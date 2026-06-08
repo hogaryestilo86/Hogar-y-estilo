@@ -426,8 +426,8 @@ export default function AdminPanel({
     const imageUrls: string[] = [];
     const imageIds = new Set<string>();
     
-    // Match CDN identifiers of Mercado Libre images (e.g. D_NQ_NP_918512-MLA74026359281_012024-F.webp)
-    const mediaCdnRegex = /D_NQ_NP_(\d+-[a-zA-Z0-9_]+)-[A-Z]\.(?:webp|jpg|jpeg|png)/gi;
+    // Match CDN identifiers of Mercado Libre images supporting optional scaling prefixes (e.g. 2X_)
+    const mediaCdnRegex = /D_NQ_NP_(?:[a-zA-Z0-9]+_)?(\d+-[a-zA-Z0-9_]+)/gi;
     let imgMatch;
     while ((imgMatch = mediaCdnRegex.exec(html)) !== null) {
       if (imgMatch[1]) {
@@ -607,8 +607,26 @@ export default function AdminPanel({
           setMediaList(importedMedia);
         }
         
-        notify(`¡Excelente! Artículo importado con ${importedMedia.length} archivos de alta resolución guardados en tu sistema local.`, "success");
+        notify(`🎉 ¡Excelente! Datos importados con éxitos y ${importedMedia.length} imágenes listas. Abajo podés definir el precio y publicar.`, "success");
         setMlImportUrl("");
+
+        // Direct focusing and smooth scroll so the user knows exactly where to view/configure the product and save it!
+        setTimeout(() => {
+          const priceInput = document.getElementById("admin-price-input");
+          if (priceInput) {
+            priceInput.scrollIntoView({ behavior: "smooth", block: "center" });
+            priceInput.focus();
+            
+            // Add a friendly temporary visual pulse to the container to show where it is
+            const container = priceInput.closest("div");
+            if (container) {
+              container.classList.add("ring-2", "ring-emerald-500", "transition-all", "duration-500");
+              setTimeout(() => {
+                container.classList.remove("ring-2", "ring-emerald-500");
+              }, 4000);
+            }
+          }
+        }, 500);
       } else {
         throw new Error(data?.error || "No se pudo extraer la información de Mercado Libre.");
       }
@@ -2686,8 +2704,8 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               {!editingProductId && (
                 <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 mb-5 text-left flex flex-col gap-2.5 animate-fadeIn">
                   <div className="flex items-center gap-2">
-                    <div className="bg-amber-100 p-1.5 rounded-lg text-amber-800">
-                      <Sparkles className="w-4 h-4" />
+                    <div className="bg-amber-100 p-1.5 rounded-lg text-amber-805">
+                      <Sparkles className="w-4 h-4 text-amber-800" />
                     </div>
                     <div>
                       <p className="text-[11.5px] font-bold text-amber-950 uppercase tracking-wide">Importador Express de Mercado Libre</p>
@@ -2725,6 +2743,13 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   {importMlError && (
                     <p className="text-[9.5px] text-red-600 font-semibold animate-pulse">{importMlError}</p>
                   )}
+                  {/* Explanatory helper box for immediate onboarding clarity */}
+                  <div className="mt-1 p-2 bg-amber-100/40 border border-amber-200/50 rounded-xl flex items-start gap-1.5 text-left">
+                    <span className="text-xs">💡</span>
+                    <p className="text-[10px] sm:text-[10.5px] leading-relaxed text-amber-900">
+                      <strong>¿Qué pasa luego de importar?</strong> Los campos de abajo (Título, Fotos, Descripción, etc.) se rellenarán automáticamente con los datos de Mercado Libre. Podés verlos bajando un poco en esta pantalla. Ajustá el <strong>"Precio de Ahora"</strong> y haz clic en el botón negro <strong>"Publicar e Incorporar Producto"</strong> al final de todo para dejar el producto activo en la tienda.
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -2738,6 +2763,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     type="text"
                     required
                     placeholder="Ej. Mesa Auxiliar Travertino"
+                    id="admin-title-input"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900"
@@ -2772,6 +2798,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                     type="number"
                     required
                     placeholder="Ej. 38500"
+                    id="admin-price-input"
                     value={basePrice}
                     onChange={(e) => setBasePrice(e.target.value)}
                     className="w-full bg-brand-50 border border-brand-200 rounded-lg p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-brand-500 text-brand-900 font-medium"
