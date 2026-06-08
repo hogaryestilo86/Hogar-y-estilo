@@ -214,13 +214,35 @@ Descripción básica / Notas del producto: "${description || ""}"`;
   // API Endpoint: Dynamic Mercado Libre Import crawler proxy
   app.get("/api/import-mercadolibre", async (req, res) => {
     try {
-      const mlUrl = req.query.url as string;
+      let mlUrl = req.query.url as string;
       if (!mlUrl) {
         return res.status(400).json({ error: "Falta el parámetro 'url' de Mercado Libre." });
       }
 
+      // Sanitize and extract URL/ID from incoming query
+      mlUrl = mlUrl.trim();
+      const urlRegex = /(https?:\/\/[^\s"'`<>]+)/gi;
+      const match = mlUrl.match(urlRegex);
+      if (match && match[0]) {
+        mlUrl = match[0];
+      } else {
+        // Safe check for MLA id
+        const mlaRegex = /(MLA-?\d{8,14})/i;
+        const mlaMatch = mlUrl.match(mlaRegex);
+        if (mlaMatch && mlaMatch[1]) {
+          const idDigits = mlaMatch[1].toUpperCase().replace("MLA", "").replace("-", "");
+          mlUrl = `https://articulo.mercadolibre.com.ar/MLA-${idDigits}`;
+        } else {
+          const directDigitsRegex = /(\b\d{9,12}\b)/;
+          const digitsMatch = mlUrl.match(directDigitsRegex);
+          if (digitsMatch && digitsMatch[1]) {
+            mlUrl = `https://articulo.mercadolibre.com.ar/MLA-${digitsMatch[1]}`;
+          }
+        }
+      }
+
       // Safe check to verify url is indeed a Mercado Libre link
-      if (!mlUrl.includes("mercadolibre.") && !mlUrl.includes("meli.la")) {
+      if (!mlUrl.includes("mercadolibre.") && !mlUrl.includes("meli.la") && !mlUrl.startsWith("https://articulo.mercadolibre.com.ar")) {
         return res.status(400).json({ error: "La URL provista no pertenece a Mercado Libre o meli.la." });
       }
 

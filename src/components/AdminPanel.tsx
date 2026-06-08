@@ -500,8 +500,49 @@ export default function AdminPanel({
     };
   };
 
+  const extractAndSanitizeMlUrl = (input: string): string => {
+    const raw = input.trim();
+    if (!raw) return "";
+
+    // 1. Check if there's a valid http or https URL inside the text
+    const urlRegex = /(https?:\/\/[^\s"'`<>]+)/gi;
+    const match = raw.match(urlRegex);
+    if (match && match[0]) {
+      return match[0];
+    }
+
+    // 2. Extra resilient: Look for MLA pattern "MLA3057980870" or "MLA-3057980870" anywhere in the input strings
+    const mlaRegex = /(MLA-?\d{8,14})/i;
+    const mlaMatch = raw.match(mlaRegex);
+    if (mlaMatch && mlaMatch[1]) {
+      const idDigits = mlaMatch[1].toUpperCase().replace("MLA", "").replace("-", "");
+      return `https://articulo.mercadolibre.com.ar/MLA-${idDigits}`;
+    }
+
+    // 3. Look for any consecutive 9-11 digit sequence representing a native Mercado Libre publication ID
+    const directDigitsRegex = /(\b\d{9,12}\b)/;
+    const digitsMatch = raw.match(directDigitsRegex);
+    if (digitsMatch && digitsMatch[1]) {
+      return `https://articulo.mercadolibre.com.ar/MLA-${digitsMatch[1]}`;
+    }
+
+    // 4. If it mentions domains like mercadolibre but doesn't start with http, prefix it
+    if (raw.toLowerCase().includes("mercadolibre.") || raw.toLowerCase().includes("meli.la")) {
+      if (!raw.toLowerCase().startsWith("http")) {
+        return `https://${raw}`;
+      }
+    }
+
+    return raw;
+  };
+
   const handleImportFromMercadoLibre = async () => {
-    if (!mlImportUrl.trim()) return;
+    const cleanedUrl = extractAndSanitizeMlUrl(mlImportUrl);
+    if (!cleanedUrl) {
+      setImportMlError("Por favor, ingresá una URL o código de producto válido de Mercado Libre.");
+      return;
+    }
+    
     setIsImportingMl(true);
     setImportMlError("");
     try {
@@ -509,7 +550,7 @@ export default function AdminPanel({
       
       let data: any = null;
       try {
-        const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(mlImportUrl.trim())}`));
+        const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(cleanedUrl)}`));
         if (res.ok) {
           data = await res.json();
         } else {
@@ -522,7 +563,7 @@ export default function AdminPanel({
       // If backend was unreachable or returned an error, run our powerful direct-client browser parser!
       if (!data || !data.success) {
         notify("Usando extractor secundario directo del navegador para evadir bloqueos de red...", "info");
-        data = await parseMercadoLibreClientSide(mlImportUrl.trim());
+        data = await parseMercadoLibreClientSide(cleanedUrl);
       }
 
       if (data && data.success) {
