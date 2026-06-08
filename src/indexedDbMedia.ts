@@ -903,7 +903,12 @@ export function getApiUrl(urlPath: string): string {
   if (!isLocalOrPreview) {
     const gConfig = (window as any).__GITHUB_CONFIG__;
     const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
-    const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+    let backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+    
+    // Self-healing: if the backend points to a dev sandbox or localhost, but we are on production Vercel, force our live preview URL!
+    if (!backend || backend.includes("localhost") || backend.includes("127.0.0.1") || backend.includes("ais-dev-") || !backend.startsWith("http")) {
+      backend = fallbackBackend;
+    }
     
     // Ensure we don't have double slashes
     const cleanPath = urlPath.startsWith("/") ? urlPath : `/${urlPath}`;
