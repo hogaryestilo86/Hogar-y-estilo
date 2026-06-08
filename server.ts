@@ -324,23 +324,34 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               if (searchRes.ok) {
                 const searchData: any = await searchRes.json();
                 if (searchData.results && searchData.results.length > 0) {
-                  // We found items for this product! Use the first item's ID to fetch complete rich details
                   const foundItemId = searchData.results[0].id;
                   console.log(`[Official ML API - Server] Found linked item ${foundItemId} for product ${itemId}`);
-                  const itemRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}`);
-                  if (itemRes.ok) {
-                    itemData = await itemRes.json();
-                    
-                    // Fetch description
-                    try {
-                      const descRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}/description`);
-                      if (descRes.ok) {
-                        const descData: any = await descRes.json();
-                        description = descData.plain_text || descData.text || "";
-                      }
-                    } catch (dErr) {
-                      console.warn(`[Official ML API - Server] Description fetch failed for ${foundItemId}:`, dErr);
+                  
+                  // Try multi-get first for found item
+                  const multiRes = await fetch(`https://api.mercadolibre.com/items?ids=${foundItemId}`);
+                  if (multiRes.ok) {
+                    const multiData = await multiRes.json();
+                    if (Array.isArray(multiData) && multiData.length > 0 && multiData[0].code === 200) {
+                      itemData = multiData[0].body;
                     }
+                  }
+                  
+                  if (!itemData) {
+                    const itemRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}`);
+                    if (itemRes.ok) {
+                      itemData = await itemRes.json();
+                    }
+                  }
+                  
+                  // Fetch description
+                  try {
+                    const descRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}/description`);
+                    if (descRes.ok) {
+                      const descData: any = await descRes.json();
+                      description = descData.plain_text || descData.text || "";
+                    }
+                  } catch (dErr) {
+                    console.warn(`[Official ML API - Server] Description fetch failed for ${foundItemId}:`, dErr);
                   }
                 }
               }
@@ -349,49 +360,90 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             }
           }
           
-          // If we still don't have itemData (or if it wasn't a product link), try direct item fetch
+          // First attempt: Multi-get /items?ids={itemId} which has higher public rate limits and is 100% open
+          if (!itemData) {
+            try {
+              console.log(`[Official ML API - Server] Fetching with multiget API: ${itemId}`);
+              const multiRes = await fetch(`https://api.mercadolibre.com/items?ids=${itemId}`);
+              if (multiRes.ok) {
+                const multiData = await multiRes.json();
+                if (Array.isArray(multiData) && multiData.length > 0 && multiData[0].code === 200) {
+                  itemData = multiData[0].body;
+                  console.log(`[Official ML API - Server] Successfully retrieved ${itemId} via multiget!`);
+                }
+              }
+            } catch (mErr: any) {
+              console.warn(`[Official ML API - Server] Multiget request failed for ${itemId}:`, mErr.message);
+            }
+          }
+
+          // Second attempt: Direct item fetch /items/{itemId} (some clusters respond better to this)
           if (!itemData) {
             console.log(`[Official ML API - Server] Fetching direct item: ${itemId}`);
             const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`);
             if (itemRes.ok) {
               itemData = await itemRes.json();
-              try {
-                const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`);
-                if (descRes.ok) {
-                  const descData: any = await descRes.json();
-                  description = descData.plain_text || descData.text || "";
+            }
+          }
+
+          // Third attempt: Public search API by publication code fallback
+          if (!itemData) {
+            console.log(`[Official ML API - Server] Fetching with search query fallback: ${itemId}`);
+            try {
+              const searchRes = await fetch(`https://api.mercadolibre.com/sites/${siteId}/search?q=${itemId}`);
+              if (searchRes.ok) {
+                const searchData = await searchRes.json();
+                if (searchData.results && searchData.results.length > 0) {
+                  const resultItem = searchData.results[0];
+                  console.log(`[Official ML API - Server] Found item metadata in search results!`, resultItem.title);
+                  itemData = {
+                    id: resultItem.id,
+                    title: resultItem.title,
+                    price: resultItem.price,
+                    thumbnail: resultItem.thumbnail,
+                    thumbnail_id: resultItem.thumbnail_id,
+                    attributes: resultItem.attributes || []
+                  };
                 }
-              } catch (dErr) {
-                console.warn(`[Official ML API - Server] Description fetch failed for ${itemId}:`, dErr);
               }
-              if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
-                const specLines = itemData.attributes
-                  .filter((attr: any) => attr.name && attr.value_name)
-                  .slice(0, 15)
-                  .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
-                description = specLines.join("\n");
-              }
+            } catch (sErr: any) {
+              console.warn(`[Official ML API - Server] Search query fallback failed for ${itemId}:`, sErr.message);
             }
           }
           
-          // If we still don't have it, try checking /products directly as a final hail-mary
+          // Try checking /products directly as a final hail-mary
           if (!itemData) {
             console.log(`[Official ML API - Server] Final attempt checking products/ for ${itemId}`);
             const prodRes = await fetch(`https://api.mercadolibre.com/products/${itemId}`);
             if (prodRes.ok) {
               itemData = await prodRes.json();
               description = itemData.short_description || "";
-              if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
-                const specLines = itemData.attributes
-                  .filter((attr: any) => attr.name && attr.value_name)
-                  .slice(0, 15)
-                  .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
-                description = specLines.join("\n");
-              }
             }
           }
           
           if (!itemData) return null;
+          
+          // Try fetching item description
+          if (!description) {
+            try {
+              const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`);
+              if (descRes.ok) {
+                const descData: any = await descRes.json();
+                description = descData.plain_text || descData.text || "";
+              }
+            } catch (dErr) {
+              console.warn(`[Official ML API - Server] Description fetch failed for ${itemId}:`, dErr);
+            }
+          }
+
+          // Format details / attributes if description is empty
+          if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
+            const specLines = itemData.attributes
+              .filter((attr: any) => attr.name && attr.value_name)
+              .slice(0, 15)
+              .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
+            description = specLines.join("\n");
+          }
           
           const imageUrls: string[] = [];
           if (itemData.pictures && Array.isArray(itemData.pictures)) {
@@ -400,6 +452,15 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                 imageUrls.push(pic.secure_url || pic.url);
               }
             });
+          }
+          
+          // If no pictures but we got thumbnail pointers
+          if (imageUrls.length === 0 && itemData.thumbnail) {
+            const highRes = itemData.thumbnail.replace("-I.jpg", "-O.jpg").replace("-V.jpg", "-O.jpg");
+            imageUrls.push(highRes);
+          }
+          if (imageUrls.length === 0 && itemData.thumbnail_id) {
+            imageUrls.push(`https://http2.mlstatic.com/D_NQ_NP_${itemData.thumbnail_id}-O.jpg`);
           }
           
           const videoUrls: string[] = [];
@@ -417,6 +478,13 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           const realTitle = itemData.title || itemData.name || "Artículo Importado";
           const realPrice = itemData.price || itemData.buy_box_scenario?.price || itemData.buy_box_scenario?.suggested_retail_price || 0;
           
+          // Verify that we actually recovered a real title and didn't fall back to "Artículo Importado" with empty pictures
+          const isInvalidResult = (realTitle === "Artículo Importado" && imageUrls.length === 0);
+          if (isInvalidResult) {
+            console.warn(`[Official ML API - Server] Obtained sparse dummy item info for ${itemId}, throwing error to force scraperfallback.`);
+            return null;
+          }
+
           console.log(`[Official ML API - Server] API download and save local media for: ${realTitle}`);
           const localImages = await downloadAndSaveLocalMedia(imageUrls.slice(0, 12), false);
           const localVideos = await downloadAndSaveLocalMedia(Array.from(new Set(videoUrls)), true);

@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
-import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings, Clipboard } from "lucide-react";
+import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings, Clipboard, MessageCircle } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image, getApiUrl } from "../indexedDbMedia";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -48,6 +48,283 @@ interface OrderRowProps {
   notify: (msg: string, type?: "success" | "error" | "info") => void;
   onViewReceipt: (url: string) => void;
   onUpdateOrderStatus?: (orderId: string, status: string, trackingCode?: string) => void;
+}
+
+// Helper to construct highly resilient WhatsApp links for Argentine telephone formats
+const getDynamicWhatsAppLink = (phone: string, fullName: string, orderId: string): string => {
+  if (!phone) return "";
+  let cleanNumber = phone.replace(/\D/g, "");
+  
+  // Argentine mobile conversion: mobile requires '9' between 54 and the area code (e.g., 341 or 11)
+  if (!cleanNumber.startsWith("54")) {
+    if (cleanNumber.startsWith("0")) {
+      cleanNumber = cleanNumber.slice(1);
+    }
+    if (cleanNumber.startsWith("15") && cleanNumber.length > 8) {
+      cleanNumber = cleanNumber.replace("15", "");
+    }
+    cleanNumber = "549" + cleanNumber;
+  } else {
+    if (!cleanNumber.startsWith("549") && cleanNumber.length >= 11) {
+      cleanNumber = "549" + cleanNumber.slice(2);
+    }
+  }
+  
+  const text = encodeURIComponent(
+    `¡Hola ${fullName}! Te escribo de Hogar y Estilo por tu pedido #${orderId} en Rosario. 🏠 ¡Muchas gracias por elegirnos! Quería coordinar con vos...`
+  );
+  return `https://wa.me/${cleanNumber}?text=${text}`;
+};
+
+function MobileOrderCardComponent({
+  order,
+  onDeleteOrder,
+  formatCurrency,
+  confirmDeleteOrderId,
+  setConfirmDeleteOrderId,
+  notify,
+  onViewReceipt,
+  onUpdateOrderStatus
+}: OrderRowProps) {
+  const [localTracking, setLocalTracking] = useState(order.trackingCode || "");
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setLocalTracking(order.trackingCode || "");
+  }, [order.trackingCode]);
+
+  const subtotal = order.items.reduce((acc: number, item: any) => acc + (item.product.basePrice * item.quantity), 0);
+  const isTransfer = order.details.paymentMethod === "transfer";
+  const priceToPay = isTransfer ? Math.round(subtotal * 0.85) : subtotal;
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    notify(`¡${label} copiado con éxito!`, "success");
+    setTimeout(() => setCopiedField(null), 2500);
+  };
+
+  const whatsAppLink = getDynamicWhatsAppLink(
+    order.details.phone || "",
+    order.details.fullName || "Cliente",
+    order.id || ""
+  );
+
+  return (
+    <div className="bg-white border border-brand-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xs text-left animate-fadeIn">
+      {/* Header Info */}
+      <div className="flex justify-between items-start gap-2">
+        <div className="space-y-0.5">
+          <span className="text-[10px] uppercase tracking-wider bg-brand-100 text-brand-800 px-2 py-0.5 rounded-full font-bold">
+            Pedido #{order.id}
+          </span>
+          <h4 className="font-bold text-brand-950 text-sm sm:text-base font-sans">{order.details.fullName}</h4>
+          <p className="text-[10px] text-brand-400 font-mono">
+            {order.createdAt ? new Date(order.createdAt).toLocaleString("es-AR") : "Fecha no registrada"}
+          </p>
+        </div>
+        
+        {/* Delete Quick action */}
+        <div>
+          {confirmDeleteOrderId !== order.id ? (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteOrderId(order.id)}
+              className="p-2 text-brand-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+              title="Eliminar este pedido"
+            >
+              <Trash2 className="w-4 h-4 text-red-500" />
+            </button>
+          ) : (
+            <div className="flex items-center gap-1 bg-red-50 p-1 border border-red-200 rounded-lg animate-fadeIn">
+              <span className="text-[9px] font-bold text-red-700 px-1">¿Borrar?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteOrder(order.id);
+                  setConfirmDeleteOrderId(null);
+                  notify(`Se borró el pedido de ${order.details.fullName}.`, "success");
+                }}
+                className="bg-red-600 text-white font-extrabold text-[9px] px-2 py-1 rounded cursor-pointer hover:bg-red-700"
+              >
+                Sí
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteOrderId(null)}
+                className="bg-white border border-brand-300 text-brand-800 font-extrabold text-[9px] px-2 py-1 rounded cursor-pointer"
+              >
+                No
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Touch-Friendly Action Bar */}
+      <div className="pt-0.5 pb-0.5">
+        {whatsAppLink && (
+          <a
+            href={whatsAppLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full h-11 bg-emerald-650 hover:bg-emerald-700 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all text-xs cursor-pointer select-none shadow-xs"
+          >
+            <MessageCircle className="w-4 h-4 fill-white text-emerald-650" />
+            <span>Chatear por WhatsApp</span>
+          </a>
+        )}
+      </div>
+
+      {/* Details List */}
+      <div className="bg-brand-50/50 p-3 rounded-xl border border-brand-100 space-y-2.5 text-xs">
+        <div className="flex items-start justify-between gap-2 border-b border-brand-100/50 pb-2.5">
+          <div className="min-w-0 flex-1">
+            <span className="block text-[9px] font-bold text-brand-400 uppercase tracking-wider">Formas de contacto</span>
+            <div className="text-brand-800 leading-normal font-sans break-words text-[11px] space-y-0.5">
+              <p className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-brand-500 shrink-0" /> {order.details.email}</p>
+              <p className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-brand-500 shrink-0" /> {order.details.phone}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleCopy(`${order.details.fullName}\nTel: ${order.details.phone}\nEmail: ${order.details.email}`, "Contacto")}
+            className="bg-white border border-brand-200 text-brand-700 hover:text-brand-950 p-1.5 rounded-lg text-[10px] font-medium flex items-center gap-1 hover:border-brand-300 transition-colors cursor-pointer select-none self-center shrink-0"
+          >
+            {copiedField === "Contacto" ? <Check className="w-3 h-3 text-emerald-650 animate-pulse" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedField === "Contacto" ? "Copiado" : "Copiar"}</span>
+          </button>
+        </div>
+
+        <div className="flex items-start justify-between gap-2 pt-0.5">
+          <div className="min-w-0 flex-1">
+            <span className="block text-[9px] font-bold text-brand-400 uppercase tracking-wider">Dirección de Destino</span>
+            <p className="font-semibold text-brand-950 text-[11px] leading-snug mt-0.5">{order.details.address}</p>
+            <p className="text-brand-600 text-[10.5px]">{order.details.city} ({order.details.zipCode})</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleCopy(`${order.details.address}, ${order.details.city} (${order.details.zipCode})`, "Dirección")}
+            className="bg-white border border-brand-200 text-brand-700 hover:text-brand-950 p-1.5 rounded-lg text-[10px] font-medium flex items-center gap-1 hover:border-brand-300 transition-colors cursor-pointer select-none self-center shrink-0"
+          >
+            {copiedField === "Dirección" ? <Check className="w-3 h-3 text-emerald-650 animate-pulse" /> : <Copy className="w-3.5 h-3.5" />}
+            <span>{copiedField === "Dirección" ? "Copiado" : "Copiar"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Cart Items Details */}
+      <div className="space-y-1.5">
+        <span className="block text-[9px] font-extrabold text-brand-500 uppercase tracking-widest">Artículos del Pedido</span>
+        <div className="divide-y divide-brand-100 bg-brand-50/20 border border-brand-150 rounded-xl px-3.5 py-1 text-xs">
+          {order.items.map((item: any, i: number) => (
+            <div key={i} className="flex justify-between items-center py-2 text-left gap-2">
+              <div className="flex items-center gap-2">
+                <span className="bg-brand-900 text-brand-100 font-mono text-[9px] px-1.5 py-0.5 rounded font-extrabold shrink-0">
+                  {item.quantity}x
+                </span>
+                <span className="font-semibold text-brand-950 line-clamp-1">{item.product.title}</span>
+              </div>
+              <span className="text-brand-500 shrink-0 font-mono text-[11px]">{formatCurrency(item.product.basePrice)} c/u</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Segment Price & Payment */}
+      <div className="flex justify-between items-center bg-brand-50 border border-brand-100 rounded-xl p-3 text-left">
+        <div className="space-y-0.5">
+          <span className="block text-[9px] text-brand-400 font-bold uppercase tracking-wider">Monto Final</span>
+          <p className="text-base font-black text-brand-950 font-serif">{formatCurrency(priceToPay)}</p>
+        </div>
+        <div className="text-right">
+          <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-md inline-block border ${
+            isTransfer 
+              ? 'bg-green-100 text-green-800 border-green-200 animate-pulse' 
+              : 'bg-brand-100 border-brand-200 text-brand-800'
+          }`}>
+            {isTransfer ? '15% Off Trsf' : '3 Cuotas S/I'}
+          </span>
+        </div>
+      </div>
+
+      {/* Payment Receipt Link */}
+      {isTransfer && order.details.receiptImage && (
+        <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-150 space-y-2 text-left">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold text-emerald-800 flex items-center gap-1">
+              <span>🧾 Comprobante Adjunto</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onViewReceipt(order.details.receiptImage)}
+              className="text-[10px] font-extrabold text-emerald-700 hover:text-emerald-950 underline flex items-center gap-1 cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5" /> Ampliar
+            </button>
+          </div>
+          <div className="relative w-full h-32 bg-white border border-emerald-100 rounded-lg overflow-hidden cursor-pointer shadow-2xs hover:opacity-95 transition-opacity" onClick={() => onViewReceipt(order.details.receiptImage)}>
+            <ResolvedImage 
+              src={order.details.receiptImage} 
+              alt="Comprobante móvil" 
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-black/40 text-center py-1.5 text-white font-bold text-[10px] uppercase">
+              Toca para ver pantalla completa
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shipment Status Selector & Tracking Code Action Row */}
+      <div className="bg-brand-50/40 p-3 rounded-xl border border-brand-205 space-y-3">
+        <div className="space-y-1">
+          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Estado del Envío</span>
+          <select
+            value={order.status || "pending"}
+            onChange={(e) => {
+              if (onUpdateOrderStatus) {
+                onUpdateOrderStatus(order.id, e.target.value);
+                notify("¡Estado de Envío Actualizado!", "success");
+              }
+            }}
+            className="w-full h-10 bg-white border border-brand-200 text-brand-900 text-xs px-2.5 py-1.5 rounded-lg focus:ring-1 focus:ring-brand-800 focus:outline-none font-bold cursor-pointer transition-colors"
+          >
+            <option value="pending">🛒 1. Pedido Recibido</option>
+            <option value="preparing">📦 2. En preparación en depósito</option>
+            <option value="shipped">✈️ 3. Despachado / En viaje</option>
+            <option value="delivery">🏠 4. En camino a domicilio</option>
+            <option value="delivered">✅ 5. Entregado</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <span className="block text-[10px] text-brand-500 uppercase tracking-widest font-bold">Código de Seguimiento</span>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Ej: CP123456789AR"
+              value={localTracking}
+              onChange={(e) => setLocalTracking(e.target.value)}
+              className="flex-1 h-9 bg-white border border-brand-200 text-brand-950 font-mono text-xs px-3 py-1 rounded-lg focus:ring-1 focus:ring-brand-800 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                if (onUpdateOrderStatus) {
+                  onUpdateOrderStatus(order.id, order.status || "pending", localTracking);
+                }
+                notify("✓ Código postal ingresado con éxito", "success");
+              }}
+              className="bg-brand-900 hover:bg-black text-white text-[11px] font-bold px-4 h-9 rounded-lg active:scale-95 transition-all cursor-pointer select-none shadow-xs"
+            >
+              Ok
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function OrderRowComponent({
@@ -298,6 +575,8 @@ export default function AdminPanel({
   const [mlImportUrl, setMlImportUrl] = useState("");
   const [isImportingMl, setIsImportingMl] = useState(false);
   const [importMlError, setImportMlError] = useState("");
+  const [manualHtml, setManualHtml] = useState("");
+  const [showHtmlBypass, setShowHtmlBypass] = useState(false);
   const [copiedJsonValue, setCopiedJsonValue] = useState<string | null>(null);
 
   // States for automated seamless GitHub catalog persistence
@@ -423,18 +702,31 @@ export default function AdminPanel({
             if (searchData.results && searchData.results.length > 0) {
               const foundItemId = searchData.results[0].id;
               console.log(`[Official ML API - Client] Found linked item ID ${foundItemId} for product ${itemId}`);
-              const itemRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}`, { signal: controller.signal });
-              if (itemRes.ok) {
-                itemData = await itemRes.json();
-                try {
-                  const descRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}/description`, { signal: controller.signal });
-                  if (descRes.ok) {
-                    const descData = await descRes.json();
-                    description = descData.plain_text || descData.text || "";
-                  }
-                } catch (dErr) {
-                  console.warn("[Official ML API - Client] Failed to fetch search description:", dErr);
+              
+              // Try multi-get first for found item
+              const multiRes = await fetch(`https://api.mercadolibre.com/items?ids=${foundItemId}`, { signal: controller.signal });
+              if (multiRes.ok) {
+                const multiData = await multiRes.json();
+                if (Array.isArray(multiData) && multiData.length > 0 && multiData[0].code === 200) {
+                  itemData = multiData[0].body;
                 }
+              }
+              
+              if (!itemData) {
+                const itemRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}`, { signal: controller.signal });
+                if (itemRes.ok) {
+                  itemData = await itemRes.json();
+                }
+              }
+              
+              try {
+                const descRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}/description`, { signal: controller.signal });
+                if (descRes.ok) {
+                  const descData = await descRes.json();
+                  description = descData.plain_text || descData.text || "";
+                }
+              } catch (dErr) {
+                console.warn("[Official ML API - Client] Failed to fetch search description:", dErr);
               }
             }
           }
@@ -443,22 +735,53 @@ export default function AdminPanel({
         }
       }
 
-      // Fallback, direct item fetch
+      // First attempt: Multi-get /items?ids={itemId} which has higher public rate limits and is 100% open
+      if (!itemData) {
+        try {
+          console.log(`[Official ML API - Client] Fetching with multiget API: ${itemId}`);
+          const multiRes = await fetch(`https://api.mercadolibre.com/items?ids=${itemId}`, { signal: controller.signal });
+          if (multiRes.ok) {
+            const multiData = await multiRes.json();
+            if (Array.isArray(multiData) && multiData.length > 0 && multiData[0].code === 200) {
+              itemData = multiData[0].body;
+              console.log(`[Official ML API - Client] Successfully retrieved ${itemId} via multiget!`);
+            }
+          }
+        } catch (mErr: any) {
+          console.warn(`[Official ML API - Client] Multiget request failed for ${itemId}:`, mErr.message);
+        }
+      }
+
+      // Second attempt: Direct item fetch
       if (!itemData) {
         const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`, { signal: controller.signal });
         if (itemRes.ok) {
           itemData = await itemRes.json();
-          
-          // Fetch description for item
-          try {
-            const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`, { signal: controller.signal });
-            if (descRes.ok) {
-              const descData = await descRes.json();
-              description = descData.plain_text || descData.text || "";
+        }
+      }
+
+      // Third attempt: Public search API by publication code fallback (always available and unrestricted)
+      if (!itemData) {
+        console.log(`[Official ML API - Client] Fetching with search query fallback: ${itemId}`);
+        try {
+          const searchRes = await fetch(`https://api.mercadolibre.com/sites/${siteId}/search?q=${itemId}`, { signal: controller.signal });
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (searchData.results && searchData.results.length > 0) {
+              const resultItem = searchData.results[0];
+              console.log(`[Official ML API - Client] Found item metadata in search results!`, resultItem.title);
+              itemData = {
+                id: resultItem.id,
+                title: resultItem.title,
+                price: resultItem.price,
+                thumbnail: resultItem.thumbnail,
+                thumbnail_id: resultItem.thumbnail_id,
+                attributes: resultItem.attributes || []
+              };
             }
-          } catch (descErr) {
-            console.warn("[Official ML API - Client] Failed to fetch item description:", descErr);
           }
+        } catch (sErr: any) {
+          console.warn(`[Official ML API - Client] Search query query lookup failed for ${itemId}:`, sErr.message);
         }
       }
 
@@ -469,13 +792,6 @@ export default function AdminPanel({
         if (prodRes.ok) {
           itemData = await prodRes.json();
           description = itemData.short_description || "";
-          if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
-            const specLines = itemData.attributes
-              .filter((attr: any) => attr.name && attr.value_name)
-              .slice(0, 15)
-              .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
-            description = specLines.join("\n");
-          }
         }
       }
       
@@ -483,6 +799,28 @@ export default function AdminPanel({
       
       if (!itemData) {
         throw new Error(`Código ${itemId} no se pudo encontrar en Mercado Libre.`);
+      }
+      
+      // Fetch description for item
+      if (!description) {
+        try {
+          const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`, { signal: controller.signal });
+          if (descRes.ok) {
+            const descData = await descRes.json();
+            description = descData.plain_text || descData.text || "";
+          }
+        } catch (descErr) {
+          console.warn("[Official ML API - Client] Failed to fetch item description:", descErr);
+        }
+      }
+
+      // Format details / attributes if description is empty
+      if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
+        const specLines = itemData.attributes
+          .filter((attr: any) => attr.name && attr.value_name)
+          .slice(0, 15)
+          .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
+        description = specLines.join("\n");
       }
       
       // Parse images from itemData.pictures
@@ -493,6 +831,15 @@ export default function AdminPanel({
             imageUrls.push(pic.secure_url || pic.url);
           }
         });
+      }
+      
+      // If no pictures but we got thumbnail pointers
+      if (imageUrls.length === 0 && itemData.thumbnail) {
+        const highRes = itemData.thumbnail.replace("-I.jpg", "-O.jpg").replace("-V.jpg", "-O.jpg");
+        imageUrls.push(highRes);
+      }
+      if (imageUrls.length === 0 && itemData.thumbnail_id) {
+        imageUrls.push(`https://http2.mlstatic.com/D_NQ_NP_${itemData.thumbnail_id}-O.jpg`);
       }
       
       // Parse videos
@@ -514,6 +861,13 @@ export default function AdminPanel({
       // Get price
       const realPrice = itemData.price || 0;
       
+      // Verify that we actually recovered a real title and didn't fall back to "Artículo Importado" with empty pictures
+      const isInvalidResult = (realTitle === "Artículo Importado" && imageUrls.length === 0);
+      if (isInvalidResult) {
+        console.warn(`[Official ML API - Client] Obtained sparse dummy item info for ${itemId}, returning null to force scraperfallback.`);
+        return null;
+      }
+
       return {
         success: true,
         title: realTitle || "Artículo Importado",
@@ -914,6 +1268,274 @@ export default function AdminPanel({
       console.warn("Mercado Libre import fail:", err);
       setImportMlError(err.message || "No se pudo conectar al importador.");
       notify("Fallo al importar de Mercado Libre: " + (err.message || ""), "error");
+    } finally {
+      setIsImportingMl(false);
+    }
+  };
+
+  const parseMercadoLibreFromHtml = (htmlContent: string) => {
+    const html = htmlContent;
+    
+    const extractMeta = (propertyOrName: string): string => {
+      const metaTagsRegex = /<meta\s+([^>]+)>/gi;
+      let match;
+      while ((match = metaTagsRegex.exec(html)) !== null) {
+        const attributesStr = match[1];
+        const hasPropertyOrName = new RegExp(`(?:property|name|itemprop)=["']${propertyOrName}["']`, 'i').test(attributesStr);
+        if (hasPropertyOrName) {
+          const contentMatch = /content=["']([^"']+)["']/i.exec(attributesStr);
+          if (contentMatch && contentMatch[1]) {
+            return contentMatch[1]
+              .replace(/&quot;/g, '"')
+              .replace(/&amp;/g, '&')
+              .replace(/&#39;/g, "'")
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .trim();
+          }
+        }
+      }
+      return "";
+    };
+
+    const title = extractMeta("og:title") || extractMeta("twitter:title") || extractMeta("title");
+    let description = extractMeta("og:description") || extractMeta("twitter:description") || extractMeta("description");
+    const image = extractMeta("og:image") || extractMeta("twitter:image");
+
+    if (html) {
+      const descriptionRegex = /<(?:p|div|span|pre)\s+class="[^"]*ui-pdp-description__content[^"]*"[^>]*>([\s\S]*?)<\/(?:p|div|span|pre)>/i;
+      const descMatch = html.match(descriptionRegex);
+      if (descMatch && descMatch[1]) {
+        const fullDesc = descMatch[1]
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&#39;/g, "'")
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .trim();
+        if (fullDesc) {
+          description = fullDesc;
+        }
+      }
+    }
+
+    const imageUrls: string[] = [];
+    const imageIds = new Set<string>();
+    
+    const mediaCdnRegex = /D_NQ_NP_(?:[a-zA-Z0-9]+_)?(\d+-[a-zA-Z0-9_]+)/gi;
+    let imgMatch;
+    while ((imgMatch = mediaCdnRegex.exec(html)) !== null) {
+      if (imgMatch[1]) {
+        imageIds.add(imgMatch[1]);
+      }
+    }
+
+    if (image) {
+      imageUrls.push(image);
+      const ogMatch = image.match(/D_NQ_NP_(\d+-[a-zA-Z0-9_]+)/i);
+      if (ogMatch && ogMatch[1]) {
+        imageIds.delete(ogMatch[1]);
+      }
+    }
+
+    for (const id of imageIds) {
+      if (imageUrls.length >= 12) break;
+      imageUrls.push(`https://http2.mlstatic.com/D_NQ_NP_${id}-O.jpg`);
+    }
+
+    const uniqueCleanImages = Array.from(new Set(imageUrls)).filter(img => {
+      return !img.includes("-C.jpg") && !img.includes("-I.jpg") && !img.includes("-V.jpg");
+    });
+
+    const videoUrls: string[] = [];
+    const mp4Regex = /https:\/\/[^\s"'`<>]+?\.mp4/gi;
+    let mp4Match;
+    const parsedMp4s = new Set<string>();
+    while ((mp4Match = mp4Regex.exec(html)) !== null) {
+      if (mp4Match[0].includes("mlstatic") || mp4Match[0].includes("melistatic") || mp4Match[0].includes("mercadolibre")) {
+        parsedMp4s.add(mp4Match[0]);
+      }
+    }
+    for (const vUrl of parsedMp4s) {
+      if (videoUrls.length >= 2) break;
+      videoUrls.push(vUrl);
+    }
+
+    let price = extractMeta("product:price:amount") || extractMeta("price");
+    if (!price) {
+      const schemaRegex = /"price"\s*:\s*"?(\d+(?:\.\d+)?)"?/i;
+      const schemaMatch = html.match(schemaRegex);
+      if (schemaMatch && schemaMatch[1]) {
+        price = schemaMatch[1];
+      }
+    }
+    if (!price) {
+      const fractionRegex = /class="[^"]*andes-money-amount__fraction[^"]*"[^>]*>([\d.,]+)<\/span>/i;
+      const match = html.match(fractionRegex);
+      if (match && match[1]) {
+        price = match[1].replace(/\./g, "").replace(/,/g, "");
+      }
+    }
+
+    let cleanTitle = title;
+    if (!cleanTitle && html) {
+      const titleClassRegex = /<h1\s+class="[^"]*ui-pdp-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i;
+      const classMatch = html.match(titleClassRegex);
+      if (classMatch && classMatch[1]) {
+        cleanTitle = classMatch[1].trim();
+      }
+    }
+    if (!cleanTitle && html) {
+      const titleTagRegex = /<title>([\s\S]*?)<\/title>/i;
+      const tagMatch = html.match(titleTagRegex);
+      if (tagMatch && tagMatch[1]) {
+        cleanTitle = tagMatch[1].trim();
+      }
+    }
+
+    if (cleanTitle) {
+      cleanTitle = cleanTitle.replace(/\s*[||-]\s*Mercado\s*Libre.*/gi, "");
+    }
+
+    const isLikelyCaptchaOrBlock = 
+      !cleanTitle || 
+      cleanTitle.includes("Verificación de seguridad") || 
+      cleanTitle.toLowerCase().includes("atención al cliente") || 
+      cleanTitle.toLowerCase().startsWith("captcha") || 
+      (!uniqueCleanImages.length && !description);
+
+    if (isLikelyCaptchaOrBlock) {
+      throw new Error("El código HTML proveído no contiene datos válidos o parece ser una página de control de seguridad de Mercado Libre.");
+    }
+
+    return {
+      success: true,
+      title: cleanTitle || "Artículo Importado",
+      description: description || "",
+      price: price ? parseFloat(price) : 0,
+      imageUrl: uniqueCleanImages[0] || image || "",
+      imageUrls: uniqueCleanImages,
+      videoUrls: videoUrls,
+      originalUrl: ""
+    };
+  };
+
+  const handleImportFromHtml = async () => {
+    if (!manualHtml.trim()) {
+      notify("Por favor, pegá el código fuente HTML de tu artículo de Mercado Libre.", "info");
+      return;
+    }
+    setIsImportingMl(true);
+    setImportMlError("");
+    try {
+      const data = parseMercadoLibreFromHtml(manualHtml);
+      if (data && data.success) {
+        setTitle(data.title || "");
+        setBasePrice(data.price ? String(data.price) : "");
+        setDescription(data.description || "");
+        
+        const rawImages = data.imageUrls || (data.imageUrl ? [data.imageUrl] : []);
+        const rawVideos = data.videoUrls || [];
+        
+        notify(`Procesando e importando ${rawImages.length + rawVideos.length} fotos y videos de tu HTML...`, "info");
+        
+        const importedMedia: ProductMedia[] = [];
+
+        const processedImages = await Promise.all(
+          rawImages.map(async (rawUrl: string) => {
+            try {
+              const proxyUrl = getApiUrl(`/api/proxy-media?url=${encodeURIComponent(rawUrl)}`);
+              const res = await fetch(proxyUrl);
+              if (res.ok) {
+                const blob = await res.blob();
+                if (blob) {
+                  const idbUrl = await storeMediaAsIdbReference(blob);
+                  return {
+                    type: "image" as const,
+                    url: idbUrl,
+                    backupUrl: ""
+                  };
+                }
+              }
+            } catch (pErr) {
+              console.warn("Fallo el proxy de descarga local de HTML-foto:", rawUrl, pErr);
+            }
+            return {
+              type: "image" as const,
+              url: rawUrl,
+              backupUrl: ""
+            };
+          })
+        );
+
+        processedImages.forEach(img => {
+          if (img) importedMedia.push(img);
+        });
+
+        const processedVideos = await Promise.all(
+          rawVideos.map(async (rawUrl: string) => {
+            try {
+              const proxyUrl = getApiUrl(`/api/proxy-media?url=${encodeURIComponent(rawUrl)}`);
+              const res = await fetch(proxyUrl);
+              if (res.ok) {
+                const blob = await res.blob();
+                if (blob) {
+                  const idbUrl = await storeMediaAsIdbReference(blob);
+                  return {
+                    type: "video" as const,
+                    url: idbUrl,
+                    backupUrl: ""
+                  };
+                }
+              }
+            } catch (vErr) {
+              console.warn("Fallo el proxy de descarga local de HTML-video:", rawUrl, vErr);
+            }
+            return {
+              type: "video" as const,
+              url: rawUrl,
+              backupUrl: ""
+            };
+          })
+        );
+
+        processedVideos.forEach(vid => {
+          if (vid) importedMedia.push(vid);
+        });
+        
+        if (importedMedia.length > 0) {
+          setMediaList(importedMedia);
+        }
+        
+        notify(`🎉 ¡Excelente! Datos extraídos con éxito de tu código fuente HTML. ${importedMedia.length} imágenes procesadas de inmediato.`, "success");
+        setManualHtml("");
+        setShowHtmlBypass(false);
+
+        // Direct focusing and smooth scroll so the user knows exactly where and what to configure
+        setTimeout(() => {
+          const priceInput = document.getElementById("admin-price-input");
+          if (priceInput) {
+            priceInput.scrollIntoView({ behavior: "smooth", block: "center" });
+            priceInput.focus();
+            
+            const container = priceInput.closest("div");
+            if (container) {
+              container.classList.add("ring-2", "ring-emerald-500", "transition-all", "duration-500");
+              setTimeout(() => {
+                container.classList.remove("ring-2", "ring-emerald-500");
+              }, 4000);
+            }
+          }
+        }, 500);
+      } else {
+        throw new Error("No se pudo extraer la información del código fuente provisto.");
+      }
+    } catch (err: any) {
+      console.warn("Mercado Libre HTML import fail:", err);
+      setImportMlError(err.message || "Fallo al procesar el código HTML provisto.");
+      notify("Error al procesar HTML: " + (err.message || ""), "error");
     } finally {
       setIsImportingMl(false);
     }
@@ -2679,35 +3301,55 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             <p className="text-[11px] text-brand-500">Los datos ingresados por tus clientes durante el Checkout se sincronizarán directamente aquí de forma privada.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto border border-brand-200 rounded-xl bg-white">
-            <table className="min-w-full divide-y divide-brand-200 text-left text-xs text-brand-800">
-              <thead className="bg-brand-50 text-[9.5px] font-bold uppercase tracking-wider text-brand-700">
-                <tr>
-                  <th className="px-5 py-3.5">Cliente / Contacto</th>
-                  <th className="px-5 py-3.5">Dirección de Destino</th>
-                  <th className="px-5 py-3.5">Detalle Artículos</th>
-                  <th className="px-5 py-3.5">Estado de Envío / Código</th>
-                  <th className="px-5 py-3.5">Metodo de Pago / Total</th>
-                  <th className="px-5 py-3.5 text-center">Eliminar</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-100 bg-white">
-                {pendingOrders.map((order: any) => (
-                  <OrderRowComponent
-                    key={order.id}
-                    order={order}
-                    onDeleteOrder={onDeleteOrder}
-                    formatCurrency={formatCurrency}
-                    confirmDeleteOrderId={confirmDeleteOrderId}
-                    setConfirmDeleteOrderId={setConfirmDeleteOrderId}
-                    notify={notify}
-                    onViewReceipt={setSelectedReceipt}
-                    onUpdateOrderStatus={onUpdateOrderStatus}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Lg Table (Desktop View only) */}
+            <div className="hidden lg:block overflow-x-auto border border-brand-200 rounded-xl bg-white">
+              <table className="min-w-full divide-y divide-brand-200 text-left text-xs text-brand-800">
+                <thead className="bg-brand-50 text-[9.5px] font-bold uppercase tracking-wider text-brand-700">
+                  <tr>
+                    <th className="px-5 py-3.5">Cliente / Contacto</th>
+                    <th className="px-5 py-3.5">Dirección de Destino</th>
+                    <th className="px-5 py-3.5">Detalle Artículos</th>
+                    <th className="px-5 py-3.5">Estado de Envío / Código</th>
+                    <th className="px-5 py-3.5">Metodo de Pago / Total</th>
+                    <th className="px-5 py-3.5 text-center">Eliminar</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-100 bg-white">
+                  {pendingOrders.map((order: any) => (
+                    <OrderRowComponent
+                      key={order.id}
+                      order={order}
+                      onDeleteOrder={onDeleteOrder}
+                      formatCurrency={formatCurrency}
+                      confirmDeleteOrderId={confirmDeleteOrderId}
+                      setConfirmDeleteOrderId={setConfirmDeleteOrderId}
+                      notify={notify}
+                      onViewReceipt={setSelectedReceipt}
+                      onUpdateOrderStatus={onUpdateOrderStatus}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Touch-Friendly Card Stack (Visible ON PHONES) */}
+            <div className="block lg:hidden space-y-4">
+              {pendingOrders.map((order: any) => (
+                <MobileOrderCardComponent
+                  key={order.id}
+                  order={order}
+                  onDeleteOrder={onDeleteOrder}
+                  formatCurrency={formatCurrency}
+                  confirmDeleteOrderId={confirmDeleteOrderId}
+                  setConfirmDeleteOrderId={setConfirmDeleteOrderId}
+                  notify={notify}
+                  onViewReceipt={setSelectedReceipt}
+                  onUpdateOrderStatus={onUpdateOrderStatus}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -2982,76 +3624,160 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
               {/* Mercado Libre Import Tool */}
               {!editingProductId && (
-                <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 mb-5 text-left flex flex-col gap-2.5 animate-fadeIn">
+                <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 mb-5 text-left flex flex-col gap-3 animate-fadeIn">
                   <div className="flex items-center gap-2">
                     <div className="bg-amber-100 p-1.5 rounded-lg text-amber-805">
                       <Sparkles className="w-4 h-4 text-amber-800" />
                     </div>
                     <div>
                       <p className="text-[11.5px] font-bold text-amber-950 uppercase tracking-wide">Importador Express de Mercado Libre</p>
-                      <p className="text-[10px] text-amber-800 leading-tight">¿Tenés tu producto en Mercado Libre? Pegá el enlace abajo para auto-completar título, precio, descripción e imagen en 1 segundo.</p>
+                      <p className="text-[10px] text-amber-800 leading-tight">¿Tenés tu producto publicado en Mercado Libre? Pegá el enlace abajo para auto-completar título, precio, descripción e imágenes en 1 segundo.</p>
                     </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-2.5">
-                    <div className="flex-1 flex gap-1.5 items-stretch">
-                      <input
-                        type="text"
-                        placeholder="Pegá el enlace de tu artículo de Mercado Libre acá (ej: https://articulo.mercadolibre.com.ar/...)"
-                        value={mlImportUrl}
-                        onChange={(e) => setMlImportUrl(e.target.value)}
-                        className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
-                      />
+
+                  {!showHtmlBypass ? (
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <div className="flex-1 flex gap-1.5 items-stretch">
+                        <input
+                          type="text"
+                          placeholder="Pegá el enlace de tu artículo de Mercado Libre acá (ej: https://articulo.mercadolibre.com.ar/...)"
+                          value={mlImportUrl}
+                          onChange={(e) => setMlImportUrl(e.target.value)}
+                          className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const text = await navigator.clipboard.readText();
+                              if (text && text.trim()) {
+                                setMlImportUrl(text.trim());
+                                notify("Enlace obtenido del portapapeles con éxito.", "success");
+                              } else {
+                                notify("El portapapeles está vacío o no contiene un formato de texto válido.", "info");
+                              }
+                            } catch (err) {
+                              console.warn("Clipboard paste permission error:", err);
+                              notify("Por favor, pegá el enlace manteniendo presionado sobre la caja de texto (o presioná Ctrl+V para pegar manualmente).", "info");
+                            }
+                          }}
+                          className="px-3 bg-amber-100 hover:bg-amber-250 border border-amber-305 text-amber-950 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-[10.5px] font-bold uppercase tracking-wide transition-all active:scale-95"
+                          title="Pegar enlace copiado"
+                        >
+                          <Clipboard className="w-3.5 h-3.5 shrink-0 text-amber-900" />
+                          <span>Pegar</span>
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        onClick={async () => {
-                          try {
-                            const text = await navigator.clipboard.readText();
-                            if (text && text.trim()) {
-                              setMlImportUrl(text.trim());
-                              notify("Enlace obtenido del portapapeles con éxito.", "success");
-                            } else {
-                              notify("El portapapeles está vacío o no contiene un formato de texto válido.", "info");
-                            }
-                          } catch (err) {
-                            console.warn("Clipboard paste permission error:", err);
-                            notify("Por favor, pegá el enlace manteniendo presionado sobre la caja de texto (o presioná Ctrl+V para pegar manualmente).", "info");
-                          }
-                        }}
-                        className="px-3 bg-amber-100 hover:bg-amber-250 border border-amber-305 text-amber-950 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-[10.5px] font-bold uppercase tracking-wide transition-all active:scale-95"
-                        title="Pegar enlace copiado"
+                        disabled={isImportingMl || !mlImportUrl.trim()}
+                        onClick={handleImportFromMercadoLibre}
+                        className={`px-5 py-2.5 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 border border-amber-300 text-amber-900 ${
+                          isImportingMl || !mlImportUrl.trim()
+                            ? "bg-amber-100/50 text-amber-400 cursor-not-allowed"
+                            : "bg-brand-900 hover:bg-black hover:text-white border-brand-900 active:scale-95 cursor-pointer text-white"
+                        }`}
                       >
-                        <Clipboard className="w-3.5 h-3.5 shrink-0 text-amber-900" />
-                        <span>Pegar</span>
+                        {isImportingMl ? (
+                          <>
+                            <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Importando...</span>
+                          </>
+                        ) : (
+                          <span>Importar enlace</span>
+                        )}
                       </button>
                     </div>
+                  ) : (
+                    <div className="flex flex-col gap-2.5 bg-white border border-amber-200/60 p-3.5 rounded-xl animate-fadeIn">
+                      <p className="text-[10.5px] font-bold text-amber-950">Bypass Manual Local Rápido (100% infalible contra captchas)</p>
+                      <p className="text-[10px] text-brand-700 leading-normal">
+                        Si la importación automática de arriba falla o Mercado Libre bloquea las fotos, podés extraer todo vos mismo de forma instantánea y local:
+                        <br />
+                        <strong className="text-amber-900">1.</strong> Entrá a la publicación en Mercado Libre.
+                        <br />
+                        <strong className="text-amber-900">2.</strong> Presioná <kbd className="bg-gray-100 px-1 border border-gray-350 rounded font-mono">Ctrl+U</kbd> o hacé clic derecho en la página y elegí <strong className="text-brand-900">"Ver código fuente de la página"</strong>.
+                        <br />
+                        <strong className="text-amber-900">3.</strong> Seleccioná todo el código (<kbd className="bg-gray-100 px-1 border border-gray-350 rounded font-mono">Ctrl+A</kbd>), copialo (<kbd className="bg-gray-100 px-1 border border-gray-350 rounded font-mono">Ctrl+C</kbd>).
+                        <br />
+                        <strong className="text-amber-900">4.</strong> Pegalo acá abajo y hacé clic en el botón negro:
+                      </p>
+                      <textarea
+                        rows={5}
+                        placeholder="Pegá todo el código HTML de la página de Mercado Libre acá..."
+                        value={manualHtml}
+                        onChange={(e) => setManualHtml(e.target.value)}
+                        className="w-full bg-amber-50/20 border border-amber-100 text-brand-950 p-2.5 text-xs rounded-lg font-mono focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
+                      />
+                      <div className="flex justify-end gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualHtml("");
+                            setShowHtmlBypass(false);
+                          }}
+                          className="px-4 py-2 hover:bg-gray-50 border border-gray-200 text-brand-800 text-[10px] uppercase font-bold tracking-wide rounded-lg cursor-pointer transition-all active:scale-95"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isImportingMl || !manualHtml.trim()}
+                          onClick={handleImportFromHtml}
+                          className={`px-4 py-2 font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all border border-brand-900 text-white ${
+                            isImportingMl || !manualHtml.trim()
+                              ? "bg-amber-100/50 text-amber-400 border-amber-100 cursor-not-allowed"
+                              : "bg-brand-900 hover:bg-black hover:border-black active:scale-95 cursor-pointer"
+                          }`}
+                        >
+                          {isImportingMl ? (
+                            <span className="flex items-center gap-1.5">
+                              <RotateCw className="w-3 h-3 animate-spin" /> Procesando Código...
+                            </span>
+                          ) : (
+                            <span>Extraer Datos del HTML</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {importMlError && (
+                    <div className="bg-red-50 border border-red-200 p-2.5 rounded-xl text-left animate-fadeIn">
+                      <p className="text-[10px] text-red-700 font-semibold leading-relaxed">
+                        ⚠️ Error: {importMlError}
+                      </p>
+                      {!showHtmlBypass && (
+                        <p className="text-[9.5px] text-red-500 mt-1 leading-normal">
+                          Mercado Libre detectó la petición automática como un bot y solicitó verificación. ¡No te preocupes! Hacé clic abajo en <strong>"Usar Bypass Manual Local"</strong> para solucionarlo de inmediato sin bloqueos de red.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Toggle alternative import bypass block */}
+                  <div className="flex items-center justify-between border-t border-amber-200/50 pt-2.5 mt-0.5">
                     <button
                       type="button"
-                      disabled={isImportingMl || !mlImportUrl.trim()}
-                      onClick={handleImportFromMercadoLibre}
-                      className={`px-5 py-2.5 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 border border-amber-300 text-amber-900 ${
-                        isImportingMl || !mlImportUrl.trim()
-                          ? "bg-amber-100/50 text-amber-400 cursor-not-allowed"
-                          : "bg-brand-900 hover:bg-black hover:text-white border-brand-900 active:scale-95 cursor-pointer text-white"
-                      }`}
+                      onClick={() => {
+                        setImportMlError("");
+                        setShowHtmlBypass(!showHtmlBypass);
+                      }}
+                      className="text-[10.5px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer transition-all tracking-wide flex items-center gap-1"
                     >
-                      {isImportingMl ? (
-                        <>
-                          <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Importando...</span>
-                        </>
+                      {showHtmlBypass ? (
+                        <span>✨ Volver a importación por enlace URL simple</span>
                       ) : (
-                        <span>Importar</span>
+                        <span>🛠️ ¿Falla la red o faltan fotos? Usar Bypass Manual Local (100% infalible)</span>
                       )}
                     </button>
                   </div>
-                  {importMlError && (
-                    <p className="text-[9.5px] text-red-600 font-semibold animate-pulse">{importMlError}</p>
-                  )}
+
                   {/* Explanatory helper box for immediate onboarding clarity */}
-                  <div className="mt-1 p-2 bg-amber-100/40 border border-amber-200/50 rounded-xl flex items-start gap-1.5 text-left">
+                  <div className="p-2.5 bg-amber-100/30 border border-amber-200/40 rounded-xl flex items-start gap-1.5 text-left">
                     <span className="text-xs">💡</span>
-                    <p className="text-[10px] sm:text-[10.5px] leading-relaxed text-amber-900">
-                      <strong>¿Qué pasa luego de importar?</strong> Los campos de abajo (Título, Fotos, Descripción, etc.) se rellenarán automáticamente con los datos de Mercado Libre. Podés verlos bajando un poco en esta pantalla. Ajustá el <strong>"Precio de Ahora"</strong> y haz clic en el botón negro <strong>"Publicar e Incorporar Producto"</strong> al final de todo para dejar el producto activo en la tienda.
+                    <p className="text-[10px] leading-relaxed text-amber-900">
+                      <strong>¿Qué pasa luego de importar?</strong> Los campos de abajo (Título, Fotos, Descripción, etc.) se rellenarán automáticamente con los datos reales de Mercado Libre. Podés verlos bajando un poco en esta pantalla. Ajustá el de <strong>"Precio de Ahora"</strong> y haz clic en el botón negro <strong>"Publicar e Incorporar Producto"</strong> al final de todo para dejar el producto activo en la tienda.
                     </p>
                   </div>
                 </div>
