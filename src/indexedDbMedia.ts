@@ -905,8 +905,8 @@ export function getApiUrl(urlPath: string): string {
     const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
     let backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
     
-    // Self-healing: if the backend points to a dev sandbox or localhost, but we are on production Vercel, force our live preview URL!
-    if (!backend || backend.includes("localhost") || backend.includes("127.0.0.1") || backend.includes("ais-dev-") || !backend.startsWith("http")) {
+    // Self-healing: only block invalid local hosts or raw empty formats, but allow active dev sandboxes so real-time testing from Vercel succeeds
+    if (!backend || backend.includes("localhost") || backend.includes("127.0.0.1") || !backend.startsWith("http")) {
       backend = fallbackBackend;
     }
     

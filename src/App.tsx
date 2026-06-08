@@ -168,8 +168,9 @@ export default function App() {
   useEffect(() => {
     async function registerLiveBackendUrl() {
       const isCloudRun = window.location.hostname.includes("run.app") || window.location.hostname.includes("localhost");
-      const isDevelopment = window.location.hostname.includes("localhost") || window.location.hostname.includes("127.0.0.1") || window.location.hostname.includes("ais-dev-");
-      if (isCloudRun && !isDevelopment && db) {
+      // Allow live development sandboxes to also register as active backends during live testing sessions
+      const isLocalHostOnly = window.location.hostname.includes("localhost") || window.location.hostname.includes("127.0.0.1");
+      if (isCloudRun && !isLocalHostOnly && db) {
         try {
           const docRef = doc(db, "settings", "github_config");
           const snap = await getDoc(docRef);
