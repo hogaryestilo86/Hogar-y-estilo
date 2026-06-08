@@ -139,6 +139,24 @@ export default function App() {
     };
   }, []);
 
+  // Resilient Domain Safeguard: Automatically redirect public visitors away from Vercel/GitHub temporary preview domains
+  // or inactive URLs to the official production URL (https://hogar-y-estilo.vercel.app), protecting presentation.
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    // Do NOT trigger redirect when developing or testing inside Google AI Studio container
+    const isAiStudio = hostname.includes("run.app") || hostname.includes("localhost") || hostname.includes("127.0.0.1");
+
+    if (!isAiStudio) {
+      const isOfficialProd = hostname === "hogar-y-estilo.vercel.app";
+      const isVercelPreview = hostname.includes(".vercel.app") && !isOfficialProd;
+      
+      if (isVercelPreview) {
+        console.log("⚠️ Redirigiendo desde entorno preview de Vercel al de producción oficial...");
+        window.location.replace("https://hogar-y-estilo.vercel.app");
+      }
+    }
+  }, []);
+
   // Synchronize the master GitHub and server URL config from Firestore on startup
   useEffect(() => {
     async function fetchGithubConfig() {

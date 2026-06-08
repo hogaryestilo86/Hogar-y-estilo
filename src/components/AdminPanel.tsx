@@ -394,18 +394,137 @@ export default function AdminPanel({
     }
   };
 
+  const parseMercadoLibreClientSide = async (mlUrl: string) => {
+    // Attempt to download the raw HTML of the PDP through a free and open CORS proxy
+    const corsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(mlUrl)}`;
+    const response = await fetch(corsUrl);
+    if (!response.ok) {
+      throw new Error(`Servidor de bypass de Mercado Libre inactivo o fuera de servicio temporalmente (${response.status})`);
+    }
+    const html = await response.text();
+    
+    // Exact replicates of the backend's OpenGraph and Schema extraction logic
+    const extractMeta = (propertyOrName: string): string => {
+      const regex = new RegExp(`<meta\\s+[^>]*(?:property|name)=["']${propertyOrName}["']\\s+[^>]*content=["']([^"']+)["']`, 'i');
+      const match = html.match(regex);
+      if (match && match[1]) {
+        return match[1]
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&#39;/g, "'")
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .trim();
+      }
+      return "";
+    };
+
+    const title = extractMeta("og:title") || extractMeta("twitter:title");
+    const description = extractMeta("og:description") || extractMeta("twitter:description");
+    const image = extractMeta("og:image") || extractMeta("twitter:image");
+
+    const imageUrls: string[] = [];
+    const imageIds = new Set<string>();
+    
+    // Match CDN identifiers of Mercado Libre images (e.g. D_NQ_NP_918512-MLA74026359281_012024-F.webp)
+    const mediaCdnRegex = /D_NQ_NP_(\d+-[a-zA-Z0-9_]+)-[A-Z]\.(?:webp|jpg|jpeg|png)/gi;
+    let imgMatch;
+    while ((imgMatch = mediaCdnRegex.exec(html)) !== null) {
+      if (imgMatch[1]) {
+        imageIds.add(imgMatch[1]);
+      }
+    }
+
+    if (image) {
+      imageUrls.push(image);
+      const ogMatch = image.match(/D_NQ_NP_(\d+-[a-zA-Z0-9_]+)/i);
+      if (ogMatch && ogMatch[1]) {
+        imageIds.delete(ogMatch[1]);
+      }
+    }
+
+    // Reconstruct the highest resolution original image pointers
+    for (const id of imageIds) {
+      if (imageUrls.length >= 12) break;
+      imageUrls.push(`https://http2.mlstatic.com/D_NQ_NP_${id}-O.jpg`);
+    }
+
+    const uniqueCleanImages = Array.from(new Set(imageUrls)).filter(img => {
+      return !img.includes("-C.jpg") && !img.includes("-I.jpg") && !img.includes("-V.jpg");
+    });
+
+    const videoUrls: string[] = [];
+    const mp4Regex = /https:\/\/[^\s"'`<>]+?\.mp4/gi;
+    let mp4Match;
+    const parsedMp4s = new Set<string>();
+    while ((mp4Match = mp4Regex.exec(html)) !== null) {
+      if (mp4Match[0].includes("mlstatic") || mp4Match[0].includes("melistatic") || mp4Match[0].includes("mercadolibre")) {
+        parsedMp4s.add(mp4Match[0]);
+      }
+    }
+    for (const vUrl of parsedMp4s) {
+      if (videoUrls.length >= 2) break;
+      videoUrls.push(vUrl);
+    }
+
+    let price = extractMeta("product:price:amount");
+    if (!price) {
+      const schemaRegex = /"price"\s*:\s*"?(\d+(?:\.\d+)?)"?/i;
+      const schemaMatch = html.match(schemaRegex);
+      if (schemaMatch && schemaMatch[1]) {
+        price = schemaMatch[1];
+      }
+    }
+    if (!price) {
+      const fractionRegex = /class="[^"]*andes-money-amount__fraction[^"]*"[^>]*>([\d.,]+)<\/span>/i;
+      const match = html.match(fractionRegex);
+      if (match && match[1]) {
+        price = match[1].replace(/\./g, "").replace(/,/g, "");
+      }
+    }
+
+    let cleanTitle = title;
+    if (cleanTitle) {
+      cleanTitle = cleanTitle.replace(/\s*[||-]\s*Mercado\s*Libre.*/gi, "");
+    }
+
+    return {
+      success: true,
+      title: cleanTitle || "Artículo Importado",
+      description: description || "",
+      price: price ? parseFloat(price) : 0,
+      imageUrl: image || "",
+      imageUrls: uniqueCleanImages,
+      videoUrls: videoUrls,
+      originalUrl: mlUrl
+    };
+  };
+
   const handleImportFromMercadoLibre = async () => {
     if (!mlImportUrl.trim()) return;
     setIsImportingMl(true);
     setImportMlError("");
     try {
       notify("Conectando con Mercado Libre para descargar los datos del artículo...", "info");
-      const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(mlImportUrl.trim())}`));
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || `Error HTTP ${res.status}`);
+      
+      let data: any = null;
+      try {
+        const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(mlImportUrl.trim())}`));
+        if (res.ok) {
+          data = await res.json();
+        } else {
+          console.warn(`Backend import returned status ${res.status}, using client-side fallback.`);
+        }
+      } catch (backErr) {
+        console.warn("Backend import fetch error, switching to resilient client-side fallback:", backErr);
       }
-      const data = await res.json();
+
+      // If backend was unreachable or returned an error, run our powerful direct-client browser parser!
+      if (!data || !data.success) {
+        notify("Usando extractor secundario directo del navegador para evadir bloqueos de red...", "info");
+        data = await parseMercadoLibreClientSide(mlImportUrl.trim());
+      }
+
       if (data && data.success) {
         setTitle(data.title || "");
         setBasePrice(data.price ? String(data.price) : "");
@@ -419,6 +538,7 @@ export default function AdminPanel({
         const importedMedia: ProductMedia[] = [];
 
         // Parallel high-performance downloader using our backend media proxy to completely avoid CORS blockages
+        // Falls back seamlessly to direct high-res CDN pointers if the backend is authenticated/restricted!
         const processedImages = await Promise.all(
           rawImages.map(async (rawUrl: string) => {
             try {
@@ -490,7 +610,7 @@ export default function AdminPanel({
         notify(`¡Excelente! Artículo importado con ${importedMedia.length} archivos de alta resolución guardados en tu sistema local.`, "success");
         setMlImportUrl("");
       } else {
-        throw new Error(data.error || "No se pudo extraer la información.");
+        throw new Error(data?.error || "No se pudo extraer la información de Mercado Libre.");
       }
     } catch (err: any) {
       console.warn("Mercado Libre import fail:", err);
