@@ -211,6 +211,183 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     }
   });
 
+  // API Endpoint: Dynamic Mercado Libre Import crawler proxy
+  app.get("/api/import-mercadolibre", async (req, res) => {
+    try {
+      const mlUrl = req.query.url as string;
+      if (!mlUrl) {
+        return res.status(400).json({ error: "Falta el parámetro 'url' de Mercado Libre." });
+      }
+
+      // Safe check to verify url is indeed a Mercado Libre link
+      if (!mlUrl.includes("mercadolibre.")) {
+        return res.status(400).json({ error: "La URL provista no pertenece a Mercado Libre." });
+      }
+
+      console.log(`[Mercado Libre Importer] Crawling: ${mlUrl}`);
+      
+      const curlResponse = await fetch(mlUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+          "Accept-Language": "es-AR,es;q=0.9,en;q=0.8"
+        }
+      });
+
+      if (!curlResponse.ok) {
+        throw new Error(`Mercado Libre respondió con código de estado HTTP ${curlResponse.status}`);
+      }
+
+      const html = await curlResponse.text();
+
+      // Simple, robust regex-based extraction of OpenGraph tags
+      const extractMeta = (propertyOrName: string): string => {
+        // match both property="..." and name="..."
+        const regex = new RegExp(`<meta\\s+[^>]*(?:property|name)=["']${propertyOrName}["']\\s+[^>]*content=["']([^"']+)["']`, 'i');
+        const match = html.match(regex);
+        if (match && match[1]) {
+          return match[1]
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&#39;/g, "'")
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .trim();
+        }
+        return "";
+      };
+
+      const title = extractMeta("og:title") || extractMeta("twitter:title");
+      const description = extractMeta("og:description") || extractMeta("twitter:description");
+      const image = extractMeta("og:image") || extractMeta("twitter:image");
+
+      // Extract multiple images hosted on Mercado Libre's high-speed CDN
+      const imageUrls: string[] = [];
+      const imageIds = new Set<string>();
+      
+      // Matches typical ML images format: D_NQ_NP_918512-MLA74026359281_012024-F.webp (captured ID: 918512-MLA74026359281_012024)
+      const mediaCdnRegex = /D_NQ_NP_(\d+-[a-zA-Z0-9_]+)-[A-Z]\.(?:webp|jpg|jpeg|png)/gi;
+      let imgMatch;
+      while ((imgMatch = mediaCdnRegex.exec(html)) !== null) {
+        if (imgMatch[1]) {
+          imageIds.add(imgMatch[1]);
+        }
+      }
+
+      // Prioritize the og:image as the first/primary thumbnail image
+      if (image) {
+        imageUrls.push(image);
+        const ogMatch = image.match(/D_NQ_NP_(\d+-[a-zA-Z0-9_]+)/i);
+        if (ogMatch && ogMatch[1]) {
+          imageIds.delete(ogMatch[1]);
+        }
+      }
+
+      // Convert extracted IDs to max-resolution original image URLs (-O.jpg indicator)
+      for (const id of imageIds) {
+        if (imageUrls.length >= 12) break; // Keep payload fast and clear
+        imageUrls.push(`https://http2.mlstatic.com/D_NQ_NP_${id}-O.jpg`);
+      }
+
+      // Clean up extracted image list to remove smaller sizing previews or placeholders
+      const uniqueCleanImages = Array.from(new Set(imageUrls)).filter(img => {
+        return !img.includes("-C.jpg") && !img.includes("-I.jpg") && !img.includes("-V.jpg");
+      });
+
+      // Extract MP4 video links hosted directly in Mercado Libre's video system (melistatic CDN)
+      const videoUrls: string[] = [];
+      const mp4Regex = /https:\/\/[^\s"'`<>]+?\.mp4/gi;
+      let mp4Match;
+      const parsedMp4s = new Set<string>();
+      while ((mp4Match = mp4Regex.exec(html)) !== null) {
+        if (mp4Match[0].includes("mlstatic") || mp4Match[0].includes("melistatic") || mp4Match[0].includes("mercadolibre")) {
+          parsedMp4s.add(mp4Match[0]);
+        }
+      }
+      for (const vUrl of parsedMp4s) {
+        if (videoUrls.length >= 2) break;
+        videoUrls.push(vUrl);
+      }
+
+      // Extract price
+      let price = "";
+      // 1. Try meta tags
+      price = extractMeta("product:price:amount");
+      
+      // 2. Fallback to parsing direct schema json or meta price tags
+      if (!price) {
+        const schemaRegex = /"price"\s*:\s*"?(\d+(?:\.\d+)?)"?/i;
+        const schemaMatch = html.match(schemaRegex);
+        if (schemaMatch && schemaMatch[1]) {
+          price = schemaMatch[1];
+        }
+      }
+
+      // If price is still missing, try matching typical Andes money fractions in Mercado Libre
+      if (!price) {
+        const fractionRegex = /class="[^"]*andes-money-amount__fraction[^"]*"[^>]*>([\d.,]+)<\/span>/i;
+        const match = html.match(fractionRegex);
+        if (match && match[1]) {
+          price = match[1].replace(/\./g, "").replace(/,/g, ""); // strip formatting
+        }
+      }
+
+      // Clean the title: remove things like " | MercadoLibre" or " - Mercado Libre"
+      let cleanTitle = title;
+      if (cleanTitle) {
+        cleanTitle = cleanTitle.replace(/\s*[||-]\s*Mercado\s*Libre.*/gi, "");
+      }
+
+      res.json({
+        success: true,
+        title: cleanTitle || "Artículo Importado",
+        description: description || "",
+        price: price ? parseFloat(price) : 0,
+        imageUrl: image || "",
+        imageUrls: uniqueCleanImages,
+        videoUrls: videoUrls,
+        originalUrl: mlUrl
+      });
+    } catch (err: any) {
+      console.error("[Mercado Libre Importer] Error fetching URL:", err);
+      res.status(500).json({
+        error: "No se pudo obtener la información de Mercado Libre. Es posible que el enlace temporalmente requiera captcha.",
+        details: err.message || err
+      });
+    }
+  });
+
+  // API Endpoint: Simple CORS proxy to download external media files server-side and return them to the admin client
+  app.get("/api/proxy-media", async (req, res) => {
+    try {
+      const mediaUrl = req.query.url as string;
+      if (!mediaUrl) {
+        return res.status(400).json({ error: "Falta el parámetro 'url'." });
+      }
+
+      console.log(`[Proxy Media] Downloading external media: ${mediaUrl}`);
+      const mediaResponse = await fetch(mediaUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+      });
+
+      if (!mediaResponse.ok) {
+        throw new Error(`Media response status ${mediaResponse.status}`);
+      }
+
+      const contentType = mediaResponse.headers.get("content-type") || "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+
+      const arrayBuffer = await mediaResponse.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      res.send(buffer);
+    } catch (err: any) {
+      console.error("[Proxy Media] Error proxying:", err);
+      res.status(500).json({ error: "No se pudo obtener la imagen externa.", details: err.message });
+    }
+  });
+
   // API Endpoint: Direct upload of media file (base64 or binary stream) to alleviate IndexedDB desynchronizations
   app.post("/api/upload-media", async (req, res) => {
     try {

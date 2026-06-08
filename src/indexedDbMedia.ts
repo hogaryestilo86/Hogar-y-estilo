@@ -299,7 +299,7 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
                   });
                   const base64Data = dataUrl.split(",")[1];
                   
-                  const uploadRes = await fetch("/api/upload-media", {
+                  const uploadRes = await fetch(getApiUrl("/api/upload-media"), {
                     method: "POST",
                     headers: {
                       "Content-Type": "application/json"
@@ -535,13 +535,25 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
       resolvedUrl = "/" + resolvedUrl;
     }
     
-    // Rewrite relative /uploads/ URLs to native relative paths so they are served directly by Vercel/localhost (supporting range content, video streaming, and CDN longevity)
-    if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
+    // Rewrite relative /uploads/ URLs or absolute URLs containing /uploads/ dynamically
+    if (resolvedUrl && resolvedUrl.includes("/uploads/")) {
       const filename = resolvedUrl.split("/").pop();
       if (filename) {
-        // ALWAYS return relative path as primary URL.
-        // This makes Vercel serve the static file natively from its fast CDN with full video range stream support (perfect Safari/Instagram playback).
-        return `/uploads/${filename}`;
+        const isLocalOrPreview = window.location.hostname.includes("run.app") || 
+                                 window.location.hostname.includes("localhost") || 
+                                 window.location.hostname.includes("127.0.0.1");
+        
+        // If we are browsing from a Vercel production/preview domain, we MUST use the absolute backend URL
+        // because Vercel doesn't have these dynamic uploads in its static asset tree!
+        if (!isLocalOrPreview) {
+          const gConfig = (window as any).__GITHUB_CONFIG__;
+          const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
+          const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+          return `${backend}/uploads/${filename}`;
+        } else {
+          // If we are in development or previewing on Cloud Run itself, relative path `/uploads/` will resolve correctly!
+          return `/uploads/${filename}`;
+        }
       }
     }
 
@@ -872,6 +884,33 @@ export function preloadProductMedia(products: Product[]): void {
       });
     }
   });
+}
+
+/**
+ * Resolves any relative /api/ path to the actual Cloud Run backend URL
+ * when browsing the application on a public domain like Vercel.
+ */
+export function getApiUrl(urlPath: string): string {
+  if (!urlPath) return "";
+  if (urlPath.startsWith("http") || urlPath.startsWith("data:") || urlPath.startsWith("idb:") || urlPath.startsWith("blob:")) {
+    return urlPath;
+  }
+  
+  const isLocalOrPreview = window.location.hostname.includes("run.app") || 
+                           window.location.hostname.includes("localhost") || 
+                           window.location.hostname.includes("127.0.0.1");
+  
+  if (!isLocalOrPreview) {
+    const gConfig = (window as any).__GITHUB_CONFIG__;
+    const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
+    const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+    
+    // Ensure we don't have double slashes
+    const cleanPath = urlPath.startsWith("/") ? urlPath : `/${urlPath}`;
+    return `${backend}${cleanPath}`;
+  }
+  
+  return urlPath;
 }
 
 

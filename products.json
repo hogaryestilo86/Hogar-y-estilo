@@ -1,485 +1,53 @@
 [
   {
-    "description": "Mantené tu casa en total armonía y transformá el caos en puro diseño. En Hogar y Estilo pensamos en tu comodidad cotidianas, por eso te traemos este set de organizadores que combina funcionalidad extrema con una estética súper delicada en tono crema, ideal para acoplarse a la decoración de tu hogar en Rosario. **Detalles de Diseño**: * Versatilidad total: Tres cajones modulares que podés apilar para aprovechar el espacio vertical o plegar por completo si no los estás usando. * Movilidad práctica: El cajón inferior viene equipado con ruedas reforzadas para que traslades todo el conjunto con total suavidad. * Medidas ideales: El set completo apilado mide 72 x 42 x 26 cm, la escala perfecta para tu vestidor, baño o zona de planchado. * Color Crema Soft: Un tono neutro y distinguido que aporta calidez visual de forma inmediata. Sumá este aliado del orden a tus rincones y disfrutá de un espacio mucho más libre y relajado. ¡Renová tus ambientes hoy mismo!",
-    "paused": false,
-    "isCustom": true,
-    "featured": true,
-    "id": "prod-custom-1780656346644",
-    "title": "Set de Cajones Apilables y Plegables Crema Soft - Organizador Premium",
-    "reviews": [
-      {
-        "id": "rev-auto-1780656346644",
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "date": "Hoy"
-      }
-    ],
-    "features": [
-      "organizador apilable premium",
-      "cajones plegables diseño",
-      "organizador de hogar crema",
-      "cajonera con ruedas funcional",
-      "orden y decoracion rosario",
-      "hogar y estilo organizacion"
-    ],
-    "basePrice": 115875,
-    "beforePrice": 125968,
-    "category": "Cocina",
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870423753_58945.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870423753_58945.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870426430_28520.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870426430_28520.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870428749_14664.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870428749_14664.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870430375_39634.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870430375_39634.jpg"
-      }
-    ]
-  },
-  {
-    "featured": true,
-    "title": "Cafetera Espresso Premium Barista con Vaporizador de Leche",
-    "reviews": [
-      {
-        "date": "Hoy",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "id": "rev-auto-1780624419149"
-      }
-    ],
-    "id": "prod-custom-1780624419149",
-    "description": "Empezá tus mañanas con ese aroma a café recién hecho que tanto amás. Con nuestra Cafetera Espresso de diseño sofisticado, vas a poder transformar tu cocina en tu propia cafetería de especialidad. Sentí el placer de un espresso perfecto, con la consistencia y temperatura ideales para arrancar tu día con toda la energía y el estilo que te merecés.\n\n**Detalles de Diseño**\n- **Rapidez y eficiencia:** Prepará hasta 4 tazas de un espresso intenso en tan solo 4 minutos.\n- **Espumado perfecto:** Creá cappuccinos y lattes súper cremosos gracias a su potente vaporizador integrado.\n- **Extracción ideal:** Lográ el sabor más puro y equilibrado con su sistema de extracción constante a 92°C y bomba de 3.5 bar.\n- **Potencia de vanguardia:** Sus 1000W garantizan un calentamiento rápido para que no tengas que esperar.\n- **Limpieza simple:** Cuenta con una bandeja de goteo extraíble súper práctica que mantiene tu mesada siempre impecable.\n\nAnimate a regalarte ese momento de relax y distinción todos los días. Sumá esta pieza de diseño a tu hogar y disfrutá del verdadero café como a vos te gusta.",
-    "isCustom": true,
-    "paused": false,
-    "beforePrice": 169870,
-    "basePrice": 150500,
+    "beforePrice": 196899,
+    "basePrice": 187402,
     "category": "Cocina",
     "features": [
-      "cafetera espresso premium",
-      "cafetera express con vaporizador",
-      "cafetera negra elegante",
-      "capuchino en casa",
-      "diseño de cocina moderno",
-      "cafetera express 1000w"
+      "cafetera expresso retro",
+      "cafetera vintage negra",
+      "cafetera 20 bar premium",
+      "cafetera express profesional",
+      "cafetera semi automatica",
+      "espresso gourmet en casa"
     ],
-    "media": [
-      {
-        "type": "video",
-        "url": "idb://media_1780861430064_or1e3yglm",
-        "backupUrl": ""
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870432555_61494.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870432555_61494.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870433882_60375.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870433882_60375.jpg"
-      }
-    ]
-  },
-  {
-    "isCustom": true,
-    "paused": false,
-    "description": "Olvidate de las improvisaciones. Con nuestro Costurero Organizador Premium de 128 piezas, vas a tener absolutamente todo lo que necesitás para tus proyectos de costura y soluciones cotidianas en un solo lugar, súper ordenado y con el estilo que tu hogar se merece. Es ese aliado infaltable que combina practicidad y elegancia para resolver cualquier detalle en un abrir y cerrar de ojos.\n\n**Detalles de Diseño**\n- **Kit súper completo:** Cuenta con 128 piezas esenciales seleccionadas para resolver desde un botón suelto hasta tus proyectos de tejido y bordado más creativos.\n- **Estuche compacto y sofisticado:** Una práctica bolsa de almacenamiento negra con cierre que mantiene todo perfectamente ordenado, ideal para guardar en cualquier rincón de tu casa o llevar con vos de viaje.\n- **Variedad de colores:** Incluye 40 carretes de hilos de diversos tonos para que siempre encuentres la combinación exacta que tu ropa necesita.\n- **Accesorios de precisión:** Viene equipado con tijera, lupa, cinta métrica, dedal metálico y una excelente variedad de agujas de alta calidad para facilitar cada una de tus tareas cotidianas.\n\nDale a tu hogar la practicidad que estabas buscando y mantené tus prendas siempre impecables de la forma más fácil. ¡Sumá este costurero esencial a tu vida y disfrutá de la tranquilidad de tener todo resuelto!",
-    "title": "Costurero Organizador Premium 128 Piezas con Estuche Compacto",
-    "id": "prod-custom-1780620747237",
+    "featured": true,
+    "title": "Cafetera Expresso Retro Noir Semi Automática 20 Bar",
     "reviews": [
       {
         "rating": 5,
         "author": "Curador de Hogar y Estilo",
         "date": "Hoy",
-        "id": "rev-auto-1780620747237",
+        "id": "rev-auto-1780351046159",
         "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño."
       }
     ],
-    "featured": false,
-    "features": [
-      "costurero premium completo",
-      "set de costura 128 piezas",
-      "estuche organizador de costura",
-      "kit de costura para el hogar",
-      "agujas e hilos de calidad",
-      "accesorios de costura rosario"
-    ],
-    "beforePrice": 24780,
-    "basePrice": 19958,
-    "category": "Belleza & Cuidado Personal",
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870435108_90668.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870435108_90668.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870436646_35423.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870436646_35423.jpg"
-      }
-    ]
-  },
-  {
-    "features": [
-      "organizador de cocina con ruedas",
-      "mueble auxiliar de cocina",
-      "estantería móvil reforzada",
-      "organización del hogar rosario",
-      "organizador vertical grande",
-      "diseño moderno minimalista"
-    ],
-    "basePrice": 41647,
-    "beforePrice": 48963,
-    "category": "Cocina",
-    "description": "¿Sentís que a tu cocina le falta ese toque de orden y sofisticación para que todo fluya mejor? Con nuestro Organizador Vertical Premium Loft, vas a poder transformar tus rincones cotidianos en un espacio súper funcional y estético. Diseñado especialmente para quienes valoran la practicidad sin resignar diseño, este mueble es el aliado perfecto para optimizar cada centímetro de tu hogar con la calidez y calidad que nos caracteriza en Hogar y Estilo.\n\n**Detalles de Diseño**\n- **Estructura ultra resistente:** Combinación perfecta de acero de alta durabilidad y estantes de PVC premium, pensados para resistir el uso diario.\n- **Movilidad absoluta:** Equipado con ruedas reforzadas de suave deslizamiento para que lo muevas con total facilidad y limpies tu cocina sin esfuerzo.\n- **Gran capacidad vertical:** Sus generosas dimensiones de 170cm x 32cm x 42cm te permiten almacenar todo lo que necesitás ocupando el mínimo espacio en el suelo.\n- **Estilo versátil y moderno:** Su diseño minimalista se adapta perfectamente tanto a tu cocina como a una despensa, lavadero o rincón de planchado.\n\nRenová tu cocina hoy mismo y disfrutá del placer de tener todo en su lugar. ¡Sumalo a tu hogar y dale ese mimo que te merecés!",
-    "isCustom": true,
-    "paused": false,
-    "featured": true,
-    "title": "Organizador de Cocina Vertical Premium Loft con Ruedas",
-    "id": "prod-custom-1780614181631",
-    "reviews": [
-      {
-        "rating": 5,
-        "author": "Curador de Hogar y Estilo",
-        "date": "Hoy",
-        "id": "rev-auto-1780614181631",
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño."
-      }
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870438065_67020.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870438065_67020.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870444323_49486.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870444323_49486.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870445654_76898.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870445654_76898.jpg"
-      }
-    ]
-  },
-  {
-    "featured": false,
-    "id": "prod-custom-1780613575038",
-    "reviews": [
-      {
-        "id": "rev-auto-1780613575038",
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "date": "Hoy"
-      }
-    ],
-    "title": "Organizador Bajo Cama de Diseño con Visor Textil Gris",
-    "description": "¿Sentís que te falta espacio para guardar tus mantas o la ropa de otra temporada? Con nuestro Organizador Bajo Cama, vas a transformar por completo la forma en que aprovechás cada rincón de tu habitación. Pensado para quienes buscan el equilibrio perfecto entre funcionalidad y estética, este organizador te ayuda a mantener el orden visual de tu dormitorio, aportando esa calidez y paz mental que tanto te merecés al llegar a casa.\\n\\n**Detalles de Diseño**\\n- **Medidas ideales**: Con dimensiones de 65cm x 45cm x 15cm, se desliza suavemente debajo de tu cama, optimizando el espacio al máximo.\\n- **Material de alta gama**: Confeccionado en un textil resistente de color gris neutro súper sofisticado, diseñado para integrarse con sutileza en cualquier estilo de decoración.\\n- **Visor inteligente**: Su ventana transparente te permite identificar de un solo vistazo lo que guardaste, ahorrándote tiempo y manteniendo todo impecable.\\n- **Protección garantizada**: Ideal para resguardar acolchados, sábanas o prendas delicadas, protegiéndolas del polvo con total delicadeza.\\n\\n¡Animate a renovar tus espacios cotidianos! Sumá este organizador a tu hogar y disfrutá de un dormitorio mucho más despejado, ordenado y armonioso. ¡Hacé tu pedido hoy!",
-    "paused": false,
-    "isCustom": true,
-    "category": "Hogar",
-    "beforePrice": 16990,
-    "basePrice": 12780,
-    "features": [
-      "organizador bajo cama",
-      "caja de guardado textil",
-      "orden del dormitorio",
-      "almacenamiento inteligente gris",
-      "contenedor de ropa premium",
-      "hogar y estilo rosario"
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870446990_57322.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870446990_57322.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870448326_39234.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870448326_39234.jpg"
-      }
-    ]
-  },
-  {
-    "paused": false,
-    "isCustom": true,
-    "description": "¿Sentís que el tender tradicional te ocupa medio balcón y rompe con la armonía de tu casa? Olvidate del desorden visual con nuestro Tender de Pared Retráctil. Pensado para optimizar cada rincón de tu hogar, combina funcionalidad premium y un diseño sutil que se adapta perfectamente a tu estilo de vida moderno. Llevá practicidad, orden y elegancia a tu patio, terraza o lavadero sin sacrificar tus metros cuadrados.\n\n**Detalles de Diseño**\n\n*   **Capacidad de tendido optimizada**: Te ofrece hasta 12 metros de cable extensible ultra resistente (3 mm de espesor revestido en PVC), ideal para secar tus prendas con total seguridad.\n*   **Estructura robusta y estética**: Fabricado con un cuerpo de ABS reforzado en un sobrio tono gris y un anclaje móvil de aluminio inalterable que aporta durabilidad y estilo.\n*   **Rotación de 180 grados**: Su soporte inteligente te permite girarlo completamente para que quede adosado a la pared cuando no lo estés usando, liberando espacio al instante.\n*   **Resistencia total a la intemperie**: Diseñado especialmente para soportar el sol y la humedad, convirtiéndolo en el aliado perfecto para exteriores y balcones.\n*   **Instalación sin complicaciones**: Incluye todos los accesorios de fijación (tornillos y tarugos) y cuenta con un sistema de freno automático para regular el largo a tu medida.\n\nHacé espacio para lo que de verdad importa. Renová tus ambientes cotidianos con una solución inteligente y disfrutá de un hogar siempre impecable. ¡Sumalo hoy a tu carrito!",
-    "reviews": [
-      {
-        "id": "rev-auto-1780608337257",
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "date": "Hoy"
-      }
-    ],
-    "id": "prod-custom-1780608337257",
-    "title": "Tender de Pared Retráctil y Extensible Minimalista 12 Metros",
-    "featured": true,
-    "features": [
-      "tender retractil de pared",
-      "tender extensible exterior",
-      "organizacion de lavadero",
-      "tender de ropa premium",
-      "tender para balcones",
-      "tender de pared giratorio"
-    ],
-    "basePrice": 28690,
-    "beforePrice": 33965,
-    "category": "Hogar",
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870449959_55257.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870449959_55257.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870451506_17116.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870451506_17116.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870452624_15050.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870452624_15050.jpg"
-      }
-    ]
-  },
-  {
-    "description": "Con nuestro Organizador Secaplatos Premium de 2 Niveles, transformás por completo tu mesada en un espacio funcional, limpio y con una estética moderna envidiable. Diseñado especialmente para optimizar cada rincón, este accesorio combina la máxima practicidad con un estilo minimalista que se roba todas las miradas. Llevá la calidez y la armonía a tu hogar, disfrutando de un espacio perfectamente ordenado.\n\n**Detalles de Diseño**\n* **Estructura Inteligente de Dos Niveles**: Maximizá el espacio de tu mesada permitiendo un secado rápido, higiénico y súper ordenado de toda tu vajilla.\n* **Accesorios Extraíbles y Versátiles**: Incluye un cubertero móvil y ganchos laterales para colgar tus utensilios favoritos, adaptándose por completo a tu dinámica diaria.\n* **Material de Alta Resistencia**: Fabricado en acero de primera calidad con un sofisticado acabado negro mate, asegurando máxima durabilidad y resistencia al uso cotidiano.\n* **Dimensiones Ideales**: Con sus medidas de 60cm x 28cm x 50cm, se adapta a la perfección sobre cualquier mesada sin perder comodidad de movimiento.\n\nDale a tu cocina el cambio que se merece y disfrutá de un espacio más práctico, ordenado y estético todos los días. ¡Sumalo hoy a tu hogar y renová tus rutinas con total comodidad!",
-    "paused": false,
-    "isCustom": true,
-    "featured": false,
-    "reviews": [
-      {
-        "date": "Hoy",
-        "rating": 5,
-        "author": "Curador de Hogar y Estilo",
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "id": "rev-auto-1780607460150"
-      }
-    ],
-    "id": "prod-custom-1780607460150",
-    "title": "Organizador Secaplatos de Cocina Premium de 2 Niveles en Acero Negro",
-    "features": [
-      "organizador de cocina premium",
-      "secaplatos de acero negro",
-      "escurridor de platos moderno",
-      "organización de cocina elegante",
-      "escurridor dos niveles minimalista",
-      "accesorios de cocina rosario"
-    ],
-    "category": "Cocina",
-    "basePrice": 99890,
-    "beforePrice": 108999,
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870453752_64196.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870453752_64196.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870455178_49755.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870455178_49755.jpg"
-      }
-    ]
-  },
-  {
-    "features": [
-      "organizador extraíble premium",
-      "organizador doble acrílico y acero",
-      "almacenamiento inteligente cocina",
-      "organizador de baño sofisticado",
-      "decoración de interiores rosario",
-      "optimización de espacios hogar"
-    ],
-    "category": "Hogar",
-    "basePrice": 28820,
-    "beforePrice": 34699,
-    "paused": false,
-    "isCustom": true,
-    "description": "Mantené el orden de tus ambientes con un toque de distinción y practicidad que te va a encantar. Imaginate abrir tus armarios y encontrar todo perfectamente organizado al instante. Este organizador deslizable de doble nivel combina la elegancia del acrílico con la resistencia del acero, logrando el equilibrio perfecto entre diseño y funcionalidad que buscás para tu hogar.\n\n**Detalles de Diseño**\n- **Sistema Deslizable Ultra Suave:** Accedé fácilmente a tus productos con un deslizamiento cómodo y rápido.\n- **Materiales de Alta Gama:** Estructura de acero súper firme y bandejas de acrílico transparente de alta resistencia que aportan luz y limpieza visual.\n- **Optimización en Dos Niveles:** Duplicá tu espacio de guardado en la mesada de la cocina, el baño o el vestidor.\n- **Medidas Compactas e Inteligentes:** Con dimensiones de 28,5 cm x 19,5 cm x 29 cm, se adapta a la perfección a cualquier rincón.\n\nSumá diseño y practicidad a tu vida cotidiana. ¡Hacé clic y renová tus espacios ahora!",
-    "title": "Organizador Deslizable de Doble Nivel Premium en Acero y Acrílico",
-    "reviews": [
-      {
-        "date": "Hoy",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "id": "rev-auto-1780603824833"
-      }
-    ],
-    "id": "prod-custom-1780603824833",
-    "featured": true,
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870456515_8231.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870456515_8231.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870457854_5274.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870457854_5274.jpg"
-      }
-    ]
-  },
-  {
-    "description": "Con nuestro organizador colgante de hierro, vas a transformar por completo la organización de tu cocina, ganando espacio útil y sumando un toque de diseño súper moderno y sofisticado. Es ideal para optimizar el interior de tus alacenas de una manera práctica, limpia y ultra estética.\n\n**Detalles de Diseño**\n* **Capacidad óptima:** Diseñado con 6 ganchos perfectamente distribuidos para colgar tus tazas de forma segura.\n* **Material Premium:** Fabricado en hierro pintado de alta resistencia en un distinguido color negro mate, ideal para combinar con cualquier estilo decorativo.\n* **Fácil instalación:** No requiere perforaciones ni pegamento. Se desliza suavemente en estantes de hasta 2,5 cm de espesor.\n* **Dimensiones inteligentes:** Cuenta con un largo total de 27,5 cm, ganchos de 4,5 cm de alto y una distancia de 4 cm entre cada uno para que tus tazas no se golpeen.\n\nAnimate a renovar tus mañanas y dale a tu cocina ese aire ordenado y de revista que tanto te gusta. ¡Llevate el tuyo y empezá a disfrutar de tus espacios!",
-    "isCustom": true,
-    "paused": false,
-    "featured": true,
-    "title": "Soporte Colgante de Hierro para Tazas y Alacenas Minimalista",
-    "id": "prod-custom-1780571848267",
-    "reviews": [
-      {
-        "id": "rev-auto-1780571848267",
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "rating": 5,
-        "author": "Curador de Hogar y Estilo",
-        "date": "Hoy"
-      }
-    ],
-    "features": [
-      "organizador de tazas colgante",
-      "soporte para alacena de hierro",
-      "orden de cocina moderno",
-      "estante porta tazas negro",
-      "accesorios de cocina minimalistas",
-      "organizadores de cocina rosario"
-    ],
-    "category": "Cocina",
-    "basePrice": 6794,
-    "beforePrice": 9946,
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870459178_27433.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870459178_27433.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870460503_29422.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870460503_29422.jpg"
-      }
-    ]
-  },
-  {
-    "basePrice": 27945,
-    "beforePrice": 32739,
-    "category": "Niños",
-    "features": [
-      "mochila infantil neopreno",
-      "mochila zoo impermeable",
-      "diseño ergonomico niños",
-      "accesorio infantil premium",
-      "mochila jardin libre bpa",
-      "mochila liviana niños"
-    ],
-    "featured": true,
-    "reviews": [
-      {
-        "id": "rev-auto-1780570594079",
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "date": "Hoy"
-      }
-    ],
-    "id": "prod-custom-1780570594079",
-    "title": "Mochila Infantil de Neopreno Impermeable Zoo Premium",
-    "description": "¡Preparate para llenar de ternura y comodidad los días de los más chicos! Con nuestra Mochila Zoo Premium, vas a transformar sus salidas y rutinas en momentos súper divertidos, manteniendo siempre ese estilo cuidado y de calidad que buscás para tu familia. Es un accesorio ultra liviano, suave al tacto y diseñado especialmente para resistir el ritmo de sus aventuras diarias.\n\n**Detalles de Diseño**\n- **Neopreno Impermeable**: Olvidate de las preocupaciones. Su material de alta calidad protege todas sus pertenencias de la lluvia y de los derrames accidentales.\n- **Ergonomía y Cuidado**: Cuenta con tirantes acolchados y completamente ajustables para que se adapten a su crecimiento y cuiden su espalda en cada paso.\n- **Distribución Inteligente**: Su práctico compartimiento interior te permite organizar fácilmente sus juguetes, mudas de ropa o la merienda.\n- **Seguridad Ante Todo**: Está fabricada con materiales 100% libres de BPA, garantizando la máxima protección para la salud de tus hijos.\n- **Liviana y Compacta**: Con un peso de solo 180 gramos y medidas ideales (27 cm x 23 cm x 9 cm), es perfecta para que la lleven solitos sin esfuerzo.\n\nHacé que sus paseos y tardes de jardín sean mágicos y súper cómodos. ¡Elegí el diseño que más les guste y renová sus accesorios con la calidad exclusiva de Hogar y Estilo!",
+    "id": "prod-custom-1780351046159",
+    "description": "Imaginate arrancar tus mañanas sintiendo el aroma del café recién hecho, con esa espuma perfecta que solo una máquina de especialidad te puede dar. Con nuestra Cafetera Expresso Retro Noir, vas a transformar tu cocina en tu cafetería favorita. Diseñada especialmente por Hogar y Estilo para quienes valoran los rituales diarios, esta pieza combina la calidez de una estética vintage con la máxima tecnología para que disfrutes de un café premium sin moverte de casa.\n\n**Detalles de Diseño**\n\n* **Presión profesional de 20 bar:** Extraé el máximo sabor y aroma de tus granos seleccionados, logrando un espresso con cuerpo y una crema irresistible de nivel barista.\n* **Potencia y rapidez de 1200W:** Olvidate de esperar. Su sistema de calentamiento rápido te asegura un café delicioso en segundos, ideal para optimizar tus mañanas.\n* **Vaporizador integrado:** Creá una espuma de leche súper cremosa y animate a preparar lattes, capuchinos y macchiatos perfectos de forma muy sencilla.\n* **Estética retro sofisticada:** Su diseño inspirado en las máquinas tradicionales y su acabado en color negro mate la convierten en la gran protagonista de tu mesada.\n* **Interfaz intuitiva y amigable:** Regulá de forma simple la intensidad y el volumen de cada taza para personalizar tu experiencia al máximo.\n\nDale a tus mañanas el mimo que te merecés y renová tus pausas cotidianas con distinción. ¡Llevá la tuya y empezá a disfrutar del verdadero café en tu hogar!",
     "paused": false,
     "isCustom": true,
     "media": [
       {
-        "type": "image",
-        "url": "/uploads/media_1780870461841_76259.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870461841_76259.jpg"
+        "url": "/uploads/media_1780363224775_73313.jpg",
+        "type": "image"
       },
       {
         "type": "image",
-        "url": "/uploads/media_1780870463167_11649.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870463167_11649.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870464702_67476.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870464702_67476.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870466140_38351.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870466140_38351.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870467457_17411.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870467457_17411.jpg"
+        "url": "/uploads/media_1780363224775_68444.jpg"
       }
     ]
   },
   {
-    "features": [
-      "organizador de acrílico circular",
-      "carrito auxiliar con ruedas",
-      "mueble organizador moderno",
-      "decoración minimalista rosario",
-      "estantería móvil transparente",
-      "hogar y estilo orden"
-    ],
-    "beforePrice": 48963,
-    "basePrice": 44986,
-    "category": "Hogar",
-    "paused": false,
-    "isCustom": true,
-    "description": "Con nuestro Carrito Organizador Circular, vas a transformar por completo la dinámica de tu hogar. Su diseño traslúcido y estilizado no solo optimiza el guardado, sino que aporta una ligereza visual única que hace que tus ambientes se vean más amplios, luminosos y sumamente distinguidos.\n\n**Detalles de Diseño**\n* **Tres niveles de acrílico premium:** Estantes circulares de alta resistencia y transparencia cristalina, ideales para exhibir tus objetos favoritos o tener tus esenciales de baño y cosmética siempre a mano.\n* **Estructura metálica minimalista:** Brinda un soporte ultra firme, combinando a la perfección la calidez del hogar con un toque contemporáneo e industrial refinado.\n* **Movilidad 360° sin esfuerzo:** Equipado con 4 ruedas multidireccionales de deslizamiento suave para que lo traslades con total comodidad según tus necesidades del día a día.\n* **Medidas ideales para optimizar espacio:** Con 67 cm de alto y 30 cm de diámetro, es la pieza perfecta para aprovechar cada rincón sin recargar visualmente el ambiente.\n\nAnimatelo a incorporar en tu living, tu dormitorio o tu espacio de relax. Llevate hoy esta pieza clave de diseño y empezá a disfrutar de un hogar mucho más armónico, práctico y con ese sello de distinción que tanto te gusta.",
-    "reviews": [
-      {
-        "date": "Hoy",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "id": "rev-auto-1780570135550"
-      }
-    ],
-    "title": "Carrito Auxiliar de Acrílico y Metal Circular - Estilo y Orden Móvil",
-    "id": "prod-custom-1780570135550",
-    "featured": true,
     "media": [
       {
         "type": "image",
-        "url": "/uploads/media_1780870468849_95529.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870468849_95529.jpg"
+        "url": "/uploads/media_1780363224776_32616.jpg"
       },
       {
-        "type": "image",
-        "url": "/uploads/media_1780870470338_28593.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870470338_28593.jpg"
+        "url": "/uploads/media_1780363224776_84158.jpg",
+        "type": "image"
       }
-    ]
-  },
-  {
+    ],
     "isCustom": true,
     "paused": false,
     "description": "Mantené tu hogar en perfecta sintonía y resolvé cada detalle con la elegancia que te caracteriza. El Set de Precisión Premium es el aliado indiscutido para quienes valoran la perfección, el orden y el cuidado de sus dispositivos más preciados. Diseñado para ofrecerte una experiencia fluida y sofisticada, este kit te permite cuidar, reparar y mantener tu tecnología con la delicadeza y prolijidad que tus espacios merecen.\n\n**Detalles de Diseño**\n* **Puntas de Acero Seleccionado**: 115 piezas magnéticas de alta resistencia para un acople perfecto, evitando desgastes y protegiendo tus dispositivos.\n* **Estuche Organizador Exclusivo**: Un diseño compacto, estético y funcional que mantiene cada pieza perfectamente ordenada y al alcance de tu mano.\n* **Ergonomía Superior**: Mango antideslizante con agarre suave que te brinda un control absoluto y sumamente cómodo en cada movimiento.\n* **Máxima Versatilidad**: La solución definitiva y elegante para reparar celulares, notebooks, consolas, cámaras y relojes con acabado profesional.\n\nDale a tus objetos cotidianos el cuidado que se merecen y renová tu forma de resolver cada proyecto. Sumá esta pieza de precisión a tu colección y disfrutá de la tranquilidad de tener el control en tus manos.",
@@ -505,19 +73,7 @@
     ],
     "category": "Herramientas",
     "beforePrice": 33449,
-    "basePrice": 29756,
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870471565_32333.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870471565_32333.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870473001_21135.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870473001_21135.jpg"
-      }
-    ]
+    "basePrice": 29756
   },
   {
     "featured": true,
@@ -535,6 +91,16 @@
     "description": "Simplificá tu día a día y sumá un toque de diseño contemporáneo a tus ambientes. Con este organizador móvil de tres niveles, vas a poder mantener el orden y la armonía en cualquier rincón de tu casa, desde la cocina hasta el baño, logrando esa combinación perfecta entre funcionalidad y calidez que tanto buscás para tu hogar.\n\n**Detalles de Diseño**\n- **Estructura Resistente y Duradera:** Fabricado en metal y polímero impermeable de alta resistencia, ideal para soportar la humedad del baño o el uso diario y exigente de la cocina.\n- **Movilidad Sin Esfuerzo:** Equipado con ruedas giratorias de suave deslizamiento y frenos de seguridad que te permiten trasladarlo con total comodidad y fijarlo exactamente donde lo necesités.\n- **Tres Niveles Desmontables:** Estantes amplios y fáciles de limpiar que te ofrecen una gran capacidad de almacenamiento sin ocupar espacio de más.\n- **Estética Neutra y Elegante:** Su acabado en color negro mate se adapta de forma orgánica a decoraciones modernas, industriales o nórdicas.\n\nAnimate a transformar tus espacios cotidianos. Llevate hoy tu organizador y disfrutá del placer de un hogar perfectamente ordenado y con estilo.",
     "isCustom": true,
     "paused": false,
+    "media": [
+      {
+        "type": "image",
+        "url": "/uploads/media_1780363224777_70563.jpg"
+      },
+      {
+        "url": "/uploads/media_1780363224777_37708.jpg",
+        "type": "image"
+      }
+    ],
     "beforePrice": 59763,
     "basePrice": 55460,
     "category": "Cocina",
@@ -545,197 +111,47 @@
       "mueble auxiliar industrial",
       "hogar y estilo rosario",
       "organizador con ruedas premium"
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870475050_72485.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870475050_72485.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870476273_86771.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870476273_86771.jpg"
-      },
-      {
-        "type": "video",
-        "url": "idb://media_1780870232359_49xfagchy",
-        "backupUrl": ""
-      }
     ]
   },
   {
+    "beforePrice": 176523,
+    "basePrice": 145694,
+    "category": "Cocina",
     "features": [
-      "lámpara led rgb rítmica",
-      "luces led inteligentes",
-      "decoración de livings modernos",
-      "iluminación ambiental gaming",
-      "lámpara usb control remoto",
-      "estilo contemporáneo hogar"
+      "freidora de aire digital",
+      "freidora sin aceite xl",
+      "electrodomésticos de diseño moderno",
+      "cocina saludable premium",
+      "freidora de aire 7 litros",
+      "cocina minimalista argentina"
     ],
-    "beforePrice": 42566,
-    "basePrice": 38256,
-    "category": "Iluminación",
-    "paused": false,
-    "isCustom": true,
-    "description": "Con nuestra Lámpara LED RGB Rítmica \"Lumina Tech\", vas a poder crear esa vibración perfecta que tu living, dormitorio o rincón de relax están pidiendo. Olvidate de las luces aburridas de siempre: animate a vivir una experiencia visual envolvente, diseñada para adaptarse a tu estado de ánimo y llenar de personalidad y calidez cada rincón de tu hogar.\n\n**Detalles de Diseño**\n- **Sincronización Audiorítmica:** Dejá que el ritmo de tu música favorita guíe el movimiento y la intensidad de las luces, creando un espectáculo sincronizado espectacular para tus visitas, sesiones de gaming o momentos de descanso.\n- **Control Absoluto en Tus Manos:** Regulá la intensidad, cambiá los colores y elegí los efectos dinámicos de forma súper cómoda a través del control remoto incluido o desde la app en tu celular.\n- **Conexión Práctica USB:** Olvidate de las instalaciones complicadas. Con su cable USB integrado, la conectás directo a la corriente o a tu computadora y ya está lista para brillar.\n- **Estilo Minimalista y Versátil:** Su diseño estilizado y moderno se adapta de manera impecable a tu oficina, mesita de luz o living, sumando estética tecnológica sin perder la elegancia.\n\nElegí el color de tu día y renová por completo tus rincones cotidianos. ¡Llevate la tuya y dale ese toque único que tu casa merece!",
-    "reviews": [
-      {
-        "date": "Hoy",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "id": "rev-auto-1780398485680"
-      }
-    ],
-    "id": "prod-custom-1780398485680",
-    "title": "Lámpara de Mesa LED RGB Rítmica Inteligente Lumina Tech",
-    "featured": false,
-    "media": [
-      {
-        "type": "video",
-        "url": "idb://media_1780861920086_rlme60000",
-        "backupUrl": ""
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870477602_87154.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870477602_87154.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870478683_41555.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870478683_41555.jpg"
-      }
-    ]
-  },
-  {
-    "features": [
-      "soporte celular de mesa astronauta",
-      "holder de diseño para celular",
-      "organizador de escritorio moderno",
-      "accesorio decorativo para celular",
-      "soporte universal estable",
-      "deco juvenil hogar y estilo"
-    ],
-    "category": "Hogar",
-    "basePrice": 9587,
-    "beforePrice": 13655,
-    "isCustom": true,
-    "paused": false,
-    "description": "Con el Soporte Astronauta Space, vas a transformar por completo tu espacio de trabajo o estudio. Olvidate de tener el celular tirado en cualquier lado; ahora podés mantenerlo siempre a la vista de una manera re canchera, ordenada y con toda la onda que te identifica.\n\n**Detalles de Diseño**\n\n* **Estabilidad total:** Diseñado con una base firme que sostiene tu dispositivo con total seguridad, evitando caídas.\n* **Versatilidad de uso:** Podés usar tu celular de forma vertical para videollamadas o scrollear en redes, o de forma horizontal para disfrutar de tus videos favoritos.\n* **Compatibilidad universal:** Se adapta perfectamente a cualquier marca y modelo de smartphone.\n* **Estilo lúdico y sofisticado:** Un accesorio de plástico resistente de alta calidad que además funciona como una hermosa pieza de decoración para tu hogar.\n\nDale un descanso a tus manos y llená de personalidad tus rincones cotidianos. ¡Sumalo hoy a tu carrito y disfrutá de un espacio más práctico y con estilo!",
-    "title": "Soporte de Mesa de Diseño Astronauta Space para Celular",
-    "id": "prod-custom-1780429909897",
+    "id": "prod-custom-1780363163283",
+    "title": "Freidora de Aire Digital Premium Smart 7L - Confort y Diseño Moderno",
     "reviews": [
       {
         "author": "Curador de Hogar y Estilo",
         "rating": 5,
         "date": "Hoy",
-        "id": "rev-auto-1780429909897",
+        "id": "rev-auto-1780363163283",
         "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño."
       }
     ],
-    "featured": false,
-    "media": [
-      {
-        "type": "video",
-        "url": "idb://media_1780861977753_0ematfm7z",
-        "backupUrl": ""
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870480065_885.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870480065_885.jpg"
-      }
-    ]
-  },
-  {
-    "description": "Manejá con total confort y olvidate del frío en cada uno de tus viajes. Te presentamos una solución ideal para transformar tus trayectos diarios en una experiencia de relax absoluto. Con nuestro almohadón térmico, vas a sentir una calidez reconfortante e inmediata que abraza tu cuerpo, aliviando tensiones y permitiéndote disfrutar del camino como te merecés.\n\nEste accesorio de alta gama combina tecnología y confort para integrarse de forma delicada a la estética de tu vehículo, brindándote un andar suave, cálido y sumamente placentero.\n\n**Detalles de Diseño**\n\n* **Calor Inmediato y Uniforme**: Aliviá la tensión muscular y combatí los días más fríos en segundos, logrando un bienestar único al manejar.\n* **Textura Soft de Alta Calidad**: Confeccionado en un material felpudo ultra suave al tacto, que aporta una calidez sumamente agradable y sofisticada.\n* **Diseño Ergonómico Inteligente**: Se adapta de forma impecable a la fisonomía de cualquier asiento, asegurando soporte y comodidad durante horas.\n* **Conectividad USB Práctica**: Pensado para tu comodidad cotidiana; se conecta fácilmente en tu auto o donde lo necesites sin instalaciones complicadas.\n\nDale a tu auto ese toque de distinción y confort que tanto buscás. ¡Sumalo hoy a tu carrito y transformá por completo tu forma de viajar!",
+    "featured": true,
     "paused": false,
     "isCustom": true,
-    "featured": false,
-    "id": "prod-custom-1780432496059",
-    "reviews": [
-      {
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "id": "rev-auto-1780432496059",
-        "date": "Hoy",
-        "rating": 5,
-        "author": "Curador de Hogar y Estilo"
-      }
-    ],
-    "title": "Almohadón Térmico Ergonómico para Auto con Conexión USB Gris Soft",
-    "features": [
-      "almohadón térmico para auto",
-      "cojín calefaccionado usb",
-      "accesorios de confort para autos",
-      "cubre asiento térmico",
-      "relax al manejar",
-      "bienestar y calidez en auto"
-    ],
-    "category": "Belleza & Cuidado Personal",
-    "basePrice": 59112,
-    "beforePrice": 62789,
+    "description": "¿Querés transformar tu cocina en un espacio de diseño y sabor sin complicaciones? En Hogar y Estilo seleccionamos para vos esta espectacular freidora de aire digital de 7 litros, pensada para simplificar tus días aportando una estética moderna, limpia y súper sofisticada. Disfrutá de tus platos favoritos de una manera mucho más saludable, rápida y con ese toque crocante que tanto te gusta, cuidando el bienestar de toda tu familia con total practicidad.\n\n### **Detalles de Diseño**\n* **Capacidad Familiar XL (7 Litros):** Prepará porciones generosas para compartir momentos únicos alrededor de la mesa, sin perder tiempo.\n* **Pantalla Táctil Intuitiva:** Controlá la temperatura y el tiempo de cocción de forma digital con un solo toque, sumando tecnología de vanguardia a tu mesada.\n* **Potencia y Versatilidad (1400W):** Horneá, asá, tostá y freí con aire caliente de manera uniforme gracias a su potente tecnología de circulación rápida.\n* **Estética Minimalista en Negro Mate:** Un diseño sofisticado que se integra perfectamente con cualquier estilo de decoración, aportando distinción y orden visual.\n* **Limpieza sin Esfuerzo:** Superficie con revestimiento antiadherente de alta calidad para que te olvides de refregar y disfrutes más de tu tiempo libre.\n\nAnimate a darle a tu cocina ese toque de distinción y bienestar que estabas buscando. ¡Sumala hoy a tu hogar y renová tu forma de cocinar!",
     "media": [
       {
-        "type": "video",
-        "url": "idb://media_1780862035661_umqg1ifxx",
-        "backupUrl": ""
+        "url": "/uploads/media_1780363224777_27676.jpg",
+        "type": "image"
       },
       {
         "type": "image",
-        "url": "/uploads/media_1780870481600_69587.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870481600_69587.jpg"
+        "url": "/uploads/media_1780363224777_20215.jpg"
       },
       {
-        "type": "image",
-        "url": "/uploads/media_1780870482825_83343.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870482825_83343.jpg"
-      }
-    ]
-  },
-  {
-    "featured": false,
-    "id": "prod-custom-1780451006361",
-    "reviews": [
-      {
-        "id": "rev-auto-1780451006361",
-        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
-        "author": "Curador de Hogar y Estilo",
-        "rating": 5,
-        "date": "Hoy"
-      }
-    ],
-    "title": "Set de Belleza Portátil Premium: Mini Planchita de Pelo y Kit de Manicuría con Estuche Rosa Chic",
-    "description": "Mimarte y lucir impecable en cualquier momento ahora es súper simple con este exclusivo set de cuidado personal de Hogar y Estilo. Sabemos que tu rutina de belleza te acompaña a donde vayas; por eso elegimos este combo ultra práctico con un diseño rosa pastel divino que vas a amar llevar con vos. Es el aliado perfecto para mantener tu estilo intacto en tu casa, la oficina o durante tu próximo viaje.\n\n**Detalles de Diseño**\n- **Portabilidad absoluta:** Diseñado con un tamaño ultra compacto, ideal para que lo guardes en tu cartera, mochila o valija sin ocupar espacio de más.\n- **Pelo dócil y prolijo:** La mini planchita es ideal para retocar tu flequillo, definir puntas o alisar tu cabello de forma rápida y súper cómoda.\n- **Uñas siempre perfectas:** El kit de manicuría y pedicuría viene equipado con herramientas de excelente precisión para cuidar tus manos y pies en cualquier lugar.\n- **Estuche protector rígido:** Mantener el orden es clave; por eso incluye un estuche de viaje elegante y duradero para que cada accesorio se mantenga seguro y en su lugar.\n\n¿Querés llevar tu ritual de cuidado personal al siguiente nivel de comodidad? Sumá este set a tus esenciales diarios y disfrutá de la practicidad de sentirte espléndida en todo momento.",
-    "isCustom": true,
-    "paused": false,
-    "category": "Belleza & Cuidado Personal",
-    "beforePrice": 23978,
-    "basePrice": 19508,
-    "features": [
-      "kit de belleza portatil",
-      "mini planchita de pelo",
-      "set manicuria rosa",
-      "organizacion de belleza viaje",
-      "set de cuidado personal premium",
-      "regalo estetica chic"
-    ],
-    "media": [
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870484262_40000.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870484262_40000.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870485701_97896.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870485701_97896.jpg"
-      },
-      {
-        "type": "image",
-        "url": "/uploads/media_1780870487331_74273.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1780870487331_74273.jpg"
+        "url": "/uploads/media_1780363224777_27131.jpg",
+        "type": "image"
       }
     ]
   }

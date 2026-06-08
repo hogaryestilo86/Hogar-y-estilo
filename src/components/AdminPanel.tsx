@@ -7,7 +7,7 @@ import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
 import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings } from "lucide-react";
-import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image } from "../indexedDbMedia";
+import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image, getApiUrl } from "../indexedDbMedia";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -295,6 +295,9 @@ export default function AdminPanel({
   });
   const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [mlImportUrl, setMlImportUrl] = useState("");
+  const [isImportingMl, setIsImportingMl] = useState(false);
+  const [importMlError, setImportMlError] = useState("");
   const [copiedJsonValue, setCopiedJsonValue] = useState<string | null>(null);
 
   // States for automated seamless GitHub catalog persistence
@@ -388,6 +391,113 @@ export default function AdminPanel({
       showToast(msg, type);
     } else {
       console.log(`[Toast Fallback] ${type.toUpperCase()}: ${msg}`);
+    }
+  };
+
+  const handleImportFromMercadoLibre = async () => {
+    if (!mlImportUrl.trim()) return;
+    setIsImportingMl(true);
+    setImportMlError("");
+    try {
+      notify("Conectando con Mercado Libre para descargar los datos del artículo...", "info");
+      const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(mlImportUrl.trim())}`));
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || `Error HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (data && data.success) {
+        setTitle(data.title || "");
+        setBasePrice(data.price ? String(data.price) : "");
+        setDescription(data.description || "");
+        
+        const rawImages = data.imageUrls || (data.imageUrl ? [data.imageUrl] : []);
+        const rawVideos = data.videoUrls || [];
+        
+        notify(`Procesando e importando ${rawImages.length + rawVideos.length} fotos y videos de Mercado Libre...`, "info");
+        
+        const importedMedia: ProductMedia[] = [];
+
+        // Parallel high-performance downloader using our backend media proxy to completely avoid CORS blockages
+        const processedImages = await Promise.all(
+          rawImages.map(async (rawUrl: string) => {
+            try {
+              const proxyUrl = getApiUrl(`/api/proxy-media?url=${encodeURIComponent(rawUrl)}`);
+              const res = await fetch(proxyUrl);
+              if (res.ok) {
+                const blob = await res.blob();
+                if (blob) {
+                  // Compresses image automatically and returns a light idb:// reference
+                  const idbUrl = await storeMediaAsIdbReference(blob);
+                  return {
+                    type: "image" as const,
+                    url: idbUrl,
+                    backupUrl: ""
+                  };
+                }
+              }
+            } catch (pErr) {
+              console.warn("Fallo el proxy de descarga local para la foto:", rawUrl, pErr);
+            }
+            return {
+              type: "image" as const,
+              url: rawUrl,
+              backupUrl: ""
+            };
+          })
+        );
+
+        processedImages.forEach(img => {
+          if (img) importedMedia.push(img);
+        });
+
+        // Parse and download videos from Mercado Libre if any are hosted on melistatic CDN
+        const processedVideos = await Promise.all(
+          rawVideos.map(async (rawUrl: string) => {
+            try {
+              const proxyUrl = getApiUrl(`/api/proxy-media?url=${encodeURIComponent(rawUrl)}`);
+              const res = await fetch(proxyUrl);
+              if (res.ok) {
+                const blob = await res.blob();
+                if (blob) {
+                  const idbUrl = await storeMediaAsIdbReference(blob);
+                  return {
+                    type: "video" as const,
+                    url: idbUrl,
+                    backupUrl: ""
+                  };
+                }
+              }
+            } catch (vErr) {
+              console.warn("Fallo el proxy de descarga local para el video:", rawUrl, vErr);
+            }
+            return {
+              type: "video" as const,
+              url: rawUrl,
+              backupUrl: ""
+            };
+          })
+        );
+
+        processedVideos.forEach(vid => {
+          if (vid) importedMedia.push(vid);
+        });
+        
+        if (importedMedia.length > 0) {
+          setMediaList(importedMedia);
+        }
+        
+        notify(`¡Excelente! Artículo importado con ${importedMedia.length} archivos de alta resolución guardados en tu sistema local.`, "success");
+        setMlImportUrl("");
+      } else {
+        throw new Error(data.error || "No se pudo extraer la información.");
+      }
+    } catch (err: any) {
+      console.warn("Mercado Libre import fail:", err);
+      setImportMlError(err.message || "No se pudo conectar al importador.");
+      notify("Fallo al importar de Mercado Libre: " + (err.message || ""), "error");
+    } finally {
+      setIsImportingMl(false);
     }
   };
 
@@ -569,6 +679,45 @@ export default function AdminPanel({
             } catch (err) {
               console.warn("Error interpretando data URL:", err);
             }
+          } else if (mediaItem.url.startsWith("blob:")) {
+            try {
+              addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Procesando enlace temporal (blob): "${prod.title || 'Multimedia'}"...`);
+              const blobRes = await fetchWithTimeout(mediaItem.url, {}, 8000);
+              const blob = await blobRes.blob();
+              if (blob) {
+                const ext = blob.type.includes("video/mp4") ? "mp4" : blob.type.includes("image/png") ? "png" : "jpg";
+                const filenameToUpload = `media_blob_${Date.now()}_${Math.floor(Math.random() * 100000)}.${ext}`;
+                filenameToUse = filenameToUpload;
+                
+                const isVideo = blob.type.startsWith("video/");
+                if (isVideo) {
+                  addProgressMsg(`ℹ️ Omitiendo video temporal de "${prod.title || 'Multimedia'}" en GitHub por eficiencia.`);
+                } else {
+                  if (blob.size > 4.5 * 1024 * 1024) {
+                    addProgressMsg(`⚠️ Omitida imagen pesada (>4.5MB): ${filenameToUpload}`);
+                  } else {
+                    const alreadyExists = existingUploads.has(filenameToUpload.toLowerCase());
+                    if (!alreadyExists) {
+                      const reader = new FileReader();
+                      const base64Promise = new Promise<string>((resolve, reject) => {
+                        reader.onloadend = () => {
+                          if (reader.result && typeof reader.result === "string") {
+                            resolve(reader.result.split(",")[1]);
+                          } else {
+                            reject(new Error("Fallo al leer blob"));
+                          }
+                        };
+                        reader.onerror = reject;
+                      });
+                      reader.readAsDataURL(blob);
+                      base64ToUpload = await base64Promise;
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn("Fallo al leer/subir archivo temporal blob:", err);
+            }
           } else if (mediaItem.url.startsWith("idb://")) {
             // Referencia a un archivo en IndexedDB local. ¡Lo subimos directamente a GitHub!
             const key = mediaItem.url.replace("idb://", "");
@@ -616,9 +765,11 @@ export default function AdminPanel({
                   base64ToUpload = await base64Promise;
                 } else if (alreadyExists) {
                   addProgressMsg(`✓ Confirmado en la nube: ${filenameToUpload}`);
-                  const backendBase = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
-                    ? "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app"
-                    : window.location.origin;
+                  const gConfig = (window as any).__GITHUB_CONFIG__;
+                  const cloudRunBackend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
+                  const backendBase = (window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1"))
+                    ? window.location.origin
+                    : cloudRunBackend;
                   mediaItem.backupUrl = `${backendBase}/uploads/${filenameToUpload}`;
                   mediaItem.url = `/uploads/${filenameToUpload}`;
                 }
@@ -703,9 +854,11 @@ export default function AdminPanel({
               
               if (putRes.ok) {
                 addProgressMsg(`✓ Guardado con éxito en la nube: ${filenameToUse}`);
-                const backendBase = window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1")
-                  ? "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app"
-                  : window.location.origin;
+                const gConfig = (window as any).__GITHUB_CONFIG__;
+                const cloudRunBackend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
+                const backendBase = (window.location.origin.includes("localhost") || window.location.origin.includes("127.0.0.1"))
+                  ? window.location.origin
+                  : cloudRunBackend;
                 mediaItem.backupUrl = `${backendBase}/uploads/${filenameToUse}`;
                 mediaItem.url = `/uploads/${filenameToUse}`;
                 existingUploads.add(filenameToUse.toLowerCase());
@@ -1355,7 +1508,7 @@ export default function AdminPanel({
       (async () => {
         try {
           // Direct stream upload (zero lag, no thread block, extremely efficient!)
-          const uploadRes = await fetch("/api/upload-media", {
+          const uploadRes = await fetch(getApiUrl("/api/upload-media"), {
             method: "POST",
             headers: {
               "Content-Type": "application/octet-stream",
@@ -1635,7 +1788,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     }
 
     try {
-      const response = await fetch("/api/optimize-description", {
+      const response = await fetch(getApiUrl("/api/optimize-description"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2406,6 +2559,52 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   >
                     Descartar Edición
                   </button>
+                </div>
+              )}
+
+              {/* Mercado Libre Import Tool */}
+              {!editingProductId && (
+                <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4 mb-5 text-left flex flex-col gap-2.5 animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-amber-100 p-1.5 rounded-lg text-amber-800">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[11.5px] font-bold text-amber-950 uppercase tracking-wide">Importador Express de Mercado Libre</p>
+                      <p className="text-[10px] text-amber-800 leading-tight">¿Tenés tu producto en Mercado Libre? Pegá el enlace abajo para auto-completar título, precio, descripción e imagen en 1 segundo.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Pegá el enlace de tu artículo de Mercado Libre acá (ej: https://articulo.mercadolibre.com.ar/...)"
+                      value={mlImportUrl}
+                      onChange={(e) => setMlImportUrl(e.target.value)}
+                      className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
+                    />
+                    <button
+                      type="button"
+                      disabled={isImportingMl || !mlImportUrl.trim()}
+                      onClick={handleImportFromMercadoLibre}
+                      className={`px-4 py-2 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center gap-1.5 border border-amber-300 text-amber-900 ${
+                        isImportingMl || !mlImportUrl.trim()
+                          ? "bg-amber-100/50 text-amber-400 cursor-not-allowed"
+                          : "bg-amber-100 hover:bg-amber-200 active:scale-95 cursor-pointer text-amber-950"
+                      }`}
+                    >
+                      {isImportingMl ? (
+                        <>
+                          <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Importando...</span>
+                        </>
+                      ) : (
+                        <span>Importar</span>
+                      )}
+                    </button>
+                  </div>
+                  {importMlError && (
+                    <p className="text-[9.5px] text-red-600 font-semibold animate-pulse">{importMlError}</p>
+                  )}
                 </div>
               )}
 
@@ -3579,7 +3778,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                             localStorage.removeItem("store_products_list");
                             notify("Catálogo vaciado localmente con éxito.", "success");
                             // Send empty payload to server to wipe also products.json on the server!
-                            fetch("/api/products", {
+                            fetch(getApiUrl("/api/products"), {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ products: [] })
@@ -3666,7 +3865,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                         setImportJsonInput("");
                         
                         // Push immediately to the server so it updates live on Vercel
-                        fetch("/api/products", {
+                        fetch(getApiUrl("/api/products"), {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ products: parsed })

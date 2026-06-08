@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { OrderDetails, CartItem, BankDetails } from "../types";
 import { X, CreditCard, Landmark, CheckCircle, ArrowRight, ClipboardCheck, ArrowLeft, ShieldAlert, DollarSign, HelpCircle, Copy, Instagram, Upload, Image } from "lucide-react";
-import { storeMedia, ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
+import { storeMedia, ResolvedImage, ResolvedVideo, getCategoryPlaceholder, getApiUrl } from "../indexedDbMedia";
 
 // Cache public key config to speed up payment brick loading and optimize conversions
 let cachedMpPublicConfig: { publicKey: string; isReal: boolean } | null = null;
@@ -74,7 +74,7 @@ export default function CheckoutModal({
     }
 
     if (!cachedMpPublicConfig) {
-      fetch("/api/mercadopago/config")
+      fetch(getApiUrl("/api/mercadopago/config"))
         .then((res) => {
           if (res.ok) return res.json();
           throw new Error();
@@ -304,7 +304,7 @@ export default function CheckoutModal({
             publicKey = cachedMpPublicConfig.publicKey;
             isReal = cachedMpPublicConfig.isReal;
           } else {
-            const configRes = await fetch("/api/mercadopago/config");
+            const configRes = await fetch(getApiUrl("/api/mercadopago/config"));
             if (configRes.ok) {
               const data = await configRes.json();
               publicKey = data.publicKey;
@@ -374,7 +374,7 @@ export default function CheckoutModal({
                 if (!active) return;
                 setLoading(true);
                 try {
-                  const res = await fetch("/api/mercadopago/payment", {
+                  const res = await fetch(getApiUrl("/api/mercadopago/payment"), {
                     method: "POST",
                     headers: {
                       "Content-Type": "application/json",

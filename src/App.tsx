@@ -14,7 +14,7 @@ import AdminPanel from "./components/AdminPanel";
 import OrderTracker from "./components/OrderTracker";
 import { INITIAL_PRODUCTS, PRESET_REVIEWS } from "./data";
 import { Product, CartItem, BankDetails } from "./types";
-import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB, preloadProductMedia } from "./indexedDbMedia";
+import { convertProductsIdbToBase64, saveProductsToIndexedDB, loadProductsFromIndexedDB, preloadProductMedia, getApiUrl } from "./indexedDbMedia";
 import { collection, getDocs, setDoc, doc, deleteDoc, getDoc, onSnapshot, disableNetwork } from "firebase/firestore";
 import { db, cleanObjectForFirestore } from "./firebase";
 import { Instagram, Star, Landmark, ShieldCheck, Heart, ArrowRight, MessageCircle, Play, Sparkles, Filter, Check, Gift, Volume2, VolumeX, Truck, ShoppingCart } from "lucide-react";
@@ -33,7 +33,16 @@ export function resolveImageUrl(url: string | undefined): string {
   if (resolvedUrl && (resolvedUrl.startsWith("/uploads/") || resolvedUrl.startsWith("uploads/"))) {
     const filename = resolvedUrl.split("/").pop();
     if (filename) {
-      // Use clean relative path natively. This ensures Vercel serves the static files (supporting video byte range streaming)
+      const isLocalOrPreview = window.location.hostname.includes("run.app") || 
+                               window.location.hostname.includes("localhost") || 
+                               window.location.hostname.includes("127.0.0.1");
+      
+      if (!isLocalOrPreview) {
+        const gConfig = (window as any).__GITHUB_CONFIG__;
+        const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
+        const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+        return `${backend}/uploads/${filename}`;
+      }
       return `/uploads/${filename}`;
     }
   }
@@ -277,7 +286,7 @@ export default function App() {
             console.log("[Catalog Loader] Fetching from fallback server API...");
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3500);
-            const res = await fetch("/api/products", { signal: controller.signal });
+            const res = await fetch(getApiUrl("/api/products"), { signal: controller.signal });
             clearTimeout(timeoutId);
 
             if (res.ok) {
@@ -345,7 +354,7 @@ export default function App() {
           const isCurrentlyAdmin = sessionStorage.getItem("is_admin_mode") === "true";
           if (loadedLocal.length > 0 && isCurrentlyAdmin) {
             console.log("[Catalog Loader] Self-healing: Re-populating out-of-sync backend server with local catalog...");
-            fetch("/api/products", {
+            fetch(getApiUrl("/api/products"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ products: finalProducts })
@@ -438,7 +447,7 @@ export default function App() {
           const controller = new AbortController();
           const localTimeoutId = setTimeout(() => controller.abort(), 4000);
           
-          const response = await fetch("/api/products", {
+          const response = await fetch(getApiUrl("/api/products"), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -1115,7 +1124,7 @@ export default function App() {
 
     // Disparar Webhook / Email automático en segundo plano de forma 100% silenciosa e invisible para el comprador
     try {
-      fetch("/api/send-order-email", {
+      fetch(getApiUrl("/api/send-order-email"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
