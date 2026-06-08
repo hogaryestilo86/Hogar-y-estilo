@@ -1166,21 +1166,28 @@ export default function AdminPanel({
       notify("Conectando con Mercado Libre para descargar los datos del artículo...", "info");
       
       let data: any = null;
+      
+      // Step A: Attempt high-performance browser-direct parsing FIRST (takes < ~300ms, immune to cold starts or server blocks)
       try {
-        const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(cleanedUrl)}`));
-        if (res.ok) {
-          data = await res.json();
-        } else {
-          console.warn(`Backend import returned status ${res.status}, using client-side fallback.`);
-        }
-      } catch (backErr) {
-        console.warn("Backend import fetch error, switching to resilient client-side fallback:", backErr);
-      }
-
-      // If backend was unreachable or returned an error, run our powerful direct-client browser parser!
-      if (!data || !data.success) {
-        notify("Usando extractor secundario directo del navegador para evadir bloqueos de red...", "info");
+        console.log("[Direct ML Import Client-Side] Attempting client-side official API...");
         data = await parseMercadoLibreClientSide(cleanedUrl);
+      } catch (clientErr) {
+        console.warn("[Direct ML Import Client-Side] Client-side parse failed, trying legacy backend helper:", clientErr);
+      }
+      
+      // Step B: Fallback to backend scraper ONLY if direct client-side parsing failed
+      if (!data || !data.success) {
+        notify("Conectando con extractor del servidor...", "info");
+        try {
+          const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(cleanedUrl)}`));
+          if (res.ok) {
+            data = await res.json();
+          } else {
+            console.warn(`Backend import returned status ${res.status}`);
+          }
+        } catch (backErr) {
+          console.warn("Backend import fallback failed:", backErr);
+        }
       }
 
       if (data && data.success) {
@@ -1330,20 +1337,55 @@ export default function AdminPanel({
     notify(`Buscando "${mlSearchQuery}" en Mercado Libre...`, "info");
     
     try {
-      const res = await fetch(getApiUrl(`/api/search-mercadolibre?q=${encodeURIComponent(mlSearchQuery.trim())}`));
-      if (!res.ok) {
-        throw new Error("Error en la conexión con el servidor.");
+      let results: any[] = [];
+      let success = false;
+      
+      // Step A: Attempt direct browser API search first (100% bypasses cold backend sleep times & server IP blocks)
+      try {
+        console.log("[Mercado Libre Direct Client Search] Fetching from public api...");
+        const directRes = await fetch(`https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(mlSearchQuery.trim())}&limit=15`);
+        if (directRes.ok) {
+          const data = await directRes.json();
+          results = (data.results || []).map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            price: item.price,
+            thumbnail: item.thumbnail ? item.thumbnail.replace("-I.jpg", "-O.jpg").replace("-V.jpg", "-O.jpg") : "",
+            permalink: item.permalink,
+            condition: item.condition
+          }));
+          success = true;
+          console.log("[Mercado Libre Direct Client Search] Found results count:", results.length);
+        } else {
+          console.warn(`Direct client search returned status ${directRes.status}, falling back to backend...`);
+        }
+      } catch (directErr) {
+        console.warn("[Mercado Libre Direct Client Search] Browser fetch failed/blocked, falling back to backend proxy:", directErr);
       }
-      const data = await res.json();
-      if (data.success && data.results) {
-        setMlSearchResults(data.results);
-        if (data.results.length === 0) {
+      
+      // Step B: Fallback to Backend Proxy search if browser-direct fetch failed
+      if (!success) {
+        console.log("[Mercado Libre Search Fallback] Calling backend search proxy...");
+        const res = await fetch(getApiUrl(`/api/search-mercadolibre?q=${encodeURIComponent(mlSearchQuery.trim())}`));
+        if (!res.ok) {
+          throw new Error("No se pudo conectar al servidor de búsqueda.");
+        }
+        const data = await res.json();
+        if (data.success && data.results) {
+          results = data.results;
+          success = true;
+        } else {
+          throw new Error(data.error || "La búsqueda falló en el servidor.");
+        }
+      }
+      
+      if (success) {
+        setMlSearchResults(results);
+        if (results.length === 0) {
           notify("No se encontraron productos con ese término.", "info");
         } else {
-          notify(`Encontrados ${data.results.length} productos de Mercado Libre listos para clonar.`, "success");
+          notify(`Encontrados ${results.length} productos de Mercado Libre listos para clonar.`, "success");
         }
-      } else {
-        throw new Error(data.error || "La búsqueda falló.");
       }
     } catch (err: any) {
       console.error("Search ML error:", err);
