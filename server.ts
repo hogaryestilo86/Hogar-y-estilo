@@ -801,6 +801,44 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     }
   });
 
+  // API Endpoint: Search products in Mercado Libre Argentina
+  app.get("/api/search-mercadolibre", async (req, res) => {
+    try {
+      const q = req.query.q as string;
+      if (!q) {
+        return res.status(400).json({ error: "Falta el término de búsqueda 'q'." });
+      }
+      
+      const searchUrl = `https://api.mercadolibre.com/sites/MLA/search?q=${encodeURIComponent(q)}&limit=15`;
+      console.log(`[Mercado Libre Search Proxy] Searching for: "${q}" via ${searchUrl}`);
+      
+      const response = await fetch(searchUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Mercado Libre API returned status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const results = (data.results || []).map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        price: item.price,
+        thumbnail: item.thumbnail ? item.thumbnail.replace("-I.jpg", "-O.jpg").replace("-V.jpg", "-O.jpg") : "",
+        permalink: item.permalink,
+        condition: item.condition
+      }));
+      
+      res.json({ success: true, results });
+    } catch (err: any) {
+      console.error("[Mercado Libre Search Proxy] Error:", err);
+      res.status(500).json({ error: "No se pudo realizar la búsqueda en Mercado Libre.", details: err.message });
+    }
+  });
+
   // API Endpoint: Simple CORS proxy to download external media files server-side and return them to the admin client
   app.get("/api/proxy-media", async (req, res) => {
     try {

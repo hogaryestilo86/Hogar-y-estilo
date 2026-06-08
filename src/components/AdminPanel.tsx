@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
-import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings, Clipboard, MessageCircle } from "lucide-react";
+import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings, Clipboard, MessageCircle, Search, Gift } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image, getApiUrl } from "../indexedDbMedia";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -579,6 +579,12 @@ export default function AdminPanel({
   const [showHtmlBypass, setShowHtmlBypass] = useState(false);
   const [copiedJsonValue, setCopiedJsonValue] = useState<string | null>(null);
 
+  // Mercado Libre direct integrated search database states
+  const [mlSearchQuery, setMlSearchQuery] = useState("");
+  const [mlSearchResults, setMlSearchResults] = useState<any[]>([]);
+  const [isSearchingMl, setIsSearchingMl] = useState(false);
+  const [mlImportMode, setMlImportMode] = useState<"search" | "url">("search");
+
   // States for automated seamless GitHub catalog persistence
   const [githubToken, setGithubToken] = useState(() => localStorage.getItem("github_sync_token") || "");
   const [githubRepo, setGithubRepo] = useState(() => localStorage.getItem("github_sync_repo") || "");
@@ -1115,8 +1121,8 @@ export default function AdminPanel({
     return raw;
   };
 
-  const handleImportFromMercadoLibre = async () => {
-    const cleanedUrl = extractAndSanitizeMlUrl(mlImportUrl);
+  const importUrlDirectly = async (targetUrl: string) => {
+    const cleanedUrl = extractAndSanitizeMlUrl(targetUrl);
     if (!cleanedUrl) {
       setImportMlError("Por favor, ingresá una URL o código de producto válido de Mercado Libre.");
       return;
@@ -1273,8 +1279,11 @@ export default function AdminPanel({
           setMediaList(importedMedia);
         }
         
-        notify(`🎉 ¡Excelente! Datos importados con éxitos y ${importedMedia.length} imágenes listas. Abajo podés definir el precio y publicar.`, "success");
         setMlImportUrl("");
+        setMlSearchQuery("");
+        setMlSearchResults([]);
+        
+        notify(`🎉 ¡Excelente! Datos importados con éxitos y ${importedMedia.length} imágenes listas. Abajo podés definir el precio y publicar.`, "success");
 
         // Direct focusing and smooth scroll so the user knows exactly where to view/configure the product and save it!
         setTimeout(() => {
@@ -1302,6 +1311,46 @@ export default function AdminPanel({
       notify("Fallo al importar de Mercado Libre: " + (err.message || ""), "error");
     } finally {
       setIsImportingMl(false);
+    }
+  };
+
+  const handleImportFromMercadoLibre = async () => {
+    await importUrlDirectly(mlImportUrl);
+  };
+
+  const handleSearchMercadoLibre = async () => {
+    if (!mlSearchQuery.trim()) {
+      notify("Ingresá qué querés buscar (ej: termo, sillón, mesa...)", "info");
+      return;
+    }
+    
+    setIsSearchingMl(true);
+    setMlSearchResults([]);
+    setImportMlError("");
+    notify(`Buscando "${mlSearchQuery}" en Mercado Libre...`, "info");
+    
+    try {
+      const res = await fetch(getApiUrl(`/api/search-mercadolibre?q=${encodeURIComponent(mlSearchQuery.trim())}`));
+      if (!res.ok) {
+        throw new Error("Error en la conexión con el servidor.");
+      }
+      const data = await res.json();
+      if (data.success && data.results) {
+        setMlSearchResults(data.results);
+        if (data.results.length === 0) {
+          notify("No se encontraron productos con ese término.", "info");
+        } else {
+          notify(`Encontrados ${data.results.length} productos de Mercado Libre listos para clonar.`, "success");
+        }
+      } else {
+        throw new Error(data.error || "La búsqueda falló.");
+      }
+    } catch (err: any) {
+      console.error("Search ML error:", err);
+      setImportMlError(err.message || "Fallo en la búsqueda de Mercado Libre.");
+      notify("No se pudieron obtener resultados de búsqueda.", "error");
+    } finally {
+      setIsSearchingMl(false);
     }
   };
 
@@ -3670,127 +3719,266 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   </div>
 
                   {!showHtmlBypass ? (
-                    <div className="space-y-3">
-                      <div className="flex flex-col sm:flex-row gap-2.5">
-                        <div className="flex-1 flex gap-1.5 items-stretch">
-                          <input
-                            type="text"
-                            placeholder="Pegá el enlace de cualquier producto público de Mercado Libre (ej: https://articulo.mercadolibre.com.ar/...)"
-                            value={mlImportUrl}
-                            onChange={(e) => setMlImportUrl(e.target.value)}
-                            className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
-                          />
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                const text = await navigator.clipboard.readText();
-                                if (text && text.trim()) {
-                                  setMlImportUrl(text.trim());
-                                  notify("Enlace obtenido del portapapeles con éxito.", "success");
-                                } else {
-                                  notify("El portapapeles está vacío o no contiene un formato de texto válido.", "info");
-                                }
-                              } catch (err) {
-                                console.warn("Clipboard paste permission error:", err);
-                                notify("Por favor, pegá el enlace manteniendo presionado sobre la caja de texto o presioná Ctrl+V.", "info");
-                              }
-                            }}
-                            className="px-3 bg-amber-100 hover:bg-amber-250 border border-amber-305 text-amber-950 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-[10.5px] font-bold uppercase tracking-wide transition-all active:scale-95"
-                            title="Pegar enlace copiado"
-                          >
-                            <Clipboard className="w-3.5 h-3.5 shrink-0 text-amber-900" />
-                            <span>Pegar</span>
-                          </button>
-                        </div>
+                    <div className="space-y-4">
+                      {/* Tabs Selector */}
+                      <div className="flex gap-1 bg-amber-100/60 p-1 rounded-xl">
                         <button
                           type="button"
-                          disabled={isImportingMl || !mlImportUrl.trim()}
-                          onClick={handleImportFromMercadoLibre}
-                          className={`px-5 py-2.5 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 border border-amber-300 text-amber-900 ${
-                            isImportingMl || !mlImportUrl.trim()
-                              ? "bg-amber-100/50 text-amber-400 cursor-not-allowed"
-                              : "bg-brand-900 hover:bg-black hover:text-white border-brand-900 active:scale-95 cursor-pointer text-white"
+                          onClick={() => setMlImportMode("search")}
+                          className={`flex-1 py-2 text-[11px] font-extrabold uppercase tracking-wide rounded-lg transition-all cursor-pointer ${
+                            mlImportMode === "search"
+                              ? "bg-amber-800 text-white shadow-xs animate-fadeIn"
+                              : "text-amber-850 hover:bg-amber-200/50"
                           }`}
                         >
-                          {isImportingMl ? (
-                            <>
-                              <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                              <span>Importando...</span>
-                            </>
-                          ) : (
-                            <span>Importar enlace</span>
-                          )}
+                          🔍 Buscar en Mercado Libre
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMlImportMode("url")}
+                          className={`flex-1 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded-lg transition-all cursor-pointer ${
+                            mlImportMode === "url"
+                              ? "bg-amber-800 text-white shadow-xs animate-fadeIn"
+                              : "text-amber-850 hover:bg-amber-200/50"
+                          }`}
+                        >
+                          🔗 Pegar Enlace URL
                         </button>
                       </div>
 
-                      {/* Clickable Real Examples to let the user understand how it works */}
-                      <div className="bg-amber-50/75 border border-amber-200/50 rounded-xl p-3 text-left">
-                        <p className="text-[10.5px] font-bold text-amber-950 flex items-center gap-1">
-                          <span>💡</span>
-                          <span>¿Querés probar cómo se importa? Hacé clic para rellenar con un ejemplo real:</span>
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1428258380-mesa-de-luz-auxiliar-travertino-nordica-moderna-_JM");
-                              notify("Ejemplo de 'Mesa Travertino' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
-                            }}
-                            className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                          >
-                            🪑 Mesa Travertino
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1748281982-sillon-divan-gervasoni-comodo-pana-premium-_JM");
-                              notify("Ejemplo de 'Sillón Gervasoni' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
-                            }}
-                            className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                          >
-                            🛋️ Sillón Gervasoni
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1393658245-ventilador-de-pared-y-pie-turbo-industrial-3-en-1-_JM");
-                              notify("Ejemplo de 'Ventilador' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
-                            }}
-                            className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
-                          >
-                            💨 Ventilador Industrial
-                          </button>
-                        </div>
-                      </div>
+                      {mlImportMode === "search" ? (
+                        <div className="space-y-3.5 animate-fadeIn text-left">
+                          <p className="text-[10.5px] font-medium text-amber-900 leading-normal">
+                            ¡El más fácil para celular! Escribí qué querés vender, mirá los resultados públicos y clonalo con un solo clic:
+                          </p>
+                          <div className="flex gap-1.5 items-stretch">
+                            <div className="relative flex-1">
+                              <input
+                                type="text"
+                                placeholder="Ej: Mesa de luz, Sillón Gervasoni, Termo Stanley..."
+                                value={mlSearchQuery}
+                                onChange={(e) => setMlSearchQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleSearchMercadoLibre();
+                                  }
+                                }}
+                                className="w-full bg-white border border-amber-200 rounded-xl pl-9 pr-3 py-2.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900 placeholder:text-gray-400"
+                              />
+                              <Search className="w-3.5 h-3.5 text-amber-700 absolute left-3 top-1/2 -translate-y-1/2" />
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isSearchingMl || isImportingMl}
+                              onClick={handleSearchMercadoLibre}
+                              className={`px-4 bg-brand-900 text-white hover:bg-black rounded-xl flex items-center justify-center gap-1 cursor-pointer text-xs font-bold uppercase tracking-wide transition-all active:scale-95 duration-100 ${
+                                isSearchingMl ? "opacity-60 cursor-not-allowed" : ""
+                              }`}
+                            >
+                              {isSearchingMl ? (
+                                <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <span>Buscar</span>
+                              )}
+                            </button>
+                          </div>
 
-                      {/* Visual Mobile Step by Step Guideline */}
-                      <div className="border border-brand-100 bg-white p-3.5 rounded-xl text-left space-y-2 animate-fadeIn shadow-xs">
-                        <p className="text-[11px] font-extrabold text-brand-950 uppercase tracking-wide flex items-center gap-1">
-                          <span>📱</span>
-                          <span>Guía corta: Cómo copiar el link de CUALQUIER producto desde tu celular</span>
-                        </p>
-                        <p className="text-[10px] text-brand-700 leading-relaxed font-light">
-                          No tenés que ir a "Vender" ni a tu panel de Mercado Libre personal. Podés clonar y revender cualquier producto libre del sitio:
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[9.5px] text-brand-800 leading-normal">
-                          <div className="bg-brand-50/50 p-2 rounded-lg border border-brand-100/40">
-                            <strong className="text-brand-900 block font-bold mb-0.5">Opción A: Desde la App de Mercado Libre </strong>
-                            1. Buscá el producto que querés vender (ej: Sillón, Mesa de Luz, etc).<br />
-                            2. Abrí el producto y tocá el icono de **Compartir** <span className="inline-block px-1 py-0.5 bg-gray-100 border rounded">Compartir 🔗</span> arriba a la derecha.<br />
-                            3. Elegí la opción <strong className="text-brand-900">"Copiar Enlace"</strong>.<br />
-                            4. Volvé acá, dale a <strong className="text-amber-900">"Pegar"</strong> e <strong className="font-bold">"Importar enlace"</strong>.
+                          {/* Search Results Display List */}
+                          {mlSearchResults && mlSearchResults.length > 0 && (
+                            <div className="border border-amber-205/60 bg-white rounded-xl divide-y divide-amber-100 overflow-hidden shadow-xs max-h-[300px] overflow-y-auto">
+                              <p className="bg-amber-100/40 text-[9.5px] font-extrabold uppercase tracking-widest text-amber-950 px-3 py-2 text-left">
+                                📑 Artículos encontrados en Mercado Libre (Seleccioná uno para clonar):
+                              </p>
+                              {mlSearchResults.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="p-2.5 flex items-center gap-3 hover:bg-amber-50/40 transition-colors group"
+                                >
+                                  {item.thumbnail ? (
+                                    <img
+                                      src={item.thumbnail}
+                                      alt={item.title}
+                                      referrerPolicy="no-referrer"
+                                      className="w-12 h-12 rounded-lg object-cover border border-amber-100 bg-gray-50 flex-shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
+                                      <Gift className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0 text-left">
+                                    <h4 className="text-[10.5px] font-bold text-brand-950 truncate group-hover:text-amber-900 transition-colors">
+                                      {item.title}
+                                    </h4>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-[11px] font-black text-amber-950">
+                                        ${Number(item.price).toLocaleString("es-AR")}
+                                      </span>
+                                      <span className="text-[8.5px] uppercase font-bold text-gray-400 bg-gray-100 px-1 rounded-sm">
+                                        Mercado Libre AR
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={isImportingMl || isSearchingMl}
+                                    onClick={() => importUrlDirectly(item.permalink)}
+                                    className={`px-3 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 flex items-center gap-1 shadow-2xs ${
+                                      isImportingMl
+                                        ? "bg-amber-100 text-amber-400 cursor-not-allowed"
+                                        : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    }`}
+                                  >
+                                    {isImportingMl ? (
+                                      <>
+                                        <RotateCw className="w-3 h-3 animate-spin" />
+                                        <span>Clonando</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Sparkles className="w-2.5 h-2.5" />
+                                        <span>Clonar</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {isSearchingMl && (
+                            <div className="bg-amber-50/20 border border-amber-200/50 p-6 rounded-xl flex flex-col items-center justify-center gap-2 animate-pulse text-center">
+                              <RotateCw className="w-5 h-5 text-amber-800 animate-spin" />
+                              <p className="text-[11px] font-bold text-amber-900 mt-1">Buscando productos en Mercado Libre...</p>
+                              <p className="text-[9px] text-amber-700 font-light max-w-xs mx-auto">Estamos consultando de forma segura y directa los listados públicos de Mercado Libre Argentina.</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-3 animate-fadeIn">
+                          <div className="flex flex-col sm:flex-row gap-2.5">
+                            <div className="flex-1 flex gap-1.5 items-stretch">
+                              <input
+                                type="text"
+                                placeholder="Pegá el enlace de cualquier producto público de Mercado Libre (ej: https://articulo.mercadolibre.com.ar/...)"
+                                value={mlImportUrl}
+                                onChange={(e) => setMlImportUrl(e.target.value)}
+                                className="flex-1 bg-white border border-amber-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-amber-500 text-brand-900"
+                              />
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const text = await navigator.clipboard.readText();
+                                    if (text && text.trim()) {
+                                      setMlImportUrl(text.trim());
+                                      notify("Enlace obtenido del portapapeles con éxito.", "success");
+                                    } else {
+                                      notify("El portapapeles está vacío o no contiene un formato de texto válido.", "info");
+                                    }
+                                  } catch (err) {
+                                    console.warn("Clipboard paste permission error:", err);
+                                    notify("Por favor, pegá el enlace manteniendo presionado sobre la caja de texto o presioná Ctrl+V.", "info");
+                                  }
+                                }}
+                                className="px-3 bg-amber-100 hover:bg-amber-250 border border-amber-305 text-amber-950 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-[10.5px] font-bold uppercase tracking-wide transition-all active:scale-95"
+                                title="Pegar enlace copiado"
+                              >
+                                <Clipboard className="w-3.5 h-3.5 shrink-0 text-amber-900" />
+                                <span>Pegar</span>
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isImportingMl || !mlImportUrl.trim()}
+                              onClick={handleImportFromMercadoLibre}
+                              className={`px-5 py-2.5 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 border border-amber-300 text-amber-900 ${
+                                isImportingMl || !mlImportUrl.trim()
+                                  ? "bg-amber-100/50 text-amber-400 cursor-not-allowed"
+                                  : "bg-brand-900 hover:bg-black hover:text-white border-brand-900 active:scale-95 cursor-pointer text-white"
+                              }`}
+                            >
+                              {isImportingMl ? (
+                                <>
+                                  <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Importando...</span>
+                                </>
+                              ) : (
+                                <span>Importar enlace</span>
+                              )}
+                            </button>
                           </div>
-                          <div className="bg-brand-50/50 p-2 rounded-lg border border-brand-100/40">
-                            <strong className="text-brand-900 block font-bold mb-0.5">Opción B: Desde el navegador del celular (Chrome/Safari)</strong>
-                            1. Entrá a Mercado Libre como comprador común.<br />
-                            2. Buscá y hacé clic sobre el producto que te gusta.<br />
-                            3. Mantené seleccionada la barra de internet arriba (donde dice la dirección).<br />
-                            4. Tocá en de **Copiar**.<br />
-                            5. Volvé aquí, pegalo y tocas Importar.
+
+                          {/* Clickable Real Examples to let the user understand how it works */}
+                          <div className="bg-amber-50/75 border border-amber-200/50 rounded-xl p-3 text-left">
+                            <p className="text-[10.5px] font-bold text-amber-950 flex items-center gap-1">
+                              <span>💡</span>
+                              <span>¿Querés probar cómo se importa? Hacé clic para rellenar con un ejemplo real:</span>
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1428258380-mesa-de-luz-auxiliar-travertino-nordica-moderna-_JM");
+                                  notify("Ejemplo de 'Mesa Travertino' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
+                                }}
+                                className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              >
+                                🪑 Mesa Travertino
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1748281982-sillon-divan-gervasoni-comodo-pana-premium-_JM");
+                                  notify("Ejemplo de 'Sillón Gervasoni' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
+                                }}
+                                className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              >
+                                🛋️ Sillón Gervasoni
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMlImportUrl("https://articulo.mercadolibre.com.ar/MLA-1393658245-ventilador-de-pared-y-pie-turbo-industrial-3-en-1-_JM");
+                                  notify("Ejemplo de 'Ventilador' copiado. ¡Hacé clic en 'Importar enlace' arriba!", "success");
+                                }}
+                                className="bg-white hover:bg-amber-100 border border-amber-200 px-2 py-1.5 rounded-lg text-[9.5px] font-medium text-amber-900 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                              >
+                                💨 Ventilador Industrial
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Visual Mobile Step by Step Guideline */}
+                          <div className="border border-brand-100 bg-white p-3.5 rounded-xl text-left space-y-2 animate-fadeIn shadow-xs">
+                            <p className="text-[11px] font-extrabold text-brand-950 uppercase tracking-wide flex items-center gap-1">
+                              <span>📱</span>
+                              <span>Guía corta: Cómo copiar el link de CUALQUIER producto desde tu celular</span>
+                            </p>
+                            <p className="text-[10px] text-brand-700 leading-relaxed font-light">
+                              No tenés que ir a "Vender" ni a tu panel de Mercado Libre personal. Podés clonar y revender cualquier producto libre del sitio:
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[9.5px] text-brand-800 leading-normal">
+                              <div className="bg-brand-50/50 p-2 rounded-lg border border-brand-100/40">
+                                <strong className="text-brand-900 block font-bold mb-0.5">Opción A: Desde la App de Mercado Libre </strong>
+                                1. Buscá el producto que querés vender (ej: Sillón, Mesa de Luz, etc).<br />
+                                2. Abrí el producto y tocá el icono de **Compartir** arriba a la derecha.<br />
+                                3. Elegí la opción <strong className="text-brand-900">"Copiar Enlace"</strong>.<br />
+                                4. Volvé acá, dale a <strong className="text-amber-900">"Pegar"</strong> e <strong className="font-bold">"Importar enlace"</strong>.
+                              </div>
+                              <div className="bg-brand-50/50 p-2 rounded-lg border border-brand-100/40">
+                                <strong className="text-brand-900 block font-bold mb-0.5">Opción B: Desde el navegador del celular (Chrome/Safari)</strong>
+                                1. Entrá a Mercado Libre como comprador común.<br />
+                                2. Buscá y hacé clic sobre el producto que te gusta.<br />
+                                3. Mantené seleccionada la barra de internet arriba (donde dice la dirección).<br />
+                                4. Tocá en de **Copiar**.<br />
+                                5. Volvé aquí, pegalo y tocas Importar.
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2.5 bg-white border border-amber-200/60 p-3.5 rounded-xl animate-fadeIn">
