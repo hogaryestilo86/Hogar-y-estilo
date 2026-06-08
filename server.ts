@@ -81,9 +81,10 @@ async function startServer() {
 
   // Enable wildcard CORS to allow streaming video and media requests from Vercel store or local hosts
   app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    const origin = req.headers.origin || "*";
+    res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
-    res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,content-type,X-Filename,X-MimeType,Authorization");
+    res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,content-type,X-Filename,X-MimeType,Authorization,Range");
     res.setHeader("Access-Control-Allow-Credentials", "true");
     if (req.method === "OPTIONS") {
       return res.sendStatus(200);
@@ -226,14 +227,16 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       if (match && match[0]) {
         mlUrl = match[0];
       } else {
-        // Safe check for MLA id
-        const mlaRegex = /(MLA-?\d{8,14})/i;
-        const mlaMatch = mlUrl.match(mlaRegex);
-        if (mlaMatch && mlaMatch[1]) {
-          const idDigits = mlaMatch[1].toUpperCase().replace("MLA", "").replace("-", "");
-          mlUrl = `https://articulo.mercadolibre.com.ar/MLA-${idDigits}`;
+        // Safe check for any country-specific Mercado Libre id (e.g., MLA, MLB, MLM, MLC, MCO, etc.) followed by digits
+        const mlIdRegex = /([A-Z]{3})-?(\d{8,15})/i;
+        const mlMatch = mlUrl.match(mlIdRegex);
+        if (mlMatch && mlMatch[1] && mlMatch[2]) {
+          const countryCode = mlMatch[1].toUpperCase();
+          const idDigits = mlMatch[2];
+          mlUrl = `https://articulo.mercadolibre.com.ar/${countryCode}-${idDigits}`;
         } else {
-          const directDigitsRegex = /(\b\d{9,12}\b)/;
+          // Direct digits sequence fallback
+          const directDigitsRegex = /(\b\d{8,15}\b)/;
           const digitsMatch = mlUrl.match(directDigitsRegex);
           if (digitsMatch && digitsMatch[1]) {
             mlUrl = `https://articulo.mercadolibre.com.ar/MLA-${digitsMatch[1]}`;
@@ -242,55 +245,92 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       }
 
       // Safe check to verify url is indeed a Mercado Libre link
-      if (!mlUrl.includes("mercadolibre.") && !mlUrl.includes("meli.la") && !mlUrl.startsWith("https://articulo.mercadolibre.com.ar")) {
+      if (!mlUrl.toLowerCase().includes("mercadolibre") && !mlUrl.toLowerCase().includes("meli.la") && !mlUrl.toLowerCase().includes("articulo.")) {
         return res.status(400).json({ error: "La URL provista no pertenece a Mercado Libre o meli.la." });
       }
 
       console.log(`[Mercado Libre Importer] Crawling: ${mlUrl}`);
       
-      // Helper function to fetch from official APIs (items & products) and return unified schema
+      // Helper function to fetch from official APIs (items, search product listings) and return unified schema
       const fetchOfficialApiData = async (urlToCheck: string) => {
         const regex = /([A-Z]{3})-?(\d{8,15})/i;
         const match = urlToCheck.match(regex);
         if (!match) return null;
         
-        const itemId = `${match[1].toUpperCase()}${match[2]}`;
-        console.log(`[Official ML API - Server] Trying API for ID: ${itemId}`);
+        const siteId = match[1].toUpperCase();
+        const idDigits = match[2];
+        const itemId = `${siteId}${idDigits}`;
+        console.log(`[Official ML API - Server] Trying API for ID: ${itemId}, siteId: ${siteId}`);
         
         try {
           let itemData: any = null;
           let description = "";
-          let isProduct = false;
+          let isProduct = urlToCheck.includes("/p/") || !urlToCheck.includes("articulo.mercadolibre");
           
-          const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`);
-          if (itemRes.ok) {
-            itemData = await itemRes.json();
+          // If it is or might be a product catalog ID, try the search API first
+          if (isProduct) {
+            console.log(`[Official ML API - Server] Product detected, searching site ${siteId} for product_id: ${itemId}`);
             try {
-              const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`);
-              if (descRes.ok) {
-                const descData: any = await descRes.json();
-                description = descData.plain_text || descData.text || "";
+              const searchRes = await fetch(`https://api.mercadolibre.com/sites/${siteId}/search?product_id=${itemId}`);
+              if (searchRes.ok) {
+                const searchData: any = await searchRes.json();
+                if (searchData.results && searchData.results.length > 0) {
+                  // We found items for this product! Use the first item's ID to fetch complete rich details
+                  const foundItemId = searchData.results[0].id;
+                  console.log(`[Official ML API - Server] Found linked item ${foundItemId} for product ${itemId}`);
+                  const itemRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}`);
+                  if (itemRes.ok) {
+                    itemData = await itemRes.json();
+                    
+                    // Fetch description
+                    try {
+                      const descRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}/description`);
+                      if (descRes.ok) {
+                        const descData: any = await descRes.json();
+                        description = descData.plain_text || descData.text || "";
+                      }
+                    } catch (dErr) {
+                      console.warn(`[Official ML API - Server] Description fetch failed for ${foundItemId}:`, dErr);
+                    }
+                  }
+                }
               }
-            } catch (dErr) {
-              console.warn(`[Official ML API - Server] Failed to fetch description for ${itemId}:`, dErr);
+            } catch (pErr: any) {
+              console.warn(`[Official ML API - Server] Product search failed for ${itemId}:`, pErr.message);
             }
-          } else {
-            console.log(`[Official ML API - Server] Item not found, checking products for ${itemId}`);
+          }
+          
+          // If we still don't have itemData (or if it wasn't a product link), try direct item fetch
+          if (!itemData) {
+            console.log(`[Official ML API - Server] Fetching direct item: ${itemId}`);
+            const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`);
+            if (itemRes.ok) {
+              itemData = await itemRes.json();
+              try {
+                const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`);
+                if (descRes.ok) {
+                  const descData: any = await descRes.json();
+                  description = descData.plain_text || descData.text || "";
+                }
+              } catch (dErr) {
+                console.warn(`[Official ML API - Server] Description fetch failed for ${itemId}:`, dErr);
+              }
+            }
+          }
+          
+          // If we still don't have it, try checking /products directly as a final hail-mary
+          if (!itemData) {
+            console.log(`[Official ML API - Server] Final attempt checking products/ for ${itemId}`);
             const prodRes = await fetch(`https://api.mercadolibre.com/products/${itemId}`);
             if (prodRes.ok) {
               itemData = await prodRes.json();
-              isProduct = true;
-              
-              if (itemData.short_description) {
-                description = itemData.short_description;
-              } else if (itemData.attributes && Array.isArray(itemData.attributes)) {
+              description = itemData.short_description || "";
+              if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
                 const specLines = itemData.attributes
                   .filter((attr: any) => attr.name && attr.value_name)
                   .slice(0, 15)
                   .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
                 description = specLines.join("\n");
-              } else {
-                description = "Producto de catálogo importado desde Mercado Libre.";
               }
             }
           }
@@ -318,23 +358,18 @@ Descripción básica / Notas del producto: "${description || ""}"`;
             });
           }
           
-          const realTitle = isProduct ? (itemData.name || itemData.title) : itemData.title;
-          let realPrice = 0;
-          if (isProduct) {
-            realPrice = itemData.buy_box_scenario?.price || itemData.price || 0;
-          } else {
-            realPrice = itemData.price || 0;
-          }
+          const realTitle = itemData.title || itemData.name || "Artículo Importado";
+          const realPrice = itemData.price || 0;
           
           return {
             success: true,
-            title: realTitle || "Artículo Importado",
+            title: realTitle,
             description: description || "",
             price: realPrice,
             imageUrl: imageUrls[0] || "",
             imageUrls: imageUrls.slice(0, 12),
             videoUrls: Array.from(new Set(videoUrls)),
-            originalUrl: mlUrl
+            originalUrl: urlToCheck
           };
         } catch (apiErr: any) {
           console.warn(`[Official ML API - Server] Error fetching data for ${itemId}:`, apiErr.message);
@@ -353,37 +388,43 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         console.warn("[Mercado Libre Importer] Primary API check failed, fetching page to resolve redirect/scraper:", err);
       }
 
-      const curlResponse = await fetch(mlUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-          "Accept-Language": "es-AR,es;q=0.9,en;q=0.8"
-        }
-      });
-
-      if (!curlResponse.ok) {
-        throw new Error(`Mercado Libre respondió con código de estado HTTP ${curlResponse.status}`);
-      }
-
-      const html = await curlResponse.text();
-      
-      // 2. Try the official API on the resolved redirect URL (e.g. if the user gave us a short link meli.la)
-      const resolvedUrl = curlResponse.url || mlUrl;
-      if (resolvedUrl !== mlUrl) {
-        console.log(`[Mercado Libre Importer] URL resolved to redirected target: ${resolvedUrl}`);
-        try {
-          const secondOfficialData = await fetchOfficialApiData(resolvedUrl);
-          if (secondOfficialData) {
-            console.log("[Mercado Libre Importer] Successfully answered using secondary official API check on redirect!");
-            return res.json(secondOfficialData);
+      let html = "";
+      let resolvedUrl = mlUrl;
+      try {
+        const curlResponse = await fetch(mlUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            "Accept-Language": "es-AR,es;q=0.9,en;q=0.8"
           }
-        } catch (err: any) {
-          console.warn("[Mercado Libre Importer] Secondary API check on redirect failed:", err);
+        });
+        
+        resolvedUrl = curlResponse.url || mlUrl;
+        
+        if (resolvedUrl !== mlUrl) {
+          console.log(`[Mercado Libre Importer] URL resolved to redirected target: ${resolvedUrl}`);
+          try {
+            const secondOfficialData = await fetchOfficialApiData(resolvedUrl);
+            if (secondOfficialData) {
+              console.log("[Mercado Libre Importer] Successfully answered using secondary official API check on redirect!");
+              return res.json(secondOfficialData);
+            }
+          } catch (err: any) {
+            console.warn("[Mercado Libre Importer] Secondary API check on redirect failed:", err);
+          }
         }
-      }
 
+        if (curlResponse.ok) {
+          html = await curlResponse.text();
+        } else {
+          console.warn(`[Mercado Libre Importer] Scraper responded with code ${curlResponse.status}, attempting fallback extraction from URL only.`);
+        }
+      } catch (e: any) {
+        console.warn("[Mercado Libre Importer] Scraper network/fetch failed:", e.message);
+      }
+      
       // Simple, robust regex-based extraction of OpenGraph tags
       const extractMeta = (propertyOrName: string): string => {
-        // match both property="..." and name="..."
+        if (!html) return "";
         const regex = new RegExp(`<meta\\s+[^>]*(?:property|name)=["']${propertyOrName}["']\\s+[^>]*content=["']([^"']+)["']`, 'i');
         const match = html.match(regex);
         if (match && match[1]) {
@@ -406,12 +447,13 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       const imageUrls: string[] = [];
       const imageIds = new Set<string>();
       
-      // Ultra-resilient match for Mercado Libre CDN IDs supporting optional scaling prefixes like 2X_
-      const mediaCdnRegex = /D_NQ_NP_(?:[a-zA-Z0-9]+_)?(\d+-[a-zA-Z0-9_]+)/gi;
-      let imgMatch;
-      while ((imgMatch = mediaCdnRegex.exec(html)) !== null) {
-        if (imgMatch[1]) {
-          imageIds.add(imgMatch[1]);
+      if (html) {
+        const mediaCdnRegex = /D_NQ_NP_(?:[a-zA-Z0-9]+_)?(\d+-[a-zA-Z0-9_]+)/gi;
+        let imgMatch;
+        while ((imgMatch = mediaCdnRegex.exec(html)) !== null) {
+          if (imgMatch[1]) {
+            imageIds.add(imgMatch[1]);
+          }
         }
       }
 
@@ -437,26 +479,26 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
       // Extract MP4 video links hosted directly in Mercado Libre's video system (melistatic CDN)
       const videoUrls: string[] = [];
-      const mp4Regex = /https:\/\/[^\s"'`<>]+?\.mp4/gi;
-      let mp4Match;
-      const parsedMp4s = new Set<string>();
-      while ((mp4Match = mp4Regex.exec(html)) !== null) {
-        if (mp4Match[0].includes("mlstatic") || mp4Match[0].includes("melistatic") || mp4Match[0].includes("mercadolibre")) {
-          parsedMp4s.add(mp4Match[0]);
+      if (html) {
+        const mp4Regex = /https:\/\/[^\s"'`<>]+?\.mp4/gi;
+        let mp4Match;
+        const parsedMp4s = new Set<string>();
+        while ((mp4Match = mp4Regex.exec(html)) !== null) {
+          if (mp4Match[0].includes("mlstatic") || mp4Match[0].includes("melistatic") || mp4Match[0].includes("mercadolibre")) {
+            parsedMp4s.add(mp4Match[0]);
+          }
         }
-      }
-      for (const vUrl of parsedMp4s) {
-        if (videoUrls.length >= 2) break;
-        videoUrls.push(vUrl);
+        for (const vUrl of parsedMp4s) {
+          if (videoUrls.length >= 2) break;
+          videoUrls.push(vUrl);
+        }
       }
 
       // Extract price
       let price = "";
-      // 1. Try meta tags
       price = extractMeta("product:price:amount");
       
-      // 2. Fallback to parsing direct schema json or meta price tags
-      if (!price) {
+      if (!price && html) {
         const schemaRegex = /"price"\s*:\s*"?(\d+(?:\.\d+)?)"?/i;
         const schemaMatch = html.match(schemaRegex);
         if (schemaMatch && schemaMatch[1]) {
@@ -464,8 +506,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         }
       }
 
-      // If price is still missing, try matching typical Andes money fractions in Mercado Libre
-      if (!price) {
+      if (!price && html) {
         const fractionRegex = /class="[^"]*andes-money-amount__fraction[^"]*"[^>]*>([\d.,]+)<\/span>/i;
         const match = html.match(fractionRegex);
         if (match && match[1]) {
@@ -473,10 +514,14 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         }
       }
 
-      // Clean the title: remove things like " | MercadoLibre" or " - Mercado Libre"
       let cleanTitle = title;
       if (cleanTitle) {
         cleanTitle = cleanTitle.replace(/\s*[||-]\s*Mercado\s*Libre.*/gi, "");
+      }
+
+      if (!cleanTitle && !uniqueCleanImages.length) {
+        // If we found absolutely nothing, then throw the final exception
+        throw new Error("No se pudo obtener la información de Mercado Libre y el bypass oficial no pudo decodificar el ID.");
       }
 
       res.json({
@@ -492,7 +537,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
     } catch (err: any) {
       console.error("[Mercado Libre Importer] Error fetching URL:", err);
       res.status(500).json({
-        error: "No se pudo obtener la información de Mercado Libre. Es posible que el enlace temporalmente requiera captcha.",
+        error: "No se pudo obtener la información de Mercado Libre. Es posible que el enlace temporalmente requiera captcha o sea un formato de URL no soportado.",
         details: err.message || err
       });
     }

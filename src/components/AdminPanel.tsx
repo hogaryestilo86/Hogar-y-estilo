@@ -400,8 +400,10 @@ export default function AdminPanel({
     const match = mlUrl.match(regex);
     if (!match) return null;
     
-    const itemId = `${match[1].toUpperCase()}${match[2]}`;
-    console.log(`[Official ML API] Attempting to fetch item or product: ${itemId}`);
+    const siteId = match[1].toUpperCase();
+    const idDigits = match[2];
+    const itemId = `${siteId}${idDigits}`;
+    console.log(`[Official ML API - Client] Attempting to fetch item or product: ${itemId}, siteId: ${siteId}`);
     
     try {
       const controller = new AbortController();
@@ -409,41 +411,70 @@ export default function AdminPanel({
       
       let itemData: any = null;
       let description = "";
-      let isProduct = false;
+      let isProduct = mlUrl.includes("/p/") || !mlUrl.includes("articulo.mercadolibre");
       
-      // Attempt item fetch first
-      const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`, { signal: controller.signal });
-      if (itemRes.ok) {
-        itemData = await itemRes.json();
-        
-        // Fetch description for item
+      // Attempt search API first if it's a product catalog link
+      if (isProduct) {
+        console.log(`[Official ML API - Client] Catalog product detected, trying search API for product_id: ${itemId}`);
         try {
-          const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`, { signal: controller.signal });
-          if (descRes.ok) {
-            const descData = await descRes.json();
-            description = descData.plain_text || descData.text || "";
+          const searchRes = await fetch(`https://api.mercadolibre.com/sites/${siteId}/search?product_id=${itemId}`, { signal: controller.signal });
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (searchData.results && searchData.results.length > 0) {
+              const foundItemId = searchData.results[0].id;
+              console.log(`[Official ML API - Client] Found linked item ID ${foundItemId} for product ${itemId}`);
+              const itemRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}`, { signal: controller.signal });
+              if (itemRes.ok) {
+                itemData = await itemRes.json();
+                try {
+                  const descRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}/description`, { signal: controller.signal });
+                  if (descRes.ok) {
+                    const descData = await descRes.json();
+                    description = descData.plain_text || descData.text || "";
+                  }
+                } catch (dErr) {
+                  console.warn("[Official ML API - Client] Failed to fetch search description:", dErr);
+                }
+              }
+            }
           }
-        } catch (descErr) {
-          console.warn("[Official ML API] Failed to fetch item description:", descErr);
+        } catch (searchErr) {
+          console.warn("[Official ML API - Client] Catalog search failed, falling back:", searchErr);
         }
-      } else {
-        // Fallback to product catalog API (handles /p/ links which denote catalog product IDs, not seller items)
-        console.log(`[Official ML API] Item not found, checking /products/${itemId}`);
+      }
+
+      // Fallback, direct item fetch
+      if (!itemData) {
+        const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`, { signal: controller.signal });
+        if (itemRes.ok) {
+          itemData = await itemRes.json();
+          
+          // Fetch description for item
+          try {
+            const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`, { signal: controller.signal });
+            if (descRes.ok) {
+              const descData = await descRes.json();
+              description = descData.plain_text || descData.text || "";
+            }
+          } catch (descErr) {
+            console.warn("[Official ML API - Client] Failed to fetch item description:", descErr);
+          }
+        }
+      }
+
+      // Final fail-safe products check
+      if (!itemData) {
+        console.log(`[Official ML API - Client] Checking products/ API for ${itemId}`);
         const prodRes = await fetch(`https://api.mercadolibre.com/products/${itemId}`, { signal: controller.signal });
         if (prodRes.ok) {
           itemData = await prodRes.json();
-          isProduct = true;
-          
-          if (itemData.short_description) {
-            description = itemData.short_description;
-          } else if (itemData.attributes && Array.isArray(itemData.attributes)) {
+          description = itemData.short_description || "";
+          if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
             const specLines = itemData.attributes
               .filter((attr: any) => attr.name && attr.value_name)
               .slice(0, 15)
               .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
             description = specLines.join("\n");
-          } else {
-            description = "Producto de catálogo importado dende Mercado Libre.";
           }
         }
       }
@@ -478,15 +509,10 @@ export default function AdminPanel({
       }
       
       // Get title/name
-      const realTitle = isProduct ? (itemData.name || itemData.title) : itemData.title;
+      const realTitle = itemData.title || itemData.name || "Artículo Importado";
       
       // Get price
-      let realPrice = 0;
-      if (isProduct) {
-        realPrice = itemData.buy_box_scenario?.price || itemData.price || 0;
-      } else {
-        realPrice = itemData.price || 0;
-      }
+      const realPrice = itemData.price || 0;
       
       return {
         success: true,
