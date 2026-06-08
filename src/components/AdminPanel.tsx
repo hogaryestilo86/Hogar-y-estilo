@@ -577,23 +577,50 @@ export default function AdminPanel({
     
     // Exact replicates of the backend's OpenGraph and Schema extraction logic
     const extractMeta = (propertyOrName: string): string => {
-      const regex = new RegExp(`<meta\\s+[^>]*(?:property|name)=["']${propertyOrName}["']\\s+[^>]*content=["']([^"']+)["']`, 'i');
-      const match = html.match(regex);
-      if (match && match[1]) {
-        return match[1]
+      const metaTagsRegex = /<meta\s+([^>]+)>/gi;
+      let match;
+      while ((match = metaTagsRegex.exec(html)) !== null) {
+        const attributesStr = match[1];
+        const hasPropertyOrName = new RegExp(`(?:property|name|itemprop)=["']${propertyOrName}["']`, 'i').test(attributesStr);
+        if (hasPropertyOrName) {
+          const contentMatch = /content=["']([^"']+)["']/i.exec(attributesStr);
+          if (contentMatch && contentMatch[1]) {
+            return contentMatch[1]
+              .replace(/&quot;/g, '"')
+              .replace(/&amp;/g, '&')
+              .replace(/&#39;/g, "'")
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .trim();
+          }
+        }
+      }
+      return "";
+    };
+
+    const title = extractMeta("og:title") || extractMeta("twitter:title") || extractMeta("title");
+    let description = extractMeta("og:description") || extractMeta("twitter:description") || extractMeta("description");
+    const image = extractMeta("og:image") || extractMeta("twitter:image");
+
+    // Match the full actual product description class on Mercado Libre
+    if (html) {
+      const descriptionRegex = /<(?:p|div|span|pre)\s+class="[^"]*ui-pdp-description__content[^"]*"[^>]*>([\s\S]*?)<\/(?:p|div|span|pre)>/i;
+      const descMatch = html.match(descriptionRegex);
+      if (descMatch && descMatch[1]) {
+        const fullDesc = descMatch[1]
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
           .replace(/&quot;/g, '"')
           .replace(/&amp;/g, '&')
           .replace(/&#39;/g, "'")
           .replace(/&lt;/g, '<')
           .replace(/&gt;/g, '>')
           .trim();
+        if (fullDesc) {
+          description = fullDesc;
+        }
       }
-      return "";
-    };
-
-    const title = extractMeta("og:title") || extractMeta("twitter:title");
-    const description = extractMeta("og:description") || extractMeta("twitter:description");
-    const image = extractMeta("og:image") || extractMeta("twitter:image");
+    }
 
     const imageUrls: string[] = [];
     const imageIds = new Set<string>();
@@ -639,7 +666,7 @@ export default function AdminPanel({
       videoUrls.push(vUrl);
     }
 
-    let price = extractMeta("product:price:amount");
+    let price = extractMeta("product:price:amount") || extractMeta("price");
     if (!price) {
       const schemaRegex = /"price"\s*:\s*"?(\d+(?:\.\d+)?)"?/i;
       const schemaMatch = html.match(schemaRegex);
@@ -656,8 +683,34 @@ export default function AdminPanel({
     }
 
     let cleanTitle = title;
+    if (!cleanTitle && html) {
+      const titleClassRegex = /<h1\s+class="[^"]*ui-pdp-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i;
+      const classMatch = html.match(titleClassRegex);
+      if (classMatch && classMatch[1]) {
+        cleanTitle = classMatch[1].trim();
+      }
+    }
+    if (!cleanTitle && html) {
+      const titleTagRegex = /<title>([\s\S]*?)<\/title>/i;
+      const tagMatch = html.match(titleTagRegex);
+      if (tagMatch && tagMatch[1]) {
+        cleanTitle = tagMatch[1].trim();
+      }
+    }
+
     if (cleanTitle) {
       cleanTitle = cleanTitle.replace(/\s*[||-]\s*Mercado\s*Libre.*/gi, "");
+    }
+
+    const isLikelyCaptchaOrBlock = 
+      !cleanTitle || 
+      cleanTitle.includes("Verificación de seguridad") || 
+      cleanTitle.toLowerCase().includes("atención al cliente") || 
+      cleanTitle.toLowerCase().startsWith("captcha") || 
+      (!uniqueCleanImages.length && !description);
+
+    if (isLikelyCaptchaOrBlock) {
+      throw new Error("No se pudo obtener la información real de Mercado Libre (la petición fue bloqueada temporalmente por controles automatizados de seguridad de Mercado Libre).");
     }
 
     return {
@@ -665,7 +718,7 @@ export default function AdminPanel({
       title: cleanTitle || "Artículo Importado",
       description: description || "",
       price: price ? parseFloat(price) : 0,
-      imageUrl: image || "",
+      imageUrl: uniqueCleanImages[0] || image || "",
       imageUrls: uniqueCleanImages,
       videoUrls: videoUrls,
       originalUrl: mlUrl

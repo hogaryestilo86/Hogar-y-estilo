@@ -364,6 +364,13 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               } catch (dErr) {
                 console.warn(`[Official ML API - Server] Description fetch failed for ${itemId}:`, dErr);
               }
+              if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
+                const specLines = itemData.attributes
+                  .filter((attr: any) => attr.name && attr.value_name)
+                  .slice(0, 15)
+                  .map((attr: any) => `• **${attr.name}**: ${attr.value_name}`);
+                description = specLines.join("\n");
+              }
             }
           }
           
@@ -478,23 +485,51 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       // Simple, robust regex-based extraction of OpenGraph tags
       const extractMeta = (propertyOrName: string): string => {
         if (!html) return "";
-        const regex = new RegExp(`<meta\\s+[^>]*(?:property|name)=["']${propertyOrName}["']\\s+[^>]*content=["']([^"']+)["']`, 'i');
-        const match = html.match(regex);
-        if (match && match[1]) {
-          return match[1]
+        // Match meta tag regardless of property/name and content attribute order
+        const metaTagsRegex = /<meta\s+([^>]+)>/gi;
+        let match;
+        while ((match = metaTagsRegex.exec(html)) !== null) {
+          const attributesStr = match[1];
+          const hasPropertyOrName = new RegExp(`(?:property|name|itemprop)=["']${propertyOrName}["']`, 'i').test(attributesStr);
+          if (hasPropertyOrName) {
+            const contentMatch = /content=["']([^"']+)["']/i.exec(attributesStr);
+            if (contentMatch && contentMatch[1]) {
+              return contentMatch[1]
+                .replace(/&quot;/g, '"')
+                .replace(/&amp;/g, '&')
+                .replace(/&#39;/g, "'")
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .trim();
+            }
+          }
+        }
+        return "";
+      };
+
+      const title = extractMeta("og:title") || extractMeta("twitter:title") || extractMeta("title");
+      let description = extractMeta("og:description") || extractMeta("twitter:description") || extractMeta("description");
+      const image = extractMeta("og:image") || extractMeta("twitter:image");
+
+      // Match the full actual product description class on Mercado Libre
+      if (html) {
+        const descriptionRegex = /<(?:p|div|span|pre)\s+class="[^"]*ui-pdp-description__content[^"]*"[^>]*>([\s\S]*?)<\/(?:p|div|span|pre)>/i;
+        const descMatch = html.match(descriptionRegex);
+        if (descMatch && descMatch[1]) {
+          const fullDesc = descMatch[1]
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<[^>]+>/g, "")
             .replace(/&quot;/g, '"')
             .replace(/&amp;/g, '&')
             .replace(/&#39;/g, "'")
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .trim();
+          if (fullDesc) {
+            description = fullDesc;
+          }
         }
-        return "";
-      };
-
-      const title = extractMeta("og:title") || extractMeta("twitter:title");
-      const description = extractMeta("og:description") || extractMeta("twitter:description");
-      const image = extractMeta("og:image") || extractMeta("twitter:image");
+      }
 
       // Extract multiple images hosted on Mercado Libre's high-speed CDN
       const imageUrls: string[] = [];
@@ -549,7 +584,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
       // Extract price
       let price = "";
-      price = extractMeta("product:price:amount");
+      price = extractMeta("product:price:amount") || extractMeta("price");
       
       if (!price && html) {
         const schemaRegex = /"price"\s*:\s*"?(\d+(?:\.\d+)?)"?/i;
@@ -568,13 +603,35 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       }
 
       let cleanTitle = title;
+      if (!cleanTitle && html) {
+        const titleClassRegex = /<h1\s+class="[^"]*ui-pdp-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i;
+        const classMatch = html.match(titleClassRegex);
+        if (classMatch && classMatch[1]) {
+          cleanTitle = classMatch[1].trim();
+        }
+      }
+      if (!cleanTitle && html) {
+        const titleTagRegex = /<title>([\s\S]*?)<\/title>/i;
+        const tagMatch = html.match(titleTagRegex);
+        if (tagMatch && tagMatch[1]) {
+          cleanTitle = tagMatch[1].trim();
+        }
+      }
+
       if (cleanTitle) {
         cleanTitle = cleanTitle.replace(/\s*[||-]\s*Mercado\s*Libre.*/gi, "");
       }
 
-      if (!cleanTitle && !uniqueCleanImages.length) {
-        // If we found absolutely nothing, then throw the final exception
-        throw new Error("No se pudo obtener la información de Mercado Libre y el bypass oficial no pudo decodificar el ID.");
+      // If we got "Mercado Libre Argentina..." as title or didn't recover images/description, it's likely a captcha response
+      const isLikelyCaptchaOrBlock = 
+        !cleanTitle || 
+        cleanTitle.includes("Verificación de seguridad") || 
+        cleanTitle.toLowerCase().includes("atención al cliente") || 
+        cleanTitle.toLowerCase().startsWith("captcha") || 
+        (!uniqueCleanImages.length && !description);
+
+      if (isLikelyCaptchaOrBlock) {
+        throw new Error("No se pudo obtener la información real de Mercado Libre (la petición fue bloqueada temporalmente por controles automatizados de seguridad de Mercado Libre).");
       }
 
       console.log(`[Mercado Libre Importer] Scraper download and save local media for: ${cleanTitle}`);
