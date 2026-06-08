@@ -395,13 +395,43 @@ export default function AdminPanel({
   };
 
   const parseMercadoLibreClientSide = async (mlUrl: string) => {
-    // Attempt to download the raw HTML of the PDP through a free and open CORS proxy
-    const corsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(mlUrl)}`;
-    const response = await fetch(corsUrl);
-    if (!response.ok) {
-      throw new Error(`Servidor de bypass de Mercado Libre inactivo o fuera de servicio temporalmente (${response.status})`);
+    // Attempt to download the raw HTML of the PDP through several free/open CORS proxies sequentially to evade ISP/AdBlock restrictions
+    const proxies = [
+      (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+      (url: string) => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`
+    ];
+
+    let html = "";
+    let lastError: any = null;
+
+    for (let i = 0; i < proxies.length; i++) {
+      try {
+        const pUrl = proxies[i](mlUrl);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s timeout per request
+        
+        const response = await fetch(pUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const text = await response.text();
+          // Check if it seems to contain Mercado Libre HTML keywords
+          if (text && (text.includes("mercadolibre") || text.includes("mlstatic") || text.includes("andes-money") || text.includes("og:title"))) {
+            html = text;
+            break;
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[Client Porting] Proxy #${i + 1} failed:`, e);
+        lastError = e;
+      }
     }
-    const html = await response.text();
+
+    if (!html) {
+      throw new Error(`Los servidores de bypass para Mercado Libre están inaccesibles en este navegador (motivado usualmente por AdBlock, Brave Shield o restricción de tu proveedor de red). Por favor, intenta desactivar tu extensor AdBlock o Brave Shield provisoriamente para habilitar el auto-completado, o escribe los datos manualmente.`);
+    }
     
     // Exact replicates of the backend's OpenGraph and Schema extraction logic
     const extractMeta = (propertyOrName: string): string => {
