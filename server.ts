@@ -226,30 +226,57 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       const match = mlUrl.match(urlRegex);
       if (match && match[0]) {
         mlUrl = match[0];
-      } else {
-        // Safe check for any country-specific Mercado Libre id (e.g., MLA, MLB, MLM, MLC, MCO, etc.) followed by digits
-        const mlIdRegex = /([A-Z]{3})-?(\d{8,15})/i;
-        const mlMatch = mlUrl.match(mlIdRegex);
-        if (mlMatch && mlMatch[1] && mlMatch[2]) {
-          const countryCode = mlMatch[1].toUpperCase();
-          const idDigits = mlMatch[2];
-          mlUrl = `https://articulo.mercadolibre.com.ar/${countryCode}-${idDigits}`;
-        } else {
-          // Direct digits sequence fallback
-          const directDigitsRegex = /(\b\d{8,15}\b)/;
-          const digitsMatch = mlUrl.match(directDigitsRegex);
-          if (digitsMatch && digitsMatch[1]) {
-            mlUrl = `https://articulo.mercadolibre.com.ar/MLA-${digitsMatch[1]}`;
+      }
+
+      // Safe check to verify URL is indeed a Mercado Libre link or standalone ID before resolving
+      const isMeliUrl = mlUrl.toLowerCase().includes("mercadolibre") || 
+                        mlUrl.toLowerCase().includes("meli.la") || 
+                        mlUrl.toLowerCase().includes("articulo.") ||
+                        /^\d{8,15}$/.test(mlUrl) ||
+                        /^[A-Z]{3}-?\d{8,15}$/i.test(mlUrl);
+
+      if (!isMeliUrl) {
+        return res.status(400).json({ error: "La URL o ID provisto no pertenece a Mercado Libre o meli.la." });
+      }
+
+      // Lightweight, 100% robust bypass: Resolve meli.la and short redirects manually
+      // by inspecting redirect headers to avoid downloading full HTML pages that trigger bot challenges
+      let resolvedUrl = mlUrl;
+      try {
+        if (mlUrl.toLowerCase().includes("meli.la") || mlUrl.toLowerCase().includes("bit.ly") || mlUrl.toLowerCase().includes("tinyurl")) {
+          console.log("[Mercado Libre Importer] Resolving short redirect link manually:", mlUrl);
+          const redirectRes = await fetch(mlUrl, {
+            method: "HEAD",
+            redirect: "manual",
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          });
+          const loc = redirectRes.headers.get("location");
+          if (loc) {
+            resolvedUrl = loc;
+            console.log(`[Mercado Libre Importer] Manually resolved standard link redirect: ${resolvedUrl}`);
+          } else {
+            // Try GET with redirect manual
+            const getRedirectRes = await fetch(mlUrl, {
+              method: "GET",
+              redirect: "manual",
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+              }
+            });
+            const locGet = getRedirectRes.headers.get("location");
+            if (locGet) {
+              resolvedUrl = locGet;
+              console.log(`[Mercado Libre Importer] Manually resolved standard link (GET) redirect: ${resolvedUrl}`);
+            }
           }
         }
+      } catch (redirErr: any) {
+        console.warn("[Mercado Libre Importer] Non-fatal custom redirect resolver issue:", redirErr.message);
       }
 
-      // Safe check to verify url is indeed a Mercado Libre link
-      if (!mlUrl.toLowerCase().includes("mercadolibre") && !mlUrl.toLowerCase().includes("meli.la") && !mlUrl.toLowerCase().includes("articulo.")) {
-        return res.status(400).json({ error: "La URL provista no pertenece a Mercado Libre o meli.la." });
-      }
-
-      console.log(`[Mercado Libre Importer] Crawling: ${mlUrl}`);
+      console.log(`[Mercado Libre Importer] Crawling / querying: ${resolvedUrl}`);
 
       // Helper to download all images & videos to local public/uploads directory during Mercado Libre import
       const downloadAndSaveLocalMedia = async (urls: string[], isVideo = false): Promise<string[]> => {
@@ -299,144 +326,173 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         );
         return localUrls.filter((url): url is string => !!url);
       };
+
+      // Extract Item ID and Site ID dynamically with fallback default for Argentina (MLA)
+      const extractItemIdAndSite = (urlToCheck: string) => {
+        let siteId = "MLA"; // Default site is Argentina
+        let idDigits = "";
+        let isCatalog = false;
+
+        const cleanText = urlToCheck.trim();
+
+        // Pattern A: Catalog product identifier (e.g., /p/MLA25946808 or /p/25946808)
+        const catRegex = /\/p\/([A-Z]{3})?(\d{8,15})/i;
+        const catMatch = cleanText.match(catRegex);
+
+        // Pattern B: Standard item with country code prefix (e.g., MLA-1428258380 or MLA1428258380)
+        const stdRegex = /\b([A-Z]{3})[-_]?(\d{8,15})\b/i;
+        const stdMatch = cleanText.match(stdRegex);
+
+        if (catMatch) {
+          if (catMatch[1]) {
+            siteId = catMatch[1].toUpperCase();
+          }
+          idDigits = catMatch[2];
+          isCatalog = true;
+          return { siteId, idDigits, itemId: idDigits, isCatalog };
+        } else if (stdMatch) {
+          siteId = stdMatch[1].toUpperCase();
+          idDigits = stdMatch[2];
+          return { siteId, idDigits, itemId: `${siteId}${idDigits}`, isCatalog: false };
+        }
+
+        // Pattern C: If no 3-letter prefix but a raw numbers sequence exists (8-15 digits long)
+        const numRegex = /\b(\d{8,15})\b/;
+        const numMatch = cleanText.match(numRegex);
+        if (numMatch) {
+          idDigits = numMatch[1];
+          isCatalog = cleanText.includes("/p/");
+          const itemId = isCatalog ? idDigits : `MLA${idDigits}`;
+          return { siteId, idDigits, itemId, isCatalog };
+        }
+
+        return null;
+      };
       
       // Helper function to fetch from official APIs (items, search product listings) and return unified schema
       const fetchOfficialApiData = async (urlToCheck: string) => {
-        const regex = /([A-Z]{3})-?(\d{8,15})/i;
-        const match = urlToCheck.match(regex);
-        if (!match) return null;
-        
-        const siteId = match[1].toUpperCase();
-        const idDigits = match[2];
-        const itemId = `${siteId}${idDigits}`;
-        console.log(`[Official ML API - Server] Trying API for ID: ${itemId}, siteId: ${siteId}`);
+        const resolution = extractItemIdAndSite(urlToCheck);
+        if (!resolution) return null;
+
+        const { siteId, idDigits, itemId, isCatalog } = resolution;
+        console.log(`[Official ML API - Server] Trying API for: siteId=${siteId}, idDigits=${idDigits}, itemId=${itemId}, isCatalog=${isCatalog}`);
         
         try {
           let itemData: any = null;
           let description = "";
-          let isProduct = urlToCheck.includes("/p/") || !urlToCheck.includes("articulo.mercadolibre");
           
-          // If it is or might be a product catalog ID, try the search API first
-          if (isProduct) {
-            console.log(`[Official ML API - Server] Product detected, searching site ${siteId} for product_id: ${itemId}`);
+          if (isCatalog) {
+            console.log(`[Official ML API - Server] Catalog product ID detected. Fetching products API: ${idDigits}`);
             try {
-              const searchRes = await fetch(`https://api.mercadolibre.com/sites/${siteId}/search?product_id=${itemId}`);
-              if (searchRes.ok) {
-                const searchData: any = await searchRes.json();
-                if (searchData.results && searchData.results.length > 0) {
-                  const foundItemId = searchData.results[0].id;
-                  console.log(`[Official ML API - Server] Found linked item ${foundItemId} for product ${itemId}`);
-                  
-                  // Try multi-get first for found item
-                  const multiRes = await fetch(`https://api.mercadolibre.com/items?ids=${foundItemId}`);
-                  if (multiRes.ok) {
-                    const multiData = await multiRes.json();
-                    if (Array.isArray(multiData) && multiData.length > 0 && multiData[0].code === 200) {
-                      itemData = multiData[0].body;
-                    }
-                  }
-                  
-                  if (!itemData) {
+              const prodRes = await fetch(`https://api.mercadolibre.com/products/${idDigits}`);
+              if (prodRes.ok) {
+                itemData = await prodRes.json();
+                console.log(`[Official ML API - Server] Found catalog product: ${itemData.name || itemData.title}`);
+                description = itemData.short_description || "";
+              }
+            } catch (pErr: any) {
+              console.warn(`[Official ML API - Server] Direct product lookup failed for ${idDigits}:`, pErr.message);
+            }
+
+            // Fallback: search for a live publication item linked to this product ID
+            if (!itemData) {
+              try {
+                const searchRes = await fetch(`https://api.mercadolibre.com/sites/${siteId}/search?product_id=${idDigits}`);
+                if (searchRes.ok) {
+                  const searchData: any = await searchRes.json();
+                  if (searchData.results && searchData.results.length > 0) {
+                    const foundItemId = searchData.results[0].id;
+                    console.log(`[Official ML API - Server] Found linked item ${foundItemId} for catalog product ${idDigits}`);
+                    
                     const itemRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}`);
                     if (itemRes.ok) {
                       itemData = await itemRes.json();
                     }
-                  }
-                  
-                  // Fetch description
-                  try {
-                    const descRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}/description`);
-                    if (descRes.ok) {
-                      const descData: any = await descRes.json();
-                      description = descData.plain_text || descData.text || "";
+
+                    // Fetch description
+                    try {
+                      const descRes = await fetch(`https://api.mercadolibre.com/items/${foundItemId}/description`);
+                      if (descRes.ok) {
+                        const descData: any = await descRes.json();
+                        description = descData.plain_text || descData.text || "";
+                      }
+                    } catch (dErr) {
+                      console.warn(`[Official ML API - Server] Description fetch failed for ${foundItemId}:`, dErr);
                     }
-                  } catch (dErr) {
-                    console.warn(`[Official ML API - Server] Description fetch failed for ${foundItemId}:`, dErr);
                   }
                 }
+              } catch (sErr: any) {
+                console.warn(`[Official ML API - Server] Catalog search searchRes failed:`, sErr.message);
               }
-            } catch (pErr: any) {
-              console.warn(`[Official ML API - Server] Product search failed for ${itemId}:`, pErr.message);
             }
-          }
-          
-          // First attempt: Multi-get /items?ids={itemId} which has higher public rate limits and is 100% open
-          if (!itemData) {
+          } else {
+            // Direct item ID lookup (e.g. MLA1428258380)
+            console.log(`[Official ML API - Server] Fetching with direct /items/ API: ${itemId}`);
             try {
-              console.log(`[Official ML API - Server] Fetching with multiget API: ${itemId}`);
-              const multiRes = await fetch(`https://api.mercadolibre.com/items?ids=${itemId}`);
-              if (multiRes.ok) {
-                const multiData = await multiRes.json();
-                if (Array.isArray(multiData) && multiData.length > 0 && multiData[0].code === 200) {
-                  itemData = multiData[0].body;
-                  console.log(`[Official ML API - Server] Successfully retrieved ${itemId} via multiget!`);
-                }
+              const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`);
+              if (itemRes.ok) {
+                itemData = await itemRes.json();
               }
-            } catch (mErr: any) {
-              console.warn(`[Official ML API - Server] Multiget request failed for ${itemId}:`, mErr.message);
+            } catch (err: any) {
+              console.warn(`[Official ML API - Server] Direct item fetch failed for ${itemId}:`, err.message);
             }
-          }
-
-          // Second attempt: Direct item fetch /items/{itemId} (some clusters respond better to this)
-          if (!itemData) {
-            console.log(`[Official ML API - Server] Fetching direct item: ${itemId}`);
-            const itemRes = await fetch(`https://api.mercadolibre.com/items/${itemId}`);
-            if (itemRes.ok) {
-              itemData = await itemRes.json();
-            }
-          }
-
-          // Third attempt: Public search API by publication code fallback
-          if (!itemData) {
-            console.log(`[Official ML API - Server] Fetching with search query fallback: ${itemId}`);
-            try {
-              const searchRes = await fetch(`https://api.mercadolibre.com/sites/${siteId}/search?q=${itemId}`);
-              if (searchRes.ok) {
-                const searchData = await searchRes.json();
-                if (searchData.results && searchData.results.length > 0) {
-                  const resultItem = searchData.results[0];
-                  console.log(`[Official ML API - Server] Found item metadata in search results!`, resultItem.title);
-                  itemData = {
-                    id: resultItem.id,
-                    title: resultItem.title,
-                    price: resultItem.price,
-                    thumbnail: resultItem.thumbnail,
-                    thumbnail_id: resultItem.thumbnail_id,
-                    attributes: resultItem.attributes || []
-                  };
+            
+            // Try multi-get as fallback
+            if (!itemData) {
+              try {
+                const multiRes = await fetch(`https://api.mercadolibre.com/items?ids=${itemId}`);
+                if (multiRes.ok) {
+                  const multiData = await multiRes.json();
+                  if (Array.isArray(multiData) && multiData.length > 0 && multiData[0].code === 200) {
+                    itemData = multiData[0].body;
+                  }
                 }
+              } catch (mErr: any) {
+                console.warn(`[Official ML API - Server] Multi-get failed for ${itemId}:`, mErr.message);
               }
-            } catch (sErr: any) {
-              console.warn(`[Official ML API - Server] Search query fallback failed for ${itemId}:`, sErr.message);
             }
-          }
-          
-          // Try checking /products directly as a final hail-mary
-          if (!itemData) {
-            console.log(`[Official ML API - Server] Final attempt checking products/ for ${itemId}`);
-            const prodRes = await fetch(`https://api.mercadolibre.com/products/${itemId}`);
-            if (prodRes.ok) {
-              itemData = await prodRes.json();
-              description = itemData.short_description || "";
+
+            // Fallback to text search by code
+            if (!itemData) {
+              try {
+                const searchRes = await fetch(`https://api.mercadolibre.com/sites/${siteId}/search?q=${idDigits}`);
+                if (searchRes.ok) {
+                  const searchData = await searchRes.json();
+                  if (searchData.results && searchData.results.length > 0) {
+                    const foundItem = searchData.results[0];
+                    itemData = {
+                      id: foundItem.id,
+                      title: foundItem.title,
+                      price: foundItem.price,
+                      thumbnail: foundItem.thumbnail,
+                      thumbnail_id: foundItem.thumbnail_id,
+                      attributes: foundItem.attributes || []
+                    };
+                  }
+                }
+              } catch (sErr: any) {
+                console.warn(`[Official ML API - Server] Fallback text search failed for ${idDigits}:`, sErr.message);
+              }
             }
           }
           
           if (!itemData) return null;
           
-          // Try fetching item description
+          // Try fetching description
           if (!description) {
+            const lookUpId = itemData.id || itemId;
             try {
-              const descRes = await fetch(`https://api.mercadolibre.com/items/${itemId}/description`);
+              const descRes = await fetch(`https://api.mercadolibre.com/items/${lookUpId}/description`);
               if (descRes.ok) {
                 const descData: any = await descRes.json();
                 description = descData.plain_text || descData.text || "";
               }
             } catch (dErr) {
-              console.warn(`[Official ML API - Server] Description fetch failed for ${itemId}:`, dErr);
+              console.warn(`[Official ML API - Server] Description fetch failed for ${lookUpId}:`, dErr);
             }
           }
 
-          // Format details / attributes if description is empty
+          // Format details / attributes if description is still empty
           if (!description && itemData.attributes && Array.isArray(itemData.attributes)) {
             const specLines = itemData.attributes
               .filter((attr: any) => attr.name && attr.value_name)
@@ -456,12 +512,19 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           
           // If no pictures but we got thumbnail pointers
           if (imageUrls.length === 0 && itemData.thumbnail) {
-            const highRes = itemData.thumbnail.replace("-I.jpg", "-O.jpg").replace("-V.jpg", "-O.jpg");
-            imageUrls.push(highRes);
+            imageUrls.push(itemData.thumbnail);
           }
           if (imageUrls.length === 0 && itemData.thumbnail_id) {
             imageUrls.push(`https://http2.mlstatic.com/D_NQ_NP_${itemData.thumbnail_id}-O.jpg`);
           }
+
+          // Convert all retrieved URLs to high-resolution (-O original resolution)
+          const highResImages = imageUrls.map(img => {
+            return img.replace("-F.jpg", "-O.jpg")
+                      .replace("-I.jpg", "-O.jpg")
+                      .replace("-V.jpg", "-O.jpg")
+                      .replace("-C.jpg", "-O.jpg");
+          });
           
           const videoUrls: string[] = [];
           if (itemData.video_id) {
@@ -479,14 +542,14 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           const realPrice = itemData.price || itemData.buy_box_scenario?.price || itemData.buy_box_scenario?.suggested_retail_price || 0;
           
           // Verify that we actually recovered a real title and didn't fall back to "Artículo Importado" with empty pictures
-          const isInvalidResult = (realTitle === "Artículo Importado" && imageUrls.length === 0);
+          const isInvalidResult = (realTitle === "Artículo Importado" && highResImages.length === 0);
           if (isInvalidResult) {
-            console.warn(`[Official ML API - Server] Obtained sparse dummy item info for ${itemId}, throwing error to force scraperfallback.`);
+            console.warn(`[Official ML API - Server] Obtained sparse dummy item info for ${itemId}, returning null.`);
             return null;
           }
 
-          console.log(`[Official ML API - Server] API download and save local media for: ${realTitle}`);
-          const localImages = await downloadAndSaveLocalMedia(imageUrls.slice(0, 12), false);
+          console.log(`[Official ML API - Server] Direct API found! Handing download & local cache process for: ${realTitle}`);
+          const localImages = await downloadAndSaveLocalMedia(highResImages.slice(0, 12), false);
           const localVideos = await downloadAndSaveLocalMedia(Array.from(new Set(videoUrls)), true);
 
           return {
@@ -505,9 +568,9 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         }
       };
 
-      // 1. Try official API on the raw user URL first
+      // 1. Try official API on the raw / redirects resolved URL first
       try {
-        const officialData = await fetchOfficialApiData(mlUrl);
+        const officialData = await fetchOfficialApiData(resolvedUrl);
         if (officialData) {
           console.log("[Mercado Libre Importer] Successfully answered using primary official API check!");
           return res.json(officialData);
@@ -517,21 +580,20 @@ Descripción básica / Notas del producto: "${description || ""}"`;
       }
 
       let html = "";
-      let resolvedUrl = mlUrl;
       try {
-        const curlResponse = await fetch(mlUrl, {
+        const curlResponse = await fetch(resolvedUrl, {
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
             "Accept-Language": "es-AR,es;q=0.9,en;q=0.8"
           }
         });
         
-        resolvedUrl = curlResponse.url || mlUrl;
+        let redirectResolvedVal = curlResponse.url || resolvedUrl;
         
-        if (resolvedUrl !== mlUrl) {
-          console.log(`[Mercado Libre Importer] URL resolved to redirected target: ${resolvedUrl}`);
+        if (redirectResolvedVal !== resolvedUrl) {
+          console.log(`[Mercado Libre Importer] URL resolved further to redirected target: ${redirectResolvedVal}`);
           try {
-            const secondOfficialData = await fetchOfficialApiData(resolvedUrl);
+            const secondOfficialData = await fetchOfficialApiData(redirectResolvedVal);
             if (secondOfficialData) {
               console.log("[Mercado Libre Importer] Successfully answered using secondary official API check on redirect!");
               return res.json(secondOfficialData);
@@ -539,6 +601,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
           } catch (err: any) {
             console.warn("[Mercado Libre Importer] Secondary API check on redirect failed:", err);
           }
+          resolvedUrl = redirectResolvedVal;
         }
 
         if (curlResponse.ok) {
