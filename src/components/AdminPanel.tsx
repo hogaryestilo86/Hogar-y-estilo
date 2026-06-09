@@ -1166,12 +1166,36 @@ export default function AdminPanel({
     try {
       notify("Conectando con Mercado Libre para descargar los datos del artículo...", "info");
       
+      let finalResolvedUrl = cleanedUrl;
+      const needsRedirectResolution = 
+        cleanedUrl.toLowerCase().includes("meli.la") || 
+        cleanedUrl.toLowerCase().includes("/up/s/") || 
+        cleanedUrl.toLowerCase().includes("/up/") || 
+        cleanedUrl.toLowerCase().includes("bit.ly") ||
+        cleanedUrl.toLowerCase().includes("tinyurl");
+
+      if (needsRedirectResolution) {
+        notify("Resolviendo enlace acortado de Mercado Libre...", "info");
+        try {
+          const resolveResponse = await fetch(getApiUrl(`/api/resolve-ml-url?url=${encodeURIComponent(cleanedUrl)}`));
+          if (resolveResponse.ok) {
+            const resolveJson = await resolveResponse.json();
+            if (resolveJson.success && resolveJson.resolvedUrl) {
+              finalResolvedUrl = resolveJson.resolvedUrl;
+              console.log("[Direct ML Import Client-Side] Resolved short URL to:", finalResolvedUrl);
+            }
+          }
+        } catch (resolveErr) {
+          console.warn("[Direct ML Import Client-Side] Failed to resolve redirect on server, continuing with original:", resolveErr);
+        }
+      }
+
       let data: any = null;
       
       // Step A: Attempt high-performance browser-direct parsing FIRST (takes < ~300ms, immune to cold starts or server blocks)
       try {
-        console.log("[Direct ML Import Client-Side] Attempting client-side official API...");
-        data = await parseMercadoLibreClientSide(cleanedUrl);
+        console.log("[Direct ML Import Client-Side] Attempting client-side official API for:", finalResolvedUrl);
+        data = await parseMercadoLibreClientSide(finalResolvedUrl);
       } catch (clientErr) {
         console.warn("[Direct ML Import Client-Side] Client-side parse failed, trying legacy backend helper:", clientErr);
       }
@@ -1180,7 +1204,7 @@ export default function AdminPanel({
       if (!data || !data.success) {
         notify("Conectando con extractor del servidor...", "info");
         try {
-          const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(cleanedUrl)}`));
+          const res = await fetch(getApiUrl(`/api/import-mercadolibre?url=${encodeURIComponent(finalResolvedUrl)}`));
           if (res.ok) {
             data = await res.json();
           } else {
