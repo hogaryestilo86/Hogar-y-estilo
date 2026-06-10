@@ -97,6 +97,124 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "150mb", extended: true }));
 
   // API Routes - Must be declared BEFORE Vite middleware
+  app.post("/api/parse-ml-paste", async (req, res) => {
+    try {
+      const { text } = req.body;
+      if (!text || !text.trim()) {
+        return res.status(400).json({ error: "Por favor, pega algún texto o código fuente del producto para poder extraerlo." });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({
+          error: "API key no configurada. La API de Gemini no está disponible todavía en este servidor. Habilítala desde Settings > Secrets."
+        });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
+        },
+      });
+
+      const systemPrompt = `Eres un extractor inteligente de información para el e-commerce "Hogar y Estilo" de Rosario, Argentina.
+Analizarás un bloque de texto que el usuario ha copiado de una publicación o página de producto (de Mercado Libre, Facebook Marketplace o cualquier otra tienda). El texto puede estar revuelto, desordenado, con marcas, precios flotantes o detalles técnicos.
+
+Tu misión es extraer y estructurar rigurosamente los siguientes campos:
+1. "title": Un título sofisticado de alta gama comercial, elegante y optimizado para SEO estilo "Hogar y Estilo" (ej: "Mesa Auxiliar de Madera Maciza Japandi" en lugar de "Mesa De Luz De Oferta Liquidacion").
+2. "price": El precio numérico real del producto (ej: 45000). Analiza el texto para buscar símbolos de pesos "$", puntos de mil o centavos. Busca el precio principal. Si no se indica ningún precio o es confuso, devuelve 0.
+3. "description": Una descripción persuasiva y súper vendedora adaptada al voseo argentino de forma informal, cercana, amigable pero muy profesional y refinada, redactada en formato Markdown con:
+   - Un párrafo introductorio ultra elegante dirigido al comprador hablándole de "Vos" (ej: "Llevá calidez a tu mesa", "Transformá tu rincón favorito").
+   - Una sección titulada "**Detalles de Diseño**" con una lista de ventajas clave, materiales sofisticados y usabilidad en viñetas.
+   - Un sutil y persuasivo llamado a la acción.
+4. "seoFeatures": Palabras clave de SEO (5 a 6 separadas únicamente por comas). Ej: "mármol travertino real, mesa auxiliar japandi, estilo rústico moderno, decoración de salas minimalistas, calidad artesanal premium".
+
+Devuelve la respuesta STRICTLY en formato JSON válido de acuerdo al esquema solicitado sin markdown backticks de código afuera.`;
+
+      const userMessage = `Analiza este texto copiado de la publicación del producto:
+----------------------------------------
+${text.trim()}
+----------------------------------------`;
+
+      const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+      let response = null;
+      let lastErr = null;
+
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`[Gemini Paste Parser] Trying model: ${modelName}...`);
+          response = await ai.models.generateContent({
+            model: modelName,
+            contents: userMessage,
+            config: {
+              systemInstruction: systemPrompt,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { 
+                    type: Type.STRING,
+                    description: "Título sofisticado y comercial para el producto" 
+                  },
+                  price: {
+                    type: Type.NUMBER,
+                    description: "El precio real extraído como número, sin signos ni puntos. 0 si no se encuentra."
+                  },
+                  description: { 
+                    type: Type.STRING, 
+                    description: "Descripción persuasiva optimizada en formato Markdown con voseo argentino" 
+                  },
+                  seoFeatures: { 
+                    type: Type.STRING, 
+                    description: "5-6 palabras clave de SEO separadas exclusivamente por comas" 
+                  }
+                },
+                required: ["title", "price", "description", "seoFeatures"]
+              }
+            }
+          });
+          console.log(`[Gemini Paste Parser] Success with model: ${modelName}!`);
+          break;
+        } catch (err: any) {
+          console.warn(`[Gemini Paste Parser] Failed with ${modelName}:`, err.message || err);
+          lastErr = err;
+        }
+      }
+
+      if (!response) {
+        throw new Error(`Los modelos de IA fallaron al estructurar el texto. Error: ${lastErr?.message || lastErr}`);
+      }
+
+      const jsonText = response.text || "{}";
+      let cleaned = jsonText.trim();
+      if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```(?:json)?\n?/, "");
+        cleaned = cleaned.replace(/\n?```$/, "");
+      }
+      cleaned = cleaned.trim();
+      
+      const parsedData = JSON.parse(cleaned);
+      
+      res.json({
+        success: true,
+        title: parsedData.title || "",
+        price: typeof parsedData.price === "number" ? parsedData.price : 0,
+        description: parsedData.description || "",
+        seoFeatures: parsedData.seoFeatures || ""
+      });
+    } catch (error: any) {
+      console.error("Error parsing pasted text with Gemini:", error);
+      res.status(500).json({
+        success: false,
+        error: "Ocurrió un error al procesar el texto con la Inteligencia Artificial.",
+        details: error.message || error,
+      });
+    }
+  });
+
   app.post("/api/optimize-description", async (req, res) => {
     try {
       const { description, title } = req.body;

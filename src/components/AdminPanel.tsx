@@ -583,8 +583,10 @@ export default function AdminPanel({
   const [mlSearchQuery, setMlSearchQuery] = useState("");
   const [mlSearchResults, setMlSearchResults] = useState<any[]>([]);
   const [isSearchingMl, setIsSearchingMl] = useState(false);
-  const [mlImportMode, setMlImportMode] = useState<"search" | "url">("search");
+  const [mlImportMode, setMlImportMode] = useState<"search" | "url" | "paste">("search");
   const [mlSearchError, setMlSearchError] = useState("");
+  const [mlPasteContent, setMlPasteContent] = useState("");
+  const [isParsingPaste, setIsParsingPaste] = useState(false);
 
   // States for automated seamless GitHub catalog persistence
   const [githubToken, setGithubToken] = useState(() => localStorage.getItem("github_sync_token") || "");
@@ -1348,6 +1350,47 @@ export default function AdminPanel({
 
   const handleImportFromMercadoLibre = async () => {
     await importUrlDirectly(mlImportUrl);
+  };
+
+  const handleParsePasteText = async () => {
+    if (!mlPasteContent.trim()) {
+      notify("Por favor, pegá algún texto o datos del producto para poder estructurarlos.", "info");
+      return;
+    }
+    
+    setIsParsingPaste(true);
+    notify("La Inteligencia Artificial está analizando tu texto copiado para estructurarlo...", "info");
+    
+    try {
+      const response = await fetch(getApiUrl("/api/parse-ml-paste"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: mlPasteContent })
+      });
+      
+      if (!response.ok) {
+        throw new Error("El servidor no pudo procesar la solicitud con IA. Verificá tu conexión.");
+      }
+      
+      const result = await response.json();
+      if (result.success) {
+        setTitle(result.title || "");
+        setBasePrice(result.price ? String(result.price) : "");
+        setDescription(result.description || "");
+        if (result.seoFeatures) {
+          setFeaturesText(result.seoFeatures);
+        }
+        notify("✨ ¡Éxito! El sistema extrajo título, precio, descripción técnica y SEO del texto copiado. Podés agregar fotos abajo.", "success");
+        setMlPasteContent(""); // clear paste content
+      } else {
+        throw new Error(result.error || "Fallo en la extracción de datos.");
+      }
+    } catch (err: any) {
+      console.error("AI Parse Paste error:", err);
+      notify("No se pudo estructurar el texto: " + (err.message || "Error de red"), "error");
+    } finally {
+      setIsParsingPaste(false);
+    }
   };
 
   const handleSearchMercadoLibre = async () => {
@@ -3839,7 +3882,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                   {!showHtmlBypass ? (
                     <div className="space-y-4">
                       {/* Tabs Selector */}
-                      <div className="flex gap-1 bg-amber-100/60 p-1 rounded-xl">
+                      <div className="flex flex-col sm:flex-row gap-1 bg-amber-100/60 p-1 rounded-xl">
                         <button
                           type="button"
                           onClick={() => setMlImportMode("search")}
@@ -3861,6 +3904,17 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                           }`}
                         >
                           🔗 Pegar Enlace URL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMlImportMode("paste")}
+                          className={`flex-1 py-1.5 text-[11px] font-extrabold uppercase tracking-wide rounded-lg transition-all cursor-pointer ${
+                            mlImportMode === "paste"
+                              ? "bg-amber-800 text-white shadow-xs animate-fadeIn"
+                              : "text-amber-850 hover:bg-amber-200/50"
+                          }`}
+                        >
+                          📋 Pegar Texto / IA (Failsafe)
                         </button>
                       </div>
 
@@ -3984,7 +4038,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                             </div>
                           )}
                         </div>
-                      ) : (
+                      ) : mlImportMode === "url" ? (
                         <div className="space-y-3 animate-fadeIn">
                           <div className="flex flex-col sm:flex-row gap-2.5">
                             <div className="flex-1 flex gap-1.5 items-stretch">
@@ -4105,6 +4159,97 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                                 5. Volvé aquí, pegalo y tocas Importar.
                               </div>
                             </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3.5 animate-fadeIn text-left">
+                          <p className="text-[11px] font-medium text-amber-950 leading-relaxed">
+                            💡 <strong>¡El método recomendado 100% infalible libre de bloqueos!</strong> Si la conexión directa de Mercado Libre presenta fallas o te da error de red, podés <strong>copiar cualquier texto</strong> de la publicación (el título de arriba, las características, la descripción o incluso podés seleccionar y copiar la pantalla completa del producto) y pegarlo aquí abajo. La Inteligencia Artificial estructurará todo el producto de forma inmediata:
+                          </p>
+
+                          <div className="space-y-3">
+                            <textarea
+                              rows={5}
+                              placeholder="Pegá cualquier texto copiado de la publicación... (ej: 'Mesa de Luz flotante Nordica $52.000, un cajón guías telescópicas. Medidas: 40x35x30...')"
+                              value={mlPasteContent}
+                              onChange={(e) => setMlPasteContent(e.target.value)}
+                              className="w-full bg-white border border-amber-200 rounded-xl p-3 text-xs focus:ring-1 focus:ring-amber-500 focus:outline-hidden text-brand-950 placeholder:text-gray-400 font-sans leading-relaxed"
+                            />
+
+                            <div className="flex flex-col sm:flex-row gap-2 justify-between items-stretch sm:items-center">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    const text = await navigator.clipboard.readText();
+                                    if (text && text.trim()) {
+                                      setMlPasteContent(text.trim());
+                                      notify("¡Texto pegado exitosamente desde tu portapapeles!", "success");
+                                    } else {
+                                      notify("El portapapeles de tu dispositivo está vacío.", "info");
+                                    }
+                                  } catch (err) {
+                                    console.warn("Clipboard access denied:", err);
+                                    notify("Por favor, escribí o pegá manteniendo presionado en la caja de texto.", "info");
+                                  }
+                                }}
+                                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-950 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-[10.5px] font-extrabold transition-all active:scale-95"
+                              >
+                                <Clipboard className="w-3.5 h-3.5 shrink-0 text-amber-900" />
+                                <span>Pegar del Portapapeles</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={isParsingPaste || !mlPasteContent.trim()}
+                                onClick={handleParsePasteText}
+                                className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 ${
+                                  isParsingPaste || !mlPasteContent.trim()
+                                    ? "bg-amber-400/50 text-amber-800 cursor-not-allowed"
+                                    : "bg-brand-900 hover:bg-black text-white"
+                                }`}
+                              >
+                                {isParsingPaste ? (
+                                  <>
+                                    <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Estructurando con IA...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                                    <span>Extraer y Estructurar con IA</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="p-3.5 bg-emerald-50 border border-emerald-150 rounded-xl text-left space-y-2.5">
+                            <div className="flex gap-2">
+                              <span className="text-emerald-800 text-sm shrink-0">📸</span>
+                              <div className="space-y-1">
+                                <p className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider">
+                                  ¿Cómo sumar las fotos y videos del producto?
+                                </p>
+                                <p className="text-[10px] leading-relaxed text-emerald-900">
+                                  La Inteligencia Artificial extrae los textos y el precio de inmediato. Para las <strong>fotos y videos</strong>, podés hacerlo manualmente de dos formas muy sencillas en la sección multimedia de abajo:
+                                </p>
+                                <ul className="list-disc pl-3.5 space-y-1 text-[9.5px] text-emerald-850 leading-relaxed">
+                                  <li><strong>Opción 1:</strong> Guardá las fotos de Mercado Libre en tu celular o computadora y subilas presionando el botón gris de <strong>"Subir Fotos (Locales)"</strong>.</li>
+                                  <li><strong>Opción 2:</strong> Copiá la dirección de cualquier foto de internet, pegala en el cuadro de <strong>"URL pública"</strong> y tocá <strong>"Agregar URL"</strong>.</li>
+                                </ul>
+                              </div>
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={() => {
+                                document.getElementById("multimedia-section")?.scrollIntoView({ behavior: "smooth" });
+                              }}
+                              className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase tracking-wider rounded-lg shadow-sm transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                            >
+                              <span>Ir abajo a agregar Fotos y Videos 👇</span>
+                            </button>
                           </div>
                         </div>
                       )}
@@ -4325,7 +4470,7 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               </div>
 
               {/* Media loader drag & drop component */}
-              <div className="space-y-3.5">
+              <div id="multimedia-section" className="space-y-3.5 scroll-mt-20">
                 <label className="block text-xs font-bold text-brand-800 uppercase tracking-widest text-left">
                   Multimedia del Producto (Fotos y Video)
                 </label>
