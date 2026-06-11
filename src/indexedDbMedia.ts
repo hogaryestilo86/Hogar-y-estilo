@@ -543,15 +543,31 @@ export function useResolvedUrl(url: string | undefined, backupUrl?: string): str
                                  window.location.hostname.includes("localhost") || 
                                  window.location.hostname.includes("127.0.0.1");
         
+        // Safe localStorage lookup
+        let localRepo = "";
+        let localBranch = "main";
+        try {
+          localRepo = localStorage.getItem("github_sync_repo") || "";
+          localBranch = localStorage.getItem("github_sync_branch") || "main";
+        } catch (_) {}
+
         // If we are browsing from a Vercel production/preview domain, we MUST use the absolute backend URL
         // because Vercel doesn't have these dynamic uploads in its static asset tree!
         if (!isLocalOrPreview) {
           const gConfig = (window as any).__GITHUB_CONFIG__;
           const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
           const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+          
+          if (localRepo) {
+            return `https://raw.githubusercontent.com/${localRepo}/${localBranch}/public/uploads/${filename}`;
+          }
           return `${backend}/uploads/${filename}`;
         } else {
-          // If we are in development or previewing on Cloud Run itself, relative path `/uploads/` will resolve correctly!
+          // If we are in development or previewing on Cloud Run itself, relative path `/uploads/` should resolve correctly!
+          // But as a premium secure asset safeguard, if there is a repository connected, we prioritize it to avoid 404s after container restarts
+          if (localRepo) {
+            return `https://raw.githubusercontent.com/${localRepo}/${localBranch}/public/uploads/${filename}`;
+          }
           return `/uploads/${filename}`;
         }
       }

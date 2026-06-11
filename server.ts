@@ -79,6 +79,69 @@ async function startServer() {
   
   app.use("/uploads", express.static(uploadsDir));
 
+  // Fallback for missing uploads: download from synchronized GitHub repository
+  app.get("/uploads/:filename", async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      const filepath = path.join(uploadsDir, filename);
+
+      if (fs.existsSync(filepath)) {
+        return res.sendFile(filepath);
+      }
+
+      console.log(`[Missing Media Proxy] File "${filename}" not found in local ephemeral disk. Resolving via settings...`);
+
+      let repo = "";
+      let branch = "main";
+
+      // Query Firestore for setting configuración
+      if (db) {
+        try {
+          const docRef = doc(db, "settings", "github_config");
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data && data.repo) {
+              repo = data.repo;
+              branch = data.branch || "main";
+              console.log(`[Missing Media Proxy] Found synced repository: ${repo}, branch: ${branch}`);
+            }
+          }
+        } catch (dbErr: any) {
+          console.warn("[Missing Media Proxy] Error reading settings from Firestore:", dbErr.message);
+        }
+      }
+
+      if (repo) {
+        const rawUrl = `https://raw.githubusercontent.com/${repo}/${branch}/public/uploads/${filename}`;
+        console.log(`[Missing Media Proxy] Fetching from permanent GitHub repo: ${rawUrl}`);
+        
+        const fetchResponse = await fetch(rawUrl);
+        if (fetchResponse.ok) {
+          const arrayBuffer = await fetchResponse.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          // Cache locally on Cloud Run disk so next requests are served immediately via express.static
+          fs.writeFileSync(filepath, buffer);
+          console.log(`[Missing Media Proxy] Cached and serving missing file: ${filename}`);
+
+          const contentType = fetchResponse.headers.get("content-type") || "image/jpeg";
+          res.setHeader("Content-Type", contentType);
+          return res.send(buffer);
+        } else {
+          console.warn(`[Missing Media Proxy] GitHub returned status ${fetchResponse.status} for rawUrl: ${rawUrl}`);
+        }
+      } else {
+        console.warn("[Missing Media Proxy] No synchronized repository set up.");
+      }
+
+      return res.status(404).send("File not found");
+    } catch (err: any) {
+      console.error("[Missing Media Proxy] Unexpected failure:", err);
+      return res.status(500).send("Proxy error");
+    }
+  });
+
   // Enable wildcard CORS to allow streaming video and media requests from Vercel store or local hosts
   app.use((req, res, next) => {
     const origin = req.headers.origin || "*";

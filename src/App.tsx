@@ -37,11 +37,27 @@ export function resolveImageUrl(url: string | undefined): string {
                                window.location.hostname.includes("localhost") || 
                                window.location.hostname.includes("127.0.0.1");
       
+      // Safe localStorage lookup
+      let localRepo = "";
+      let localBranch = "main";
+      try {
+        localRepo = localStorage.getItem("github_sync_repo") || "";
+        localBranch = localStorage.getItem("github_sync_branch") || "main";
+      } catch (_) {}
+
       if (!isLocalOrPreview) {
         const gConfig = (window as any).__GITHUB_CONFIG__;
         const fallbackBackend = "https://ais-pre-ph66dlmv5s32y4wf423upe-513897801395.us-east1.run.app";
         const backend = (gConfig && gConfig.backendUrl) ? gConfig.backendUrl : fallbackBackend;
+        
+        if (localRepo) {
+          return `https://raw.githubusercontent.com/${localRepo}/${localBranch}/public/uploads/${filename}`;
+        }
         return `${backend}/uploads/${filename}`;
+      }
+
+      if (localRepo) {
+        return `https://raw.githubusercontent.com/${localRepo}/${localBranch}/public/uploads/${filename}`;
       }
       return `/uploads/${filename}`;
     }
