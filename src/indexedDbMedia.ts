@@ -277,12 +277,13 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
             try {
               const blob = await getMedia(key);
               if (blob) {
-                // EXTREMELY IMPORTANT SAFEGUARD: Avoid converting videos to heavy base64 strings!
+                // EXTREMELY IMPORTANT SAFEGUARD: Avoid converting videos to heavy base64 strings in backupUrl!
                 // Video files are very large and converting them to base64 completely blocks the React state,
                 // triggers Firestore quota warnings and causes GitHub API 422 errors due to massive JSON payloads.
                 // We keep them as IDB references locally, and sync them as independent physical files to GitHub uploads.
-                if (blob.type && blob.type.startsWith("video/")) {
-                  console.log("[convertProductsIdbToBase64] Safe skip of base64 conversion for video:", key);
+                const isVideo = !!(blob.type && blob.type.startsWith("video/"));
+                if (isVideo && blob.size > 50 * 1024 * 1024) {
+                  console.log("[convertProductsIdbToBase64] Safe skip of extremely heavy video (>50MB):", key);
                   return item;
                 }
 
@@ -320,12 +321,17 @@ export async function convertProductsIdbToBase64(products: Product[]): Promise<{
                       return {
                         ...item,
                         url: uploadData.url,
-                        backupUrl: dataUrl
+                        backupUrl: isVideo ? "" : dataUrl // Do NOT store video base64 in backupUrl, keep metadata tiny
                       };
                     }
                   }
                 } catch (uploadErr) {
                   console.warn("[IndexedDB Self-Healing] Server upload failed. Falling back to base64 conversions:", uploadErr);
+                }
+
+                if (isVideo) {
+                  console.log("[convertProductsIdbToBase64] Video server migration was unsuccessful, keeping as local idb reference:", key);
+                  return item;
                 }
 
                 const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -785,13 +791,20 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       });
     }
 
+    const { autoPlay, muted, ...restProps } = props;
+    const forceMuted = !!autoPlay ? true : muted;
+
     return React.createElement("video", {
       ref,
       src: activeVideoSrc,
       preload: "auto",
       poster: backupUrl || undefined,
       onError: handleVideoError,
-      ...props
+      playsInline: true,
+      "webkit-playsinline": "true",
+      autoPlay,
+      muted: forceMuted,
+      ...restProps
     });
   }
 );

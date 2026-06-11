@@ -2008,18 +2008,20 @@ export default function AdminPanel({
             filenameToUse = filenameToUpload;
 
             try {
-              // Filtrar y omitir videos en el respaldo de GitHub para evitar bloqueos por peso y memoria RAM móvil
               const isVideo = mediaItem.type === "video" || ext === "mp4" || ext === "webm" || ext === "mov" || key.toLowerCase().endsWith(".mp4") || key.toLowerCase().endsWith(".mov") || key.toLowerCase().endsWith(".webm");
-              if (isVideo) {
-                addProgressMsg(`ℹ️ Omitiendo video "${prod.title || 'Multimedia'}" de GitHub para mantener una alta velocidad de sincronización de tu tienda.`);
-                continue;
-              }
 
               // Obtener la media para medir el tamaño antes de cualquier fetch a GitHub o conversión pesada
               const blob = await getMedia(key);
               if (blob) {
-                if (blob.size > 4.5 * 1024 * 1024) { // Límite seguro de 4.5MB
-                  addProgressMsg(`⚠️ Omitida imagen por peso (>4.5MB) para evitar lentitud de red: ${filenameToUpload}`);
+                // Limit images to 4.5MB, but allow videos up to 24MB for physical files on GitHub
+                const maxAllowedSize = isVideo ? 24 * 1024 * 1024 : 4.5 * 1024 * 1024;
+                if (blob.size > maxAllowedSize) {
+                  const sizeInMB = (blob.size / (1024 * 1024)).toFixed(1);
+                  if (isVideo) {
+                    addProgressMsg(`⚠️ Omitido video "${prod.title || 'Video'}" por peso excesivo (${sizeInMB}MB > 24MB para API de GitHub). Se sugiere vincular vía YouTube/Drive.`);
+                  } else {
+                    addProgressMsg(`⚠️ Omitida imagen por peso (>4.5MB) para evitar lentitud de red: ${filenameToUpload}`);
+                  }
                   base64ToUpload = null;
                   filenameToUse = null;
                   continue; // Pasar al siguiente archivo multimedia sin trabar la sincronización
@@ -2029,7 +2031,7 @@ export default function AdminPanel({
                 const alreadyExists = existingUploads.has(filenameToUpload.toLowerCase());
                 
                 if (!alreadyExists) {
-                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Procesando foto local: ${filenameToUpload}...`);
+                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Procesando ${isVideo ? "video" : "foto"} local: ${filenameToUpload}...`);
                   const reader = new FileReader();
                   const base64Promise = new Promise<string>((resolve, reject) => {
                     reader.onloadend = () => {
@@ -2066,21 +2068,22 @@ export default function AdminPanel({
               try {
                 const ext = filename.split(".").pop() || "jpg";
                 const isVideo = mediaItem.type === "video" || ext === "mp4" || ext === "webm" || ext === "mov" || filename.toLowerCase().endsWith(".mp4") || filename.toLowerCase().endsWith(".mov") || filename.toLowerCase().endsWith(".webm");
-                if (isVideo) {
-                  addProgressMsg(`ℹ️ Omitiendo video guardado "${prod.title || 'Multimedia'}" de la carga a GitHub.`);
-                  continue;
-                }
-
                 const alreadyExists = existingUploads.has(filename.toLowerCase());
                 
                 if (!alreadyExists) {
                   // ¡No está en Git todavía! Lo descargamos del servidor local para subirlo
-                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Obteniendo foto del servidor: ${filename}...`);
-                  const fileRes = await fetchWithTimeout(mediaItem.url, {}, 15000);
+                  addProgressMsg(`[${mediaCount}/${totalMediaToProcess}] Obteniendo ${isVideo ? "video" : "foto"} del servidor: ${filename}...`);
+                  const fileRes = await fetchWithTimeout(mediaItem.url, {}, 35000);
                   if (fileRes.ok) {
                     const blob = await fileRes.blob();
-                    if (blob.size > 4.5 * 1024 * 1024) {
-                      addProgressMsg(`⚠️ Omitida imagen pesada (>4.5MB): ${filename}`);
+                    const maxAllowedSize = isVideo ? 24 * 1024 * 1024 : 4.5 * 1024 * 1024;
+                    if (blob.size > maxAllowedSize) {
+                      const sizeInMB = (blob.size / (1024 * 1024)).toFixed(1);
+                      if (isVideo) {
+                        addProgressMsg(`⚠️ Omitido video del servidor por peso excesivo (${sizeInMB}MB > 24MB para API de GitHub).`);
+                      } else {
+                        addProgressMsg(`⚠️ Omitida imagen pesada (>4.5MB): ${filename}`);
+                      }
                       base64ToUpload = null;
                       filenameToUse = null;
                       continue;
