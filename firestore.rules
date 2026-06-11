@@ -26,10 +26,10 @@ service cloud.firestore {
         );
     }
 
-    // Config settings for GitHub repo / branch / fallback URL
-    match /settings/github_config {
+    // Config settings for GitHub repo, branch, and catalog master
+    match /settings/{settingId} {
       allow read: if true;
-      allow write: if true; // Allowed for admin save in AdminPanel
+      allow write: if true; // Allowed for admin save and catalog sync
     }
 
     // Global site and performance analytics
