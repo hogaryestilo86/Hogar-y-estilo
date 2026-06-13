@@ -424,7 +424,10 @@ export default function CheckoutModal({
               },
               onError: (error: any) => {
                 console.error("Mercado Pago Brick error callback:", error);
-                if (active) setMpError("Error de validación o inicialización en el widget. Corregí los datos de la tarjeta.");
+                if (active) {
+                  setMpError("Error de validación o credenciales de pasarela (Clave Pública). Si colocaste claves reales, verificá que coincidan y correspondan a Mercado Pago (las de Stripe de tipo sk_live_ no funcionarán).");
+                  setMpPreferenceLoading(false);
+                }
               },
             },
           };

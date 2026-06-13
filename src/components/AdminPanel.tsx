@@ -8,7 +8,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
 import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings, Clipboard, MessageCircle, Search, Gift } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image, getApiUrl } from "../indexedDbMedia";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 interface AdminPanelProps {
@@ -621,6 +621,58 @@ export default function AdminPanel({
       }
     }
   }, []);
+
+  // --- MERCADO PAGO MANAGEMENT STATES & PERSISTENCE ---
+  const [mpPublicKey, setMpPublicKey] = useState("");
+  const [mpAccessToken, setMpAccessToken] = useState("");
+  const [isSavingMpConfig, setIsSavingMpConfig] = useState(false);
+  const [showMpSettings, setShowMpSettings] = useState(false);
+
+  React.useEffect(() => {
+    const loadMpConfig = async () => {
+      try {
+        const docRef = doc(db, "settings", "mercadopago_config");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.publicKey) setMpPublicKey(data.publicKey);
+          if (data.accessToken) setMpAccessToken(data.accessToken);
+        }
+      } catch (err) {
+        console.warn("Error loading Mercado Pago config from Firestore:", err);
+      }
+    };
+    loadMpConfig();
+  }, []);
+
+  const handleSaveMpConfig = async () => {
+    if (!mpPublicKey.trim() || !mpAccessToken.trim()) {
+      notify("Por favor completa tanto la Clave Pública como el Token de Acceso.", "error");
+      return;
+    }
+    
+    // Safety check for common key copy-paste mistakes (like Stripe keys!)
+    if (mpAccessToken.trim().startsWith("sk_live_") || mpPublicKey.trim().startsWith("pk_live_")) {
+      notify("⚠️ ¡Error! Ingresaste una clave que empieza con 'sk_live_' o 'pk_live_'. Estas son claves de Stripe, NO de Mercado Pago. Mercado Pago usa claves que empiezan con 'APP_USR-' o 'MLA-'.", "error");
+      return;
+    }
+
+    setIsSavingMpConfig(true);
+    try {
+      const docRef = doc(db, "settings", "mercadopago_config");
+      await setDoc(docRef, {
+        publicKey: mpPublicKey.trim(),
+        accessToken: mpAccessToken.trim(),
+        updatedAt: new Date().toISOString()
+      });
+      notify("✨ ¡Credenciales de Mercado Pago guardadas con éxito! Cobros reales en vivo activos de inmediato.", "success");
+    } catch (err: any) {
+      console.error("Error saving MP config to Firestore:", err);
+      notify("Error al guardar credenciales en la base de datos: " + err.message, "error");
+    } finally {
+      setIsSavingMpConfig(false);
+    }
+  };
 
   const handleOptimizeDatabase = async () => {
     if (!onSetProducts) {
@@ -5170,6 +5222,99 @@ Descripción básica / Notas del producto: "${description || ""}"`;
               </div>
             </div>
           )}
+
+          {/* CONFIGURACIÓN DE PASARELA DE COBRO MERCADO PAGO COMPATIBLE CON PRODUCTION */}
+          <div className="bg-white rounded-2xl border border-blue-200 p-5 shadow-sm space-y-4 text-left">
+            <h4 className="font-serif font-bold text-blue-900 text-base pb-2 border-b border-blue-100 flex items-center gap-2">
+              <Gift className="w-4.5 h-4.5 text-blue-600" />
+              Pasarela de Pago Mercado Pago real (Instantáneo)
+            </h4>
+            <p className="text-xs text-blue-800 font-light leading-relaxed">
+              Configura tus credenciales reales de Mercado Pago para procesar pagos auténticos de tus clientes. Al guardarlos aquí, <strong>se activan de forma inmediata en vivo</strong> sin necesidad de configurar variables de entorno complejas en Vercel ni tener que esperar las demoras de las redespliegues.
+            </p>
+
+            <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-4 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <span className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Settings className="w-4 h-4 text-blue-800" />
+                  Credenciales de Producción Mercado Pago
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowMpSettings(!showMpSettings)}
+                  className="px-2 py-1 bg-white border border-blue-200 hover:bg-blue-100 text-blue-950 rounded-lg transition-all flex items-center gap-1 text-[10px] uppercase font-bold cursor-pointer"
+                >
+                  <span>{showMpSettings ? "Ocultar" : "Mostrar Config"}</span>
+                </button>
+              </div>
+
+              {showMpSettings && (
+                <div className="space-y-3 animate-in slide-in-from-top-1 duration-155">
+                  <div>
+                    <label className="block text-[10px] font-bold text-blue-800 mb-1 flex items-center justify-between">
+                      <span>Clave Pública (Public Key):</span>
+                      <a
+                        href="https://www.mercadopago.com.ar/developers/panel/credentials"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9.5px] text-blue-600 hover:underline font-extrabold uppercase tracking-wide"
+                      >
+                        Obtener mis Claves de Mercado Pago
+                      </a>
+                    </label>
+                    <input
+                      type="text"
+                      value={mpPublicKey}
+                      onChange={(e) => setMpPublicKey(e.target.value)}
+                      placeholder="Empieza con APP_USR-..."
+                      className="w-full text-xs p-2 bg-white border border-blue-200 rounded-lg focus:ring-1 focus:ring-blue-300 outline-hidden transition-all font-mono"
+                    />
+                    <p className="text-[10px] text-blue-600 font-light mt-1">
+                      Identifica tu cuenta de Mercado Pago de forma pública. Empieza por lo general con <strong className="font-semibold">APP_USR-</strong>.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-blue-800 mb-1">
+                      Token de Acceso de Producción (Access Token):
+                    </label>
+                    <input
+                      type="password"
+                      value={mpAccessToken}
+                      onChange={(e) => setMpAccessToken(e.target.value)}
+                      placeholder="Empieza con APP_USR-... o MLA-..."
+                      className="w-full text-xs p-2 bg-white border border-blue-200 rounded-lg focus:ring-1 focus:ring-blue-300 outline-hidden transition-all font-mono"
+                    />
+                    <p className="text-[10px] text-blue-600 font-light mt-1">
+                      Clave secreta privada para procesar la transacción. <strong>Importante:</strong> no ingreses una clave que comience con <strong className="text-red-600">sk_live_</strong> ya que esa corresponde a Stripe, no a Mercado Pago.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isSavingMpConfig}
+                    onClick={handleSaveMpConfig}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-lg text-xs transition-all flex items-center justify-center gap-1"
+                  >
+                    {isSavingMpConfig ? (
+                      <>
+                        <RotateCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Guardando en la base de datos...</span>
+                      </>
+                    ) : (
+                      <span>Activar Cobros en Vivo (Guardar en Firestore)</span>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {!showMpSettings && (
+                <p className="text-[10.5px] text-blue-800/80 font-medium">
+                  {mpPublicKey ? "✓ Claves configuradas en base de datos. Haz clic en 'Mostrar Config' para editarlas." : "⚡ Sin claves. Haz clic en 'Mostrar Config' para ingresarlas."}
+                </p>
+              )}
+            </div>
+          </div>
 
           {/* CONTROL DE RESPAldo Y SINCRONIZACIÓN EN LA NUBE */}
           <div className="bg-white rounded-2xl border border-brand-200 p-5 shadow-sm space-y-4 text-left">

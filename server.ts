@@ -1551,7 +1551,22 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         return res.status(400).json({ error: "No se enviaron artículos para procesar el pago." });
       }
 
-      const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+      let mpAccessToken = process.env.MP_ACCESS_TOKEN;
+
+      try {
+        if (db) {
+          const docRef = doc(db, "settings", "mercadopago_config");
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const fsData = docSnap.data();
+            if (fsData.accessToken && fsData.accessToken.trim()) {
+              mpAccessToken = fsData.accessToken.trim();
+            }
+          }
+        }
+      } catch (fsErr) {
+        console.warn("Could not read dynamic MP_ACCESS_TOKEN on preference creation:", fsErr);
+      }
 
       // Prepare items for Mercado Pago format
       const mpItems = items.map((item: any) => ({
@@ -1651,11 +1666,31 @@ Descripción básica / Notas del producto: "${description || ""}"`;
   });
 
   // API Endpoint: Get Mercado Pago Config (Public Key)
-  app.get("/api/mercadopago/config", (req, res) => {
-    const publicKey = process.env.MP_PUBLIC_KEY || process.env.VITE_MP_PUBLIC_KEY || "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849";
+  app.get("/api/mercadopago/config", async (req, res) => {
+    let publicKey = process.env.MP_PUBLIC_KEY || process.env.VITE_MP_PUBLIC_KEY || "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849";
+    let hasPrivateToken = !!process.env.MP_ACCESS_TOKEN;
+
+    try {
+      if (db) {
+        const docRef = doc(db, "settings", "mercadopago_config");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const fsData = docSnap.data();
+          if (fsData.publicKey && fsData.publicKey.trim()) {
+            publicKey = fsData.publicKey.trim();
+          }
+          if (fsData.accessToken && fsData.accessToken.trim()) {
+            hasPrivateToken = true;
+          }
+        }
+      }
+    } catch (fsErr) {
+      console.warn("Could not read mercadopago_config from Firestore on config get:", fsErr);
+    }
+
     return res.json({
       publicKey,
-      hasPrivateToken: !!process.env.MP_ACCESS_TOKEN
+      hasPrivateToken
     });
   });
 
@@ -1668,7 +1703,22 @@ Descripción básica / Notas del producto: "${description || ""}"`;
         return res.status(400).json({ error: "Falta el payload de pago ('paymentData')." });
       }
 
-      const mpAccessToken = process.env.MP_ACCESS_TOKEN;
+      let mpAccessToken = process.env.MP_ACCESS_TOKEN;
+
+      try {
+        if (db) {
+          const docRef = doc(db, "settings", "mercadopago_config");
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const fsData = docSnap.data();
+            if (fsData.accessToken && fsData.accessToken.trim()) {
+              mpAccessToken = fsData.accessToken.trim();
+            }
+          }
+        }
+      } catch (fsErr) {
+        console.warn("Could not read dynamic MP_ACCESS_TOKEN from Firestore on payment:", fsErr);
+      }
 
       // SIMULATED TESTING MODE
       if (!mpAccessToken) {
