@@ -791,11 +791,50 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       });
     }
 
+    const localVideoRef = React.useRef<HTMLVideoElement | null>(null);
+
+    const setRefs = React.useCallback((node: HTMLVideoElement | null) => {
+      localVideoRef.current = node;
+      if (typeof ref === "function") {
+        ref(node);
+      } else if (ref) {
+        (ref as any).current = node;
+      }
+    }, [ref]);
+
     const { autoPlay, muted, ...restProps } = props;
     const forceMuted = !!autoPlay ? true : muted;
 
+    React.useEffect(() => {
+      const video = localVideoRef.current;
+      if (!video || !activeVideoSrc) return;
+
+      if (autoPlay) {
+        video.muted = true;
+        
+        const handleForcePlay = () => {
+          video.play().catch((err) => {
+            console.warn("[Instagram Sandbox Autoplay Prevented] Retrying playing...", err);
+            video.muted = true;
+            video.play().catch(e => console.error("Playback fully blocked by container:", e));
+          });
+        };
+
+        video.addEventListener("canplay", handleForcePlay);
+        handleForcePlay();
+
+        // Backup timer to trigger playback in case "canplay" event doesn't fire fast enough
+        const playbackTimeout = setTimeout(handleForcePlay, 300);
+
+        return () => {
+          video.removeEventListener("canplay", handleForcePlay);
+          clearTimeout(playbackTimeout);
+        };
+      }
+    }, [activeVideoSrc, autoPlay]);
+
     return React.createElement("video", {
-      ref,
+      ref: setRefs,
       src: activeVideoSrc,
       preload: "auto",
       poster: backupUrl || undefined,
@@ -804,6 +843,7 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       "webkit-playsinline": "true",
       autoPlay,
       muted: forceMuted,
+      crossOrigin: "anonymous",
       ...restProps
     });
   }

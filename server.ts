@@ -53,6 +53,20 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Enable wildcard CORS FIRST before any routes or static folders to allow correct headers (including byte range headers for webviews)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin || "*";
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
+    res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,content-type,X-Filename,X-MimeType,Authorization,Range");
+    res.setHeader("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // Ensure uploads directory exists inside public folder so Vite can bundle on build (important for Vercel/dynamic paths)
   const legacyDir = path.join(process.cwd(), "uploads");
   const uploadsDir = path.join(process.cwd(), "public", "uploads");
@@ -140,19 +154,6 @@ async function startServer() {
       console.error("[Missing Media Proxy] Unexpected failure:", err);
       return res.status(500).send("Proxy error");
     }
-  });
-
-  // Enable wildcard CORS to allow streaming video and media requests from Vercel store or local hosts
-  app.use((req, res, next) => {
-    const origin = req.headers.origin || "*";
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
-    res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,content-type,X-Filename,X-MimeType,Authorization,Range");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    if (req.method === "OPTIONS") {
-      return res.sendStatus(200);
-    }
-    next();
   });
 
   // Middleware for parsing JSON requests
