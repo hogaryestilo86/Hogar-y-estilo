@@ -7,9 +7,64 @@ import React, { useState, useEffect, useRef } from "react";
 import { OrderDetails, CartItem, BankDetails } from "../types";
 import { X, CreditCard, Landmark, CheckCircle, ArrowRight, ClipboardCheck, ArrowLeft, ShieldAlert, DollarSign, HelpCircle, Copy, Instagram, Upload, Image } from "lucide-react";
 import { storeMedia, ResolvedImage, ResolvedVideo, getCategoryPlaceholder, getApiUrl } from "../indexedDbMedia";
+import { db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 // Cache public key config to speed up payment brick loading and optimize conversions
 let cachedMpPublicConfig: { publicKey: string; isReal: boolean } | null = null;
+
+async function getMpRealConfig(): Promise<{ publicKey: string; isReal: boolean }> {
+  if (cachedMpPublicConfig) return cachedMpPublicConfig;
+
+  try {
+    // 1. Core strategy: Always try custom Firebase Firestore direct document read first for absolute resiliency and zero CORS/mixed-content or backend lagging!
+    const docRef = doc(db, "settings", "mercadopago_config");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data && data.publicKey && data.publicKey.trim()) {
+        cachedMpPublicConfig = {
+          publicKey: data.publicKey.trim(),
+          isReal: !!(data.accessToken && data.accessToken.trim())
+        };
+        console.log("⚡ [Checkout MP Config] Loaded Mercado Pago credentials directly from Firestore:", cachedMpPublicConfig);
+        return cachedMpPublicConfig;
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ [Checkout MP Config] Direct Firestore read failed or timed out. Falling back to backend endpoints...", err);
+  }
+
+  try {
+    // 2. Secondary strategy: Fallback backend endpoint proxy
+    const res = await fetch(getApiUrl("/api/mercadopago/config"));
+    if (res.ok) {
+      const data = await res.json();
+      cachedMpPublicConfig = {
+        publicKey: data.publicKey,
+        isReal: data.hasPrivateToken
+      };
+      console.log("⚡ [Checkout MP Config] Loaded config via Express API:", cachedMpPublicConfig);
+      return cachedMpPublicConfig;
+    }
+  } catch (err) {
+    console.warn("⚠️ [Checkout MP Config] Backend API config fetch failed. Using fallback keys...", err);
+  }
+
+  // 3. Fallback strategy: Demo Keys
+  cachedMpPublicConfig = {
+    publicKey: "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849",
+    isReal: false
+  };
+  return cachedMpPublicConfig;
+}
+
+if (typeof window !== "undefined") {
+  (window as any).clearMpPublicConfigCache = () => {
+    console.log("🧹 [Checkout MP Config] Clearing cached public keys.");
+    cachedMpPublicConfig = null;
+  };
+}
 
 // Preload Mercado Pago SDK script globally at module evaluation to eliminate load latency!
 if (typeof window !== "undefined" && typeof (window as any).MercadoPago === "undefined" && 
@@ -74,24 +129,9 @@ export default function CheckoutModal({
     }
 
     if (!cachedMpPublicConfig) {
-      fetch(getApiUrl("/api/mercadopago/config"))
-        .then((res) => {
-          if (res.ok) return res.json();
-          throw new Error();
-        })
-        .then((data) => {
-          cachedMpPublicConfig = {
-            publicKey: data.publicKey,
-            isReal: data.hasPrivateToken,
-          };
-        })
-        .catch(() => {
-          // Fallback to demo public key to guarantee zero latency loading
-          cachedMpPublicConfig = {
-            publicKey: "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849",
-            isReal: false,
-          };
-        });
+      getMpRealConfig().catch((err) => {
+        console.warn("Error caching MP config in background on open:", err);
+      });
     }
   }, [isOpen]);
   const [formData, setFormData] = useState<OrderDetails>({
@@ -297,21 +337,10 @@ export default function CheckoutModal({
           if (!active) return;
 
           // 2. Fetch config (cached at module level to eliminate API roundtrip latency!)
-          let publicKey = "APP_USR-7e14f52c-80fd-4fbc-ad89-d9cb79b6f849";
-          let isReal = false;
-
-          if (cachedMpPublicConfig) {
-            publicKey = cachedMpPublicConfig.publicKey;
-            isReal = cachedMpPublicConfig.isReal;
-          } else {
-            const configRes = await fetch(getApiUrl("/api/mercadopago/config"));
-            if (configRes.ok) {
-              const data = await configRes.json();
-              publicKey = data.publicKey;
-              isReal = data.hasPrivateToken;
-              cachedMpPublicConfig = { publicKey, isReal };
-            }
-          }
+          const mpConf = await getMpRealConfig();
+          const publicKey = mpConf.publicKey;
+          const isReal = mpConf.isReal;
+          
           setHasPrivateToken(isReal);
           setMpIsSimulator(!isReal);
 

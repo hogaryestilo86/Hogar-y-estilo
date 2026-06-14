@@ -657,7 +657,7 @@ export default function AdminPanel({
       return;
     }
 
-    setIsSavingMpConfig(true);
+     setIsSavingMpConfig(true);
     try {
       const docRef = doc(db, "settings", "mercadopago_config");
       await setDoc(docRef, {
@@ -665,6 +665,12 @@ export default function AdminPanel({
         accessToken: mpAccessToken.trim(),
         updatedAt: new Date().toISOString()
       });
+      
+      // Bust client cache immediately to guarantee instant checkout updates
+      if (typeof window !== "undefined" && (window as any).clearMpPublicConfigCache) {
+        (window as any).clearMpPublicConfigCache();
+      }
+      
       notify("✨ ¡Credenciales de Mercado Pago guardadas con éxito! Cobros reales en vivo activos de inmediato.", "success");
     } catch (err: any) {
       console.error("Error saving MP config to Firestore:", err);
