@@ -240,7 +240,7 @@ export default function CheckoutModal({
     0
   );
   const isFreeShipping = subtotal >= 50000;
-  const shipping = isFreeShipping ? 0 : 10000;
+  const shipping = 0; // Temporarily set to 0 for low-value testing
   const finalListTotal = subtotal + shipping;
 
   // Payments logic
