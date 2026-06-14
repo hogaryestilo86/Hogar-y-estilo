@@ -657,10 +657,17 @@ export const ResolvedImage = React.forwardRef<HTMLImageElement, ResolvedImagePro
       }
     };
 
+    const preventAction = (e: any) => {
+      e.preventDefault();
+    };
+
     return React.createElement("img", {
       ref,
       src: finalSrc || undefined,
       onError: handleError,
+      onContextMenu: preventAction,
+      onDragStart: preventAction,
+      style: { userSelect: "none", WebkitUserSelect: "none", ...props.style },
       ...props
     });
   }
@@ -735,12 +742,18 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       }
     };
 
+    const preventAction = (e: any) => {
+      e.preventDefault();
+    };
+
     if (errorCount >= 2 || !activeVideoSrc || isImage(finalSource)) {
       return React.createElement("img", {
         src: resolvedBackup || backupUrl || resolved || finalPlaceholder,
         className: props.className,
-        style: props.style,
+        style: { userSelect: "none", WebkitUserSelect: "none", ...props.style },
         referrerPolicy: "no-referrer",
+        onContextMenu: preventAction,
+        onDragStart: preventAction,
         onError: handleImageError,
         ...props
       });
@@ -844,6 +857,9 @@ export const ResolvedVideo = React.forwardRef<any, ResolvedVideoProps>(
       autoPlay,
       muted: forceMuted,
       crossOrigin: "anonymous",
+      onContextMenu: preventAction,
+      onDragStart: preventAction,
+      style: { userSelect: "none", WebkitUserSelect: "none", ...props.style },
       ...restProps
     });
   }

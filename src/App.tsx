@@ -198,11 +198,12 @@ export default function App() {
           const docRef = doc(db, "settings", "github_config");
           const snap = await getDoc(docRef);
           const currentData = snap.exists() ? snap.data() : {};
-          if (currentData.backendUrl !== window.location.origin) {
-            console.log("🔄 [App Sync] Registering active server backend URL in Firestore:", window.location.origin);
+          const cleanBackendUrl = window.location.origin.replace("-dev-", "-pre-");
+          if (currentData.backendUrl !== cleanBackendUrl) {
+            console.log("🔄 [App Sync] Registering active server backend URL in Firestore:", cleanBackendUrl);
             await setDoc(docRef, {
               ...currentData,
-              backendUrl: window.location.origin
+              backendUrl: cleanBackendUrl
             }, { merge: true });
           }
         } catch (err) {

@@ -607,10 +607,11 @@ export default function AdminPanel({
     if (cachedRepo) {
       try {
         const docRef = doc(db, "settings", "github_config");
+        const cleanBackendUrl = window.location.origin.replace("-dev-", "-pre-");
         setDoc(docRef, {
           repo: cachedRepo,
           branch: cachedBranch,
-          backendUrl: window.location.origin
+          backendUrl: cleanBackendUrl
         }).then(() => {
           console.log("[Admin Auto-register] Automatically synchronized local session settings to Firestore database.");
         }).catch(err => {
@@ -1918,10 +1919,11 @@ export default function AdminPanel({
       // Guardar también la configuración en Firestore de forma no bloqueante para evitar bloqueos si las cuotas están agotadas
       try {
         const docRef = doc(db, "settings", "github_config");
+        const cleanBackendUrl = window.location.origin.replace("-dev-", "-pre-");
         setDoc(docRef, {
           repo: cleanRepo,
           branch: branchToUse,
-          backendUrl: window.location.origin
+          backendUrl: cleanBackendUrl
         }).then(() => {
           console.log("[Firestore Sync] Successfully persisted github_config to Firestore.");
         }).catch((fsErr) => {
