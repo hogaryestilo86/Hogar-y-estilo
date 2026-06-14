@@ -26,7 +26,7 @@ export default function SlideOutCart({
   onCheckout,
 }: SlideOutCartProps) {
   const FREE_SHIPPING_LIMIT = 50000;
-  const SHIPPING_COST = 0;
+  const SHIPPING_COST = 10000;
 
   // Calculations
   const subtotal = cartItems.reduce(
