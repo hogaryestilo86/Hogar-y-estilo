@@ -1316,22 +1316,6 @@ export default function CheckoutModal({
                         className="w-full min-h-[250px]"
                       ></div>
                     </div>
-
-                    {mpIsSimulator ? (
-                      <div className="bg-[#002f54]/70 border border-[#009ee3]/30 rounded-xl p-3.5 text-[10.5px] text-blue-100 leading-relaxed flex gap-2 font-sans">
-                        <span className="text-sm select-none">💡</span>
-                        <div>
-                          <strong>Modo Demostración Activo:</strong> Como todavía no has configurado tus claves privadas reales en el panel de administrador, Mercado Pago opera en modo simulador para que pruebes tarjetas y transferencias de prueba.
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-xl p-3.5 text-[11px] text-emerald-100 leading-relaxed flex gap-2.5 font-sans animate-in fade-in duration-300">
-                        <span className="text-sm select-none">🟢</span>
-                        <div>
-                          <strong className="text-emerald-400">Cobro Real En Vivo Activo:</strong> Tu tienda está conectada de forma directa y segura con tu cuenta de Mercado Pago mediante la clave pública <code className="bg-emerald-900/60 px-1.5 py-0.5 rounded text-[10px] font-mono text-emerald-200">{mpActivePublicKey ? (mpActivePublicKey.slice(0, 15) + "..." + mpActivePublicKey.slice(-6)) : "Cargada"}</code>. Todas las ventas reales que realicen tus clientes se acreditarán de forma directa e inmediata en tu saldo disponible de Mercado Pago. ¡Listo para recibir pagos reales!
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
