@@ -1415,13 +1415,13 @@ export default function CheckoutModal({
                       ¡Gracias por elegirnos!
                     </h4>
                     <p className="text-xs sm:text-sm text-brand-700 max-w-xs mx-auto font-light leading-relaxed">
-                      Registramos el pedido de forma exitosa para <strong>{formData.fullName}</strong>.
+                      Registramos el pedido de forma exitosa en <strong>Hogar y Estilo</strong>.
                     </p>
                   </div>
 
                   <div className="border-t border-brand-250 pt-3 space-y-3">
                     <p className="text-xs sm:text-sm text-[#065F46] bg-[#ECFDF5] p-3 rounded-xl font-semibold leading-relaxed font-sans border border-[#A7F3D0]">
-                      ✨ <strong>Comprobante Recibido:</strong> Tu comprobante ya fue adjuntado a la orden y enviado a administración. No necesitas enviarlo manualmente. ¡Prepararemos tu despacho de inmediato! 🚚
+                      ¡Prepararemos tu envío de inmediato! 🚚
                     </p>
 
                     <a
@@ -1440,7 +1440,7 @@ export default function CheckoutModal({
                 </div>
 
                 {/* 2. BADGE DE ESTADO DEL PAGO SÚPER CLARO SEGÚN TRANSFER/TARJETA */}
-                {isTransfer ? (
+                {isTransfer && (
                   <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-3.5 shadow-xs">
                     <div className="space-y-1.5">
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-955 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full font-serif">
@@ -1480,52 +1480,6 @@ export default function CheckoutModal({
                         </div>
                       </div>
                     )}
-                  </div>
-                ) : mpTransferDetails ? (
-                  <div className="bg-blue-50 border border-blue-200 text-blue-955 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-3 shadow-xs">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-955 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full font-serif font-bold">
-                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-                      Estado: Transferencia Automática Mercado Pago
-                    </div>
-                    <p className="text-[11px] text-brand-700 leading-relaxed font-light">
-                      Se generó una solicitud de transferencia bancaria inmediata (DEBIN/Red Link) de <strong>{formatCurrency(finalListTotal)}</strong> mediante Mercado Pago.
-                    </p>
-                    {mpTransferDetails.transaction_data?.qr_code && (
-                      <div className="bg-white p-3.5 rounded-xl border border-blue-100 max-w-[280px] mx-auto text-center space-y-1">
-                        <p className="text-[9px] text-brand-500 font-bold uppercase tracking-wider">Código de Transferencia Automática</p>
-                        <p className="font-mono text-xs text-brand-900 break-all select-all font-bold p-2 bg-blue-50/50 rounded-lg">{mpTransferDetails.transaction_data.qr_code}</p>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(mpTransferDetails.transaction_data.qr_code);
-                            notify("¡Código copiado! Pegalo en tu home banking.", "success");
-                          }}
-                          className="text-[10px] text-blue-600 font-bold underline cursor-pointer hover:text-blue-800"
-                        >Copiar código de transferencia</button>
-                      </div>
-                    )}
-                    {mpTransferDetails.transaction_data?.ticket_url && (
-                      <div className="pt-1">
-                        <a 
-                          href={mpTransferDetails.transaction_data.ticket_url} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="inline-block bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4.5 py-2.5 text-xs font-bold transition-all shadow-md active:scale-95 text-center font-sans"
-                        >
-                          Ver Detalle de Transferencia / Pagar con MP
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-green-50 border border-green-200 text-green-955 rounded-2xl p-4.5 max-w-md mx-auto text-center space-y-1.5 shadow-xs">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-955 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-full font-serif">
-                      <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                      Estado: Pago Seguro Aprobado 🎉
-                    </div>
-                    <p className="text-[11px] text-brand-700 leading-relaxed font-light">
-                      El pago de <strong>{formatCurrency(finalListTotal)}</strong> con tarjeta fue procesado y confirmado con éxito. ¡Ya estamos preparando tu pedido para despacharlo!
-                    </p>
                   </div>
                 )}
 
