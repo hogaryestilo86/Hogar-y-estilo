@@ -295,8 +295,8 @@ export default function ProductCard({
 
         {/* Dynamic CTAs - Unified Consultation and Instant Purchase blocks to guarantee conversion */}
         <div className="space-y-1.5 mt-2.5">
-          {/* Social direct messaging and instant product sharing side-by-side layout */}
-          <div className="grid grid-cols-2 gap-1.5 justify-center">
+          {/* Social direct messaging and instant product sharing full-width layout */}
+          <div className="flex justify-center w-full">
             <a
               id={`btn-stock-instagram-${product.id}`}
               href={`https://instagram.com/deco.home.rosario`}
@@ -305,65 +305,12 @@ export default function ProductCard({
               onClick={(e) => {
                 e.stopPropagation();
               }}
-              className="grow justify-center bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:brightness-110 text-white font-black text-[8.5px] sm:text-[9.5px] scale-95 tracking-wide uppercase py-1 px-1.5 rounded-lg flex items-center gap-1 transition-all text-center cursor-pointer shadow-3xs transform active:scale-95 border-0"
+              className="w-full justify-center bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:brightness-110 text-white font-black text-[10px] sm:text-[11px] py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all text-center cursor-pointer shadow-3xs transform active:scale-95 border-0"
               title="Consultar Stock del producto por Instagram"
             >
-              <Instagram className="w-2.5 h-2.5 text-white shrink-0" />
-              <span>Consultar 📱</span>
+              <Instagram className="w-3.5 h-3.5 text-white shrink-0" />
+              <span>Consultar Stock 📱</span>
             </a>
-            <button
-              id={`btn-copiar-link-${product.id}`}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                try {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("p", product.id);
-                  const shareableUrl = url.toString();
-                  
-                  const handleSuccessfulCopy = () => {
-                    setIsCopied(true);
-                    setTimeout(() => setIsCopied(false), 2000);
-                    if (showToast) {
-                      showToast("¡Enlace copiado! Compartilo de forma directa.", "success");
-                    }
-                  };
-
-                  if (navigator.clipboard) {
-                    navigator.clipboard.writeText(shareableUrl)
-                      .then(handleSuccessfulCopy)
-                      .catch(() => {
-                        const input = document.createElement("input");
-                        input.value = shareableUrl;
-                        document.body.appendChild(input);
-                        input.select();
-                        document.execCommand("copy");
-                        document.body.removeChild(input);
-                        handleSuccessfulCopy();
-                      });
-                  } else {
-                    const input = document.createElement("input");
-                    input.value = shareableUrl;
-                    document.body.appendChild(input);
-                    input.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(input);
-                    handleSuccessfulCopy();
-                  }
-                } catch (err) {
-                  if (showToast) showToast("Error al copiar enlace.", "error");
-                }
-              }}
-              className={`grow justify-center font-black text-[8.5px] sm:text-[9.5px] scale-95 tracking-wide uppercase py-1 px-1.5 rounded-lg flex items-center gap-1 transition-all text-center cursor-pointer shadow-3xs transform active:scale-95 border ${
-                isCopied 
-                  ? "bg-emerald-600 text-white border-emerald-500 animate-pulse" 
-                  : "bg-[#ccbfab] hover:bg-[#b8ad90] border-[#bfae98] text-brand-950"
-              }`}
-              title="Copiar link directo de este producto"
-            >
-              <Share2 className="w-2.5 h-2.5 shrink-0" />
-              <span>{isCopied ? "¡Copiado! ✔️" : "Copiar Link"}</span>
-            </button>
           </div>
 
           {/* Standard instant purchase hooks - Free of barriers (thin & full width stacked layout) */}
