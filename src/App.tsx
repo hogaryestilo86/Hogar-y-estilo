@@ -157,7 +157,8 @@ export default function App() {
       
       if (isVercelPreview) {
         console.log("⚠️ Redirigiendo desde entorno preview de Vercel al de producción oficial...");
-        window.location.replace("https://hogar-y-estilo.vercel.app");
+        // Preserve all path, search query, and hash parameters (e.g., ?p=xxx) so users land directly on the product!
+        window.location.replace("https://hogar-y-estilo.vercel.app" + window.location.search + window.location.hash);
       }
     }
   }, []);
@@ -556,7 +557,7 @@ export default function App() {
   // 1. Process initial parameter or browser back/forward buttons (popstate)
   useEffect(() => {
     const handleUrlNavigation = () => {
-      if (products && products.length > 0) {
+      if (hasLoadedInitial && products && products.length > 0) {
         const pId = getProductIdFromUrl();
         if (pId) {
           const found = products.find(p => p.id === pId || p.id?.toString() === pId?.toString());
@@ -570,16 +571,17 @@ export default function App() {
     };
 
     // Handle initial load once products are fetched
-    if (products && products.length > 0) {
+    if (hasLoadedInitial && products && products.length > 0) {
       handleUrlNavigation();
     }
 
     window.addEventListener("popstate", handleUrlNavigation);
     return () => window.removeEventListener("popstate", handleUrlNavigation);
-  }, [products]);
+  }, [products, hasLoadedInitial]);
 
   // 2. Keep the URL parameter in sync with the state of selectedProduct
   useEffect(() => {
+    if (!hasLoadedInitial) return; // Keep URL query details intact while independent background database loading takes place!
     try {
       const currentUrlParams = new URLSearchParams(window.location.search);
       const urlProductId = currentUrlParams.get("p") || currentUrlParams.get("product");
@@ -602,7 +604,7 @@ export default function App() {
     } catch (e) {
       console.warn("Failed to synchronize selectedProduct with browser URL state:", e);
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, hasLoadedInitial]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab ] = useState<"shop" | "admin" | "tracker">("shop");
   const [isCartOpen, setIsCartOpen] = useState(false);
