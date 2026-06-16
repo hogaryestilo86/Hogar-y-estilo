@@ -6,7 +6,7 @@
 import React, { useState, useRef } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, ProductMedia, BankDetails } from "../types";
-import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings, Clipboard, MessageCircle, Search, Gift } from "lucide-react";
+import { Plus, Sparkles, AlertCircle, FileVideo, FileImage, Trash2, CheckCircle, ArrowRightLeft, Eye, EyeOff, ShoppingCart, TrendingUp, Clock, Phone, Mail, Award, Check, Pencil, Copy, Database, Download, Github, RotateCw, Settings, Clipboard, MessageCircle, Search, Gift, Share2 } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, storeMedia, storeMediaAsIdbReference, getCategoryPlaceholder, inMemoryFallbackCache, getMedia, compressAllProductsBase64, compressBase64Image, getApiUrl } from "../indexedDbMedia";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -5079,6 +5079,49 @@ Descripción básica / Notas del producto: "${description || ""}"`;
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
+                        {/* Copy direct shareable landing link */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            try {
+                              const cleanOrigin = window.location.origin;
+                              const shareableUrl = `${cleanOrigin}/?p=${item.id}`;
+                              
+                              const copySuccess = () => {
+                                notify("¡Enlace de venta copiado! Compartilo directamente con tu cliente.", "success");
+                              };
+
+                              if (navigator.clipboard) {
+                                navigator.clipboard.writeText(shareableUrl)
+                                  .then(copySuccess)
+                                  .catch(() => {
+                                    const input = document.createElement("input");
+                                    input.value = shareableUrl;
+                                    document.body.appendChild(input);
+                                    input.select();
+                                    document.execCommand("copy");
+                                    document.body.removeChild(input);
+                                    copySuccess();
+                                  });
+                              } else {
+                                const input = document.createElement("input");
+                                input.value = shareableUrl;
+                                document.body.appendChild(input);
+                                input.select();
+                                document.execCommand("copy");
+                                document.body.removeChild(input);
+                                copySuccess();
+                              }
+                            } catch (_) {
+                              notify("No se pudo copiar el enlace automáticamente.", "error");
+                            }
+                          }}
+                          className="p-1.5 text-brand-400 hover:text-pink-600 hover:bg-pink-50 rounded-md transition-colors cursor-pointer active:scale-95 transition-all"
+                          title="Copiar enlace de venta para compartir en Instagram/WhatsApp"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+
                         {/* Toggle Pause button (Pausar sin eliminar) */}
                         <button
                           type="button"

@@ -93,7 +93,7 @@ async function startServer() {
   
   app.use("/uploads", express.static(uploadsDir));
 
-  // Fallback for missing uploads: download from synchronized GitHub repository
+  // Fallback for missing uploads: download from synchronized GitHub repository or restore from Firestore persistent media backup
   app.get("/uploads/:filename", async (req, res) => {
     try {
       const filename = req.params.filename;
@@ -103,12 +103,36 @@ async function startServer() {
         return res.sendFile(filepath);
       }
 
-      console.log(`[Missing Media Proxy] File "${filename}" not found in local ephemeral disk. Resolving via settings...`);
+      console.log(`[Missing Media Proxy] File "${filename}" not found in local ephemeral disk. Checking persistent backup systems...`);
+
+      // 1. Prioritize restoring from our persistent, highly-resilient Firestore media backup collection!
+      if (db) {
+        try {
+          const docRef = doc(db, "uploaded_media_backups", filename);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data && data.base64) {
+              const buffer = Buffer.from(data.base64, "base64");
+              
+              // Cache locally on Cloud Run ephemeral disk so subsequent requests hit express.static instantly
+              fs.writeFileSync(filepath, buffer);
+              console.log(`[Missing Media Proxy] Success! Self-healed/Restored missing media file "${filename}" from Firestore backup.`);
+
+              const contentType = data.mimeType || "image/jpeg";
+              res.setHeader("Content-Type", contentType);
+              return res.send(buffer);
+            }
+          }
+        } catch (dbErr: any) {
+          console.warn("[Missing Media Proxy] Minor issue reading from Firestore uploaded_media_backups:", dbErr.message);
+        }
+      }
 
       let repo = "";
       let branch = "main";
 
-      // Query Firestore for setting configuración
+      // 2. Fall back to GitHub synchronized repository if Firestore didn't have it
       if (db) {
         try {
           const docRef = doc(db, "settings", "github_config");
@@ -118,7 +142,7 @@ async function startServer() {
             if (data && data.repo) {
               repo = data.repo;
               branch = data.branch || "main";
-              console.log(`[Missing Media Proxy] Found synced repository: ${repo}, branch: ${branch}`);
+              console.log(`[Missing Media Proxy] Secondary fallback check: Found synced repository: ${repo}, branch: ${branch}`);
             }
           }
         } catch (dbErr: any) {
@@ -137,7 +161,7 @@ async function startServer() {
           
           // Cache locally on Cloud Run disk so next requests are served immediately via express.static
           fs.writeFileSync(filepath, buffer);
-          console.log(`[Missing Media Proxy] Cached and serving missing file: ${filename}`);
+          console.log(`[Missing Media Proxy] Cached and serving missing file from GitHub: ${filename}`);
 
           const contentType = fetchResponse.headers.get("content-type") || "image/jpeg";
           res.setHeader("Content-Type", contentType);
@@ -1167,6 +1191,21 @@ Descripción básica / Notas del producto: "${description || ""}"`;
 
       fs.writeFileSync(filepath, fileBuffer);
       console.log(`[Media Direct Upload] Saved: /uploads/${cleanFilename} (${mimeType || ext}) - Method: ${isBinaryStream ? "BinaryStream" : "Base64"}`);
+
+      // Persistent Cloud Backup: Synchronize uploaded media file to Firestore to survive Cloud Run container restarts and re-deploys!
+      if (db) {
+        try {
+          const docRef = doc(db, "uploaded_media_backups", cleanFilename);
+          await setDoc(docRef, {
+            mimeType: mimeType || "image/jpeg",
+            base64: fileBuffer.toString("base64"),
+            createdAt: new Date().toISOString()
+          });
+          console.log(`[Firestore Media Backup] Successfully saved persistent copy of: ${cleanFilename}`);
+        } catch (backupDbErr: any) {
+          console.warn("[Firestore Media Backup] Non-blocking backup to Firestore failed:", backupDbErr.message);
+        }
+      }
 
       res.json({
         success: true,
