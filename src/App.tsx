@@ -532,6 +532,77 @@ export default function App() {
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Helper to extract product ID from URL query parameters or hash
+  const getProductIdFromUrl = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      let pId = params.get("p") || params.get("product");
+      if (!pId) {
+        const hash = window.location.hash;
+        if (hash) {
+          const match = hash.match(/#p(?:roduct)?=([^&]+)/);
+          if (match) {
+            pId = match[1];
+          }
+        }
+      }
+      return pId;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  // 1. Process initial parameter or browser back/forward buttons (popstate)
+  useEffect(() => {
+    const handleUrlNavigation = () => {
+      if (products && products.length > 0) {
+        const pId = getProductIdFromUrl();
+        if (pId) {
+          const found = products.find(p => p.id === pId || p.id?.toString() === pId?.toString());
+          if (found) {
+            setSelectedProduct(found);
+            return;
+          }
+        }
+        setSelectedProduct(null);
+      }
+    };
+
+    // Handle initial load once products are fetched
+    if (products && products.length > 0) {
+      handleUrlNavigation();
+    }
+
+    window.addEventListener("popstate", handleUrlNavigation);
+    return () => window.removeEventListener("popstate", handleUrlNavigation);
+  }, [products]);
+
+  // 2. Keep the URL parameter in sync with the state of selectedProduct
+  useEffect(() => {
+    try {
+      const currentUrlParams = new URLSearchParams(window.location.search);
+      const urlProductId = currentUrlParams.get("p") || currentUrlParams.get("product");
+      const targetId = selectedProduct?.id;
+
+      if (targetId) {
+        if (urlProductId !== targetId) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("p", targetId);
+          window.history.pushState({ productId: targetId }, "", url.toString());
+        }
+      } else {
+        if (urlProductId) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("p");
+          url.searchParams.delete("product");
+          window.history.pushState({}, "", url.toString());
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to synchronize selectedProduct with browser URL state:", e);
+    }
+  }, [selectedProduct]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab ] = useState<"shop" | "admin" | "tracker">("shop");
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -1489,6 +1560,7 @@ export default function App() {
                             onAddToCart={handleAddToCart}
                             onViewDetails={(p) => setSelectedProduct(p)}
                             onBuyNow={handleBuyNow}
+                            showToast={showToast}
                           />
                         ))}
                       </div>
@@ -1513,6 +1585,7 @@ export default function App() {
                                 onAddToCart={handleAddToCart}
                                 onViewDetails={(p) => setSelectedProduct(p)}
                                 onBuyNow={handleBuyNow}
+                                showToast={showToast}
                               />
                             ))}
                           </div>
@@ -1612,6 +1685,7 @@ export default function App() {
                                       onAddToCart={handleAddToCart}
                                       onViewDetails={(p) => setSelectedProduct(p)}
                                       onBuyNow={handleBuyNow}
+                                      showToast={showToast}
                                     />
                                   ))}
                                 </div>
@@ -1635,6 +1709,7 @@ export default function App() {
                                     onAddToCart={handleAddToCart}
                                     onViewDetails={(p) => setSelectedProduct(p)}
                                     onBuyNow={handleBuyNow}
+                                    showToast={showToast}
                                   />
                                 ))}
                               </div>
@@ -1663,6 +1738,7 @@ export default function App() {
                                 onAddToCart={handleAddToCart}
                                 onViewDetails={(p) => setSelectedProduct(p)}
                                 onBuyNow={handleBuyNow}
+                                showToast={showToast}
                               />
                             ))}
                           </div>
@@ -1713,6 +1789,7 @@ export default function App() {
                         onAddToCart={handleAddToCart}
                         onViewDetails={(p) => setSelectedProduct(p)}
                         onBuyNow={handleBuyNow}
+                        showToast={showToast}
                       />
                     ))}
                   </div>

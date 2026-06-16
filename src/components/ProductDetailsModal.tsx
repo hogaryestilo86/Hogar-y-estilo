@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { Product, ProductReview } from "../types";
-import { X, Star, ShoppingCart, Check, ShieldCheck, Heart, Sparkles, MessageSquare, Plus, Send, Truck, Volume2, VolumeX, Instagram } from "lucide-react";
+import { X, Star, ShoppingCart, Check, ShieldCheck, Heart, Sparkles, MessageSquare, Plus, Send, Truck, Volume2, VolumeX, Instagram, Share2 } from "lucide-react";
 import { ResolvedImage, ResolvedVideo, getCategoryPlaceholder } from "../indexedDbMedia";
 
 interface ProductDetailsModalProps {
@@ -113,6 +113,43 @@ export default function ProductDetailsModal({
         
         {/* Close Button Pin and Like Button */}
         <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+          <button
+            onClick={() => {
+              try {
+                const url = new URL(window.location.href);
+                url.searchParams.set("p", product.id);
+                const shareableUrl = url.toString();
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(shareableUrl)
+                    .then(() => notify("¡Enlace copiado! Compartilo directamente.", "success"))
+                    .catch(() => {
+                      const input = document.createElement("input");
+                      input.value = shareableUrl;
+                      document.body.appendChild(input);
+                      input.select();
+                      document.execCommand("copy");
+                      document.body.removeChild(input);
+                      notify("¡Enlace copiado! Compartilo directamente.", "success");
+                    });
+                } else {
+                  const input = document.createElement("input");
+                  input.value = shareableUrl;
+                  document.body.appendChild(input);
+                  input.select();
+                  document.execCommand("copy");
+                  document.body.removeChild(input);
+                  notify("¡Enlace copiado! Compartilo directamente.", "success");
+                }
+              } catch (_) {
+                notify("Por favor, copiá el enlace del navegador.", "error");
+              }
+            }}
+            className="p-2 rounded-full bg-[#fcfbfa]/90 hover:bg-white text-brand-800 shadow-sm border border-[#b8ad90] cursor-pointer flex items-center justify-center"
+            title="Copiar enlace del producto"
+            aria-label="Copiar Enlace"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setLiked(!liked)}
             className="p-2 rounded-full bg-[#fcfbfa]/90 hover:bg-white text-rose-600 shadow-sm border border-[#b8ad90] cursor-pointer"
@@ -242,9 +279,49 @@ export default function ProductDetailsModal({
             </div>
 
             {/* Title */}
-            <h2 className="font-serif text-2xl sm:text-3xl font-black text-brand-950 leading-tight">
-              {product.title}
-            </h2>
+            <div className="space-y-1.5">
+              <h2 className="font-serif text-2xl sm:text-3xl font-black text-brand-950 leading-tight">
+                {product.title}
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("p", product.id);
+                    const shareableUrl = url.toString();
+                    if (navigator.clipboard) {
+                      navigator.clipboard.writeText(shareableUrl)
+                        .then(() => notify("¡Enlace copiado! Compartilo directamente.", "success"))
+                        .catch(() => {
+                          const input = document.createElement("input");
+                          input.value = shareableUrl;
+                          document.body.appendChild(input);
+                          input.select();
+                          document.execCommand("copy");
+                          document.body.removeChild(input);
+                          notify("¡Enlace copiado! Compartilo directamente.", "success");
+                        });
+                    } else {
+                      const input = document.createElement("input");
+                      input.value = shareableUrl;
+                      document.body.appendChild(input);
+                      input.select();
+                      document.execCommand("copy");
+                      document.body.removeChild(input);
+                      notify("¡Enlace copiado! Compartilo directamente.", "success");
+                    }
+                  } catch (_) {
+                    notify("No se pudo copiar el enlace automáticamente.", "error");
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#ccbfab] hover:bg-[#b8ad90] border border-[#bfae98] text-brand-950 text-xs font-bold rounded-lg transition-all active:scale-95 cursor-pointer shadow-xs"
+                title="Copiar enlace directo de este producto"
+              >
+                <Share2 className="w-3.5 h-3.5 text-brand-950" />
+                <span>Copiar enlace de este producto</span>
+              </button>
+            </div>
 
             {/* Description */}
             <p className="text-sm text-brand-900 font-normal leading-relaxed">
