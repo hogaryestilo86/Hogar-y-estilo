@@ -1,5 +1,50 @@
 [
   {
+    "id": "prod-custom-1781665622516",
+    "title": "Soporte de Celular Flexible Premium con Brazo Articulado y Rotación 360°",
+    "basePrice": 17845,
+    "beforePrice": 21561,
+    "category": "Hogar",
+    "description": "¿Te imaginás disfrutar de tus series favoritas en la cama, seguir una receta en la cocina o hacer videollamadas con total comodidad y sin cansarte las manos? Con nuestro soporte flexible premium, vas a transformar por completo la forma en que interactuás con tus dispositivos en el hogar. Un accesorio pensado para integrarse a tu rutina diaria, aportando máxima funcionalidad, orden y confort a tus ambientes.\n\n**Detalles de Diseño**\n- **Flexibilidad total**: Equipado con un brazo flexible y extensible de 100 cm que podés moldear y regular a la altura exacta que necesités.\n- **Ángulo perfecto**: Su cabezal giratorio de 360° te permite colocar tu teléfono en posición vertical u horizontal con total suavidad.\n- **Fijación firme y segura**: Cuenta con una pinza de alta resistencia y protección antirrayas, ideal para sujetar en escritorios, mesas de luz o cabeceros de cama sin marcar tus muebles.\n- **Compatibilidad universal**: Su agarre ajustable se adapta a la perfección a cualquier modelo de celular del mercado.\n- **Diseño estético y funcional**: Estructura minimalista en tonos neutros que se adapta con total sutileza a la decoración de tu casa.\n\nRegalate un momento de relax absoluto y liberá tus manos para lo que realmente importa. ¡Elegí practicidad y renová tu forma de disfrutar el día a día en tu hogar!",
+    "features": [
+      "soporte flexible para celular",
+      "brazo articulado 360",
+      "accesorio de tecnología para el hogar",
+      "soporte para cama y escritorio",
+      "comodidad ergonómica premium",
+      "soporte de celular funcional"
+    ],
+    "isCustom": true,
+    "featured": false,
+    "paused": false,
+    "reviews": [
+      {
+        "id": "rev-auto-1781665622516",
+        "author": "Curador de Hogar y Estilo",
+        "rating": 5,
+        "comment": "Nuevo ingreso seleccionado minuciosamente por nuestro departamento de diseño.",
+        "date": "Hoy"
+      }
+    ],
+    "media": [
+      {
+        "type": "image",
+        "url": "/uploads/media_1781665630824_44549.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665630824_44549.jpg"
+      },
+      {
+        "type": "image",
+        "url": "/uploads/media_1781665632550_26939.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665632550_26939.jpg"
+      },
+      {
+        "type": "image",
+        "url": "/uploads/media_1781665633895_47584.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665633895_47584.jpg"
+      }
+    ]
+  },
+  {
     "title": "Cama Elevada Premium para Mascotas - Descanso Ergonómico y Transpirable",
     "reviews": [
       {
@@ -28,24 +73,24 @@
     "basePrice": 38468,
     "media": [
       {
-        "url": "/uploads/media_1781664481690_46343.jpg",
         "type": "image",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664481690_46343.jpg"
-      },
-      {
-        "url": "/uploads/media_1781664483408_86788.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664483408_86788.jpg",
-        "type": "image"
-      },
-      {
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664484625_21853.jpg",
-        "type": "image",
-        "url": "/uploads/media_1781664484625_21853.jpg"
+        "url": "/uploads/media_1781665636342_19150.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665636342_19150.jpg"
       },
       {
         "type": "image",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664486284_84595.jpg",
-        "url": "/uploads/media_1781664486284_84595.jpg"
+        "url": "/uploads/media_1781665637984_31647.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665637984_31647.jpg"
+      },
+      {
+        "type": "image",
+        "url": "/uploads/media_1781665639211_78590.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665639211_78590.jpg"
+      },
+      {
+        "type": "image",
+        "url": "/uploads/media_1781665640503_77543.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665640503_77543.jpg"
       }
     ]
   },
@@ -78,19 +123,19 @@
     "isCustom": true,
     "media": [
       {
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664487930_36470.jpg",
         "type": "image",
-        "url": "/uploads/media_1781664487930_36470.jpg"
+        "url": "/uploads/media_1781665642191_58627.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665642191_58627.jpg"
       },
       {
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664489247_10388.jpg",
         "type": "image",
-        "url": "/uploads/media_1781664489247_10388.jpg"
+        "url": "/uploads/media_1781665643408_82505.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665643408_82505.jpg"
       },
       {
-        "url": "/uploads/media_1781664490681_80181.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664490681_80181.jpg",
-        "type": "image"
+        "type": "image",
+        "url": "/uploads/media_1781665644592_93985.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665644592_93985.jpg"
       }
     ]
   },
@@ -123,24 +168,24 @@
     "description": "Con nuestro Perchero Doble de Diseño Industrial, vas a transformar por completo la organización de tu hogar. Su estructura estilizada y súper funcional está pensada para optimizar cada rincón de tus espacios con total elegancia y la practicidad que te merecés en tu día a día.\n\n**Detalles de Diseño**\n\n* **Doble barral escalonado:** Diseñado con dos alturas diferentes (120 cm en la barra trasera y 90 cm en la delantera) para que organices tus camisas, abrigos y vestidos de manera visualmente armoniosa y sin que se encimen.\n* **Movilidad sin esfuerzo:** Equipado con ruedas giratorias de alta resistencia que te permiten trasladarlo de un ambiente a otro de forma fluida y súper liviana, ideal para cuando querés reconfigurar tus espacios.\n* **Estante inferior multifunción:** Un sector diseñado especialmente en la base para acomodar tus zapatos preferidos, cajas organizadoras o carteras, aprovechando al máximo la superficie vertical.\n* **Estructura fuerte y desarmable:** Fabricado en metal reforzado de excelente durabilidad. Su sistema de ensamble intuitivo te permite armarlo en pocos minutos y sin complicaciones, adaptándose siempre a tu ritmo de vida.\n\nDale a tu ropa el lugar que se merece y renová la estética de tu hogar hoy mismo. ¡Llevate el tuyo y disfrutá de un espacio mucho más ordenado, libre y con estilo!",
     "media": [
       {
-        "url": "/uploads/media_1781664492220_34798.jpg",
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664492220_34798.jpg",
-        "type": "image"
+        "type": "image",
+        "url": "/uploads/media_1781665645896_97271.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665645896_97271.jpg"
       },
       {
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664494269_52842.jpg",
         "type": "image",
-        "url": "/uploads/media_1781664494269_52842.jpg"
+        "url": "/uploads/media_1781665647502_34548.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665647502_34548.jpg"
       },
       {
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664495446_67679.jpg",
         "type": "image",
-        "url": "/uploads/media_1781664495446_67679.jpg"
+        "url": "/uploads/media_1781665648689_26975.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665648689_26975.jpg"
       },
       {
-        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781664496528_34639.jpg",
         "type": "image",
-        "url": "/uploads/media_1781664496528_34639.jpg"
+        "url": "/uploads/media_1781665650370_45918.jpg",
+        "backupUrl": "https://hogar-y-estilo.vercel.app/uploads/media_1781665650370_45918.jpg"
       }
     ]
   },
